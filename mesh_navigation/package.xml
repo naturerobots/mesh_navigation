@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mesh_navigation</name>
+  <version>0.0.1</version>
+  <description>The mesh_navigation package</description>
+  <maintainer email="spuetz@todo.todo">Sebastian Pütz</maintainer>
+  <license>BSD</license>
+  <author email="spuetz@uos.de">Sebastian Pütz</author> -->
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export>
+    <metapackage/>
+  </export>
+</package>
