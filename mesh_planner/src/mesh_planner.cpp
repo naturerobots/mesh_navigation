@@ -36,7 +36,7 @@
  */
 
 
-#include <mesh_planner/mesh_planner.h>
+#include <mesh_nav_planner/mesh_planner.h>
 
 namespace mesh_planner{
 

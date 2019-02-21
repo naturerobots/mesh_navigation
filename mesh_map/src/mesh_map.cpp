@@ -44,7 +44,7 @@ namespace mesh_map{
   {
     ROS_INFO_STREAM("Reading the mesh map...");
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(new lvr2::HDF5IO(mesh_map, mesh_part));
-    mesh_opt = mesh_io_ptr->getMesh();
+    auto mesh_opt = mesh_io_ptr->getMesh();
 
     if(mesh_opt)
     {
@@ -54,7 +54,7 @@ namespace mesh_map{
     {
       ROS_ERROR_STREAM("Could not load mesh map!");
     }
-    
+
   }
 
 } /* namespace mesh_map */
