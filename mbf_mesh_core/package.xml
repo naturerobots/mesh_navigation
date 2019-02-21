@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mbf_mesh_core</name>
+  <version>0.0.1</version>
+  <description>The mbf_mesh_core package</description>
+
+  <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
+
+  <license>BSD</license>
+
+  <author email="spuetz@uos.de">Sebastian Pütz</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>mbf_abstract_core</build_depend>
+
+  <build_depend>mesh_map</build_depend>
+  <build_export_depend>mesh_map</build_export_depend>
+  <exec_depend>mesh_map</exec_depend>
+
+</package>
