@@ -1,0 +1,7 @@
+<library path="lib/libmesh_planner">
+    <class name="mesh_planner/MeshPlanner" type="mesh_planner::MeshPlanner" base_class_type="mbf_mesh_core::MeshPlanner">
+        <description>
+            A mesh planner for mbf_mesh_nav
+        </description>
+    </class>
+</library>

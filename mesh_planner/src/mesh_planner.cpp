@@ -35,11 +35,47 @@
  *
  */
 
+#include <pluginlib/class_list_macros.h>
+#include <mesh_planner/mesh_planner.h>
+#include <mbf_msgs/GetPathResult.h>
 
-#include <mesh_nav_planner/mesh_planner.h>
+PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
 
 namespace mesh_planner{
 
-  MeshPlanner::MeshPlanner(){}
+  MeshPlanner::MeshPlanner(){
+
+  }
+
+  MeshPlanner::~MeshPlanner(){
+
+  }
+
+  uint32_t MeshPlanner::makePlan(
+      const geometry_msgs::PoseStamped &start,
+      const geometry_msgs::PoseStamped &goal,
+      double tolerance,
+      std::vector<geometry_msgs::PoseStamped> &plan,
+      double &cost,
+      std::string &message)
+  {
+
+
+    return mbf_msgs::GetPathResult::INTERNAL_ERROR;
+  }
+
+  bool MeshPlanner::cancel(){
+    return false;
+  }
+
+  bool MeshPlanner::initialize(
+      const std::string& name,
+      const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+  {
+    mesh_ptr_ = mesh_map_ptr;
+    name_ = name;
+
+    return false;
+  }
 
 } /* namespace mesh_planner */

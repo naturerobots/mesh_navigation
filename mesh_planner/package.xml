@@ -10,10 +10,10 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>roscpp</depend>
-  <depend>mbf_abstract_core</depend>
+  <depend>mbf_mesh_core</depend>
+  <depend>mesh_map</depend>
 
   <export>
-    <!-- Other tools can request additional information be placed here -->
-
+    <mbf_mesh_core plugin="${prefix}/mesh_planner.xml" />
   </export>
 </package>

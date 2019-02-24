@@ -41,6 +41,7 @@
 #include <lvr2/io/HDF5IO.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <tf/transform_listener.h>
+#include <mesh_msgs/MeshVertexCosts.h>
 
 namespace mesh_map{
 
@@ -50,9 +51,13 @@ class MeshMap
 {
  public:
 
+  typedef boost::shared_ptr<MeshMap> Ptr;
+
   MeshMap(tf::TransformListener& tf);
 
-  MeshMap(const std::string& mesh_map, const std::string& mesh_part);
+  bool readMap();
+
+  bool readMap(const std::string& mesh_map, const std::string& mesh_part);
 
   const std::string getGlobalFrameID();
 
@@ -64,6 +69,23 @@ class MeshMap
 
   std::string global_frame_;
 
+  std::string mesh_file_;
+  std::string mesh_part_;
+
+  lvr2::DenseVertexMap<float> roughness_;
+  lvr2::DenseVertexMap<float> height_diff_;
+  lvr2::DenseVertexMap<float> riskiness_;
+  lvr2::DenseVertexMap<float> potential_;
+
+
+  lvr2::DenseFaceMap<lvr2::Normal<BaseVec>> face_normals_;
+  lvr2::DenseVertexMap<lvr2::Normal<BaseVec>> vertex_normals_;
+
+  ros::Publisher vertex_costs_pub_;
+
+  ros::NodeHandle private_nh_;
+
+  float local_neighborhood_;
 
 };
 
