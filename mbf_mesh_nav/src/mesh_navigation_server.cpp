@@ -30,24 +30,18 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_navigation_server.cpp
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
 
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseArray.h>
-#include <mesh_2d/mesh_2d_ros.h>
+#include <mesh_map/mesh_map.h>
 #include <base_local_planner/footprint_helper.h>
 #include <mbf_msgs/MoveBaseAction.h>
 #include <mbf_abstract_nav/MoveBaseFlexConfig.h>
 #include <actionlib/client/simple_action_client.h>
-#include <nav_core_wrapper/wrapper_global_planner.h>
-#include <nav_core_wrapper/wrapper_local_planner.h>
-#include <nav_core_wrapper/wrapper_recovery_behavior.h>
 
 #include "mbf_mesh_nav/mesh_navigation_server.h"
 
@@ -58,40 +52,18 @@ namespace mbf_mesh_nav
 MeshNavigationServer::MeshNavigationServer(const TFPtr &tf_listener_ptr) :
   AbstractNavigationServer(tf_listener_ptr),
   recovery_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshRecovery"),
-  nav_core_recovery_plugin_loader_("nav_core", "nav_core::RecoveryBehavior"),
   controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController"),
-  nav_core_controller_plugin_loader_("nav_core", "nav_core::BaseLocalPlanner"),
   planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner"),
-  nav_core_planner_plugin_loader_("nav_core", "nav_core::BaseGlobalPlanner"),
-  global_mesh_ptr_(new mesh_2d::Mesh2DROS("global_mesh", *tf_listener_ptr_)),
-  local_mesh_ptr_(new mesh_2d::Mesh2DROS("local_mesh", *tf_listener_ptr_)),
-  setup_reconfigure_(false), shutdown_meshs_(false)
+  mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_)),
+  setup_reconfigure_(false)
 {
-  // even if shutdown_meshs is a dynamically reconfigurable parameter, we
-  // need it here to decide whether to start or not the meshs on starting up
-  private_nh_.param("shutdown_meshs", shutdown_meshs_, false);
-
-  // initialize meshs (stopped if shutdown_meshs is true)
-  if (!shutdown_meshs_)
-  {
-    local_mesh_active_ = true;
-    global_mesh_active_ = true;
-  }
-  else
-  {
-    local_mesh_ptr_->stop();
-    global_mesh_ptr_->stop();
-    local_mesh_active_ = false;
-    global_mesh_active_ = false;
-  }
-
   // advertise services and current goal topic
   check_pose_cost_srv_ = private_nh_.advertiseService("check_pose_cost",
                                                       &MeshNavigationServer::callServiceCheckPoseCost, this);
   check_path_cost_srv_ = private_nh_.advertiseService("check_path_cost",
                                                       &MeshNavigationServer::callServiceCheckPathCost, this);
-  clear_meshs_srv_ = private_nh_.advertiseService("clear_meshs",
-                                                     &MeshNavigationServer::callServiceClearMeshs, this);
+  clear_mesh_srv_ = private_nh_.advertiseService("clear_mesh",
+                                                     &MeshNavigationServer::callServiceClearMesh, this);
 
   // dynamic reconfigure server for mbf_mesh_nav configuration; also include abstract server parameters
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig> >(private_nh_);
@@ -111,10 +83,8 @@ mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlanner
   return boost::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
       name,
       boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr),
-      boost::ref(global_mesh_ptr_),
-      last_config_,
-      boost::bind(&MeshNavigationServer::checkActivateMeshs, this),
-      boost::bind(&MeshNavigationServer::checkDeactivateMeshs, this));
+      mesh_ptr_,
+      last_config_);
 }
 
 mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newControllerExecution(
@@ -127,10 +97,8 @@ mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newCont
       vel_pub_,
       goal_pub_,
       tf_listener_ptr_,
-      boost::ref(local_mesh_ptr_),
-      last_config_,
-      boost::bind(&MeshNavigationServer::checkActivateMeshs, this),
-      boost::bind(&MeshNavigationServer::checkDeactivateMeshs, this));
+      mesh_ptr_,
+      last_config_);
 }
 
 mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecoveryExecution(
@@ -141,11 +109,8 @@ mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecove
       name,
       boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr),
       tf_listener_ptr_,
-      boost::ref(global_mesh_ptr_),
-      boost::ref(local_mesh_ptr_),
-      last_config_,
-      boost::bind(&MeshNavigationServer::checkActivateMeshs, this),
-      boost::bind(&MeshNavigationServer::checkDeactivateMeshs, this));
+      boost::ref(mesh_ptr_),
+      last_config_);
 }
 
 mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(const std::string& planner_type)
@@ -160,21 +125,8 @@ mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(
   }
   catch (const pluginlib::PluginlibException &ex_mbf_core)
   {
-    ROS_DEBUG_STREAM("Failed to load the " << planner_type << " planner as a mbf_mesh_core-based plugin."
-                                          << " Try to load as a nav_core-based plugin. " << ex_mbf_core.what());
-    try
-    {
-      // For plugins still based on old nav_core API, we load them and pass to a new MBF API that will act as wrapper
-      boost::shared_ptr<nav_core::BaseGlobalPlanner> nav_core_planner_ptr = nav_core_planner_plugin_loader_.createInstance(planner_type);
-      planner_ptr = boost::make_shared<mbf_nav_core_wrapper::WrapperGlobalPlanner>(nav_core_planner_ptr);
-      std::string planner_name = nav_core_planner_plugin_loader_.getName(planner_type);
-      ROS_DEBUG_STREAM("nav_core-based planner plugin " << planner_name << " loaded");
-    }
-    catch (const pluginlib::PluginlibException &ex_nav_core)
-    {
-      ROS_FATAL_STREAM("Failed to load the " << planner_type << " planner, are you sure it's properly registered"
-          << " and that the containing library is built? " << ex_mbf_core.what() << " " << ex_nav_core.what());
-    }
+    ROS_FATAL_STREAM("Failed to load the " << planner_type << " planner, are you sure it's properly registered"
+          << " and that the containing library is built? " << ex_mbf_core.what());
   }
 
   return planner_ptr;
@@ -189,13 +141,13 @@ bool MeshNavigationServer::initializePlannerPlugin(
       = boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(planner_ptr);
   ROS_DEBUG_STREAM("Initialize planner \"" << name << "\".");
 
-  if (!global_mesh_ptr_)
+  if (!mesh_ptr_)
   {
     ROS_FATAL_STREAM("The mesh pointer has not been initialized!");
     return false;
   }
 
-  mesh_planner_ptr->initialize(name, global_mesh_ptr_.get());
+  mesh_planner_ptr->initialize(name, mesh_ptr_);
   ROS_DEBUG("Planner plugin initialized.");
   return true;
 }
@@ -212,22 +164,8 @@ mbf_abstract_core::AbstractController::Ptr MeshNavigationServer::loadControllerP
   }
   catch (const pluginlib::PluginlibException &ex_mbf_core)
   {
-    ROS_DEBUG_STREAM("Failed to load the " << controller_type << " controller as a mbf_mesh_core-based plugin;"
-                                          << "  we will retry to load as a nav_core-based plugin. " << ex_mbf_core.what());
-    try
-    {
-      // For plugins still based on old nav_core API, we load them and pass to a new MBF API that will act as wrapper
-      boost::shared_ptr<nav_core::BaseLocalPlanner> nav_core_controller_ptr
-          = nav_core_controller_plugin_loader_.createInstance(controller_type);
-      controller_ptr = boost::make_shared<mbf_nav_core_wrapper::WrapperLocalPlanner>(nav_core_controller_ptr);
-      std::string controller_name = nav_core_controller_plugin_loader_.getName(controller_type);
-      ROS_DEBUG_STREAM("nav_core-based controller plugin " << controller_name << " loaded.");
-    }
-    catch (const pluginlib::PluginlibException &ex_nav_core)
-    {
-      ROS_FATAL_STREAM("Failed to load the " << controller_type << " controller, are you sure it's properly registered"
-          << " and that the containing library is built? " << ex_mbf_core.what() << " " << ex_nav_core.what());
-    }
+    ROS_FATAL_STREAM("Failed to load the " << controller_type << " controller, are you sure it's properly registered"
+      << " and that the containing library is built? " << ex_mbf_core.what());
   }
   return controller_ptr;
 }
@@ -244,7 +182,7 @@ bool MeshNavigationServer::initializeControllerPlugin(
     return false;
   }
 
-  if (!local_mesh_ptr_)
+  if (!mesh_ptr_)
   {
     ROS_FATAL_STREAM("The mesh pointer has not been initialized!");
     return false;
@@ -252,7 +190,7 @@ bool MeshNavigationServer::initializeControllerPlugin(
 
   mbf_mesh_core::MeshController::Ptr mesh_controller_ptr
       = boost::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
-  mesh_controller_ptr->initialize(name, tf_listener_ptr_.get(), local_mesh_ptr_.get());
+  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_);
   ROS_DEBUG_STREAM("Controller plugin \"" << name << "\" initialized.");
   return true;
 }
@@ -271,24 +209,8 @@ mbf_abstract_core::AbstractRecovery::Ptr MeshNavigationServer::loadRecoveryPlugi
   }
   catch (pluginlib::PluginlibException &ex_mbf_core)
   {
-    ROS_DEBUG_STREAM("Failed to load the " << recovery_type << " recovery behavior as a mbf_mesh_core-based plugin;"
-        << " Retry to load as a nav_core-based plugin. " << ex_mbf_core.what());
-    try
-    {
-      // For plugins still based on old nav_core API, we load them and pass to a new MBF API that will act as wrapper
-      boost::shared_ptr<nav_core::RecoveryBehavior> nav_core_recovery_ptr =
-          nav_core_recovery_plugin_loader_.createInstance(recovery_type);
-
-      recovery_ptr = boost::make_shared<mbf_nav_core_wrapper::WrapperRecoveryBehavior>(nav_core_recovery_ptr);
-      std::string recovery_name = recovery_plugin_loader_.getName(recovery_type);
-      ROS_DEBUG_STREAM("nav_core-based recovery behavior plugin " << recovery_name << " loaded.");
-
-    }
-    catch (const pluginlib::PluginlibException &ex_nav_core)
-    {
-      ROS_FATAL_STREAM("Failed to load the " << recovery_type << " recovery behavior, are you sure it's properly registered"
-          << " and that the containing library is built? " << ex_mbf_core.what() << " " << ex_nav_core.what());
-    }
+    ROS_FATAL_STREAM("Failed to load the " << recovery_type << " recovery behavior, are you sure it's properly registered"
+      << " and that the containing library is built? " << ex_mbf_core.what());
   }
 
   return recovery_ptr;
@@ -306,21 +228,15 @@ bool MeshNavigationServer::initializeRecoveryPlugin(
     return false;
   }
 
-  if (!local_mesh_ptr_)
+  if (!mesh_ptr_)
   {
-    ROS_FATAL_STREAM("The local mesh pointer has not been initialized!");
-    return false;
-  }
-
-  if (!global_mesh_ptr_)
-  {
-    ROS_FATAL_STREAM("The global mesh pointer has not been initialized!");
+    ROS_FATAL_STREAM("The mesh map pointer has not been initialized!");
     return false;
   }
 
   mbf_mesh_core::MeshRecovery::Ptr behavior =
       boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
-  behavior->initialize(name, tf_listener_ptr_.get(), global_mesh_ptr_.get(), local_mesh_ptr_.get());
+  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_);
   ROS_DEBUG_STREAM("Recovery behavior plugin \"" << name << "\" initialized.");
   return true;
 }
@@ -329,9 +245,9 @@ bool MeshNavigationServer::initializeRecoveryPlugin(
 void MeshNavigationServer::stop()
 {
   AbstractNavigationServer::stop();
-  ROS_INFO_STREAM_NAMED("mbf_mesh_nav", "Stopping local and global mesh for shutdown");
-  local_mesh_ptr_->stop();
-  global_mesh_ptr_->stop();
+  // TODO
+  //ROS_INFO_STREAM_NAMED("mbf_mesh_nav", "Stopping mesh map for shutdown");
+  //mesh_ptr_->stop();
 }
 
 
@@ -372,22 +288,6 @@ void MeshNavigationServer::reconfigure(mbf_mesh_nav::MoveBaseFlexConfig &config,
   abstract_config.restore_defaults = config.restore_defaults;
   mbf_abstract_nav::AbstractNavigationServer::reconfigure(abstract_config, level);
 
-  // handle mesh activation reconfiguration here.
-  shutdown_meshs_delay_ = ros::Duration(config.shutdown_meshs_delay);
-  if (shutdown_meshs_delay_.isZero())
-    ROS_WARN("Zero shutdown meshs delay is not recommended, as it forces us to enable meshs on each action");
-
-  if (shutdown_meshs_ && !config.shutdown_meshs)
-  {
-    checkActivateMeshs();
-    shutdown_meshs_ = config.shutdown_meshs;
-  }
-  if (!shutdown_meshs_ && config.shutdown_meshs)
-  {
-    shutdown_meshs_ = config.shutdown_meshs;
-    checkDeactivateMeshs();
-  }
-
   last_config_ = config;
 }
 
@@ -395,34 +295,16 @@ bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request
                                                        mbf_msgs::CheckPose::Response &response)
 {
   // selecting the requested mesh
-  MeshPtr mesh;
-  std::string mesh_name;
-  switch (request.mesh)
-  {
-    case mbf_msgs::CheckPose::Request::LOCAL_COSTMAP:
-      mesh = local_mesh_ptr_;
-      mesh_name = "local mesh";
-      break;
-    case mbf_msgs::CheckPose::Request::GLOBAL_COSTMAP:
-      mesh = global_mesh_ptr_;
-      mesh_name = "global mesh";
-      break;
-    default:
-      ROS_ERROR_STREAM("No valid mesh provided; options are "
-                       << mbf_msgs::CheckPose::Request::LOCAL_COSTMAP << ": local mesh, "
-                       << mbf_msgs::CheckPose::Request::GLOBAL_COSTMAP << ": global mesh");
-      return false;
-  }
 
   // get target pose or current robot pose as x, y, yaw coordinates
-  std::string mesh_frame = mesh->getGlobalFrameID();
+  std::string mesh_frame = mesh_ptr_->getGlobalFrameID();
 
   geometry_msgs::PoseStamped pose;
   if (request.current_pose)
   {
     if (! mbf_utility::getRobotPose(*tf_listener_ptr_, robot_frame_, mesh_frame, ros::Duration(0.5), pose))
     {
-      ROS_ERROR_STREAM("Get robot pose on " << mesh_name << " frame '" << mesh_frame << "' failed");
+      ROS_ERROR_STREAM("Could not get robot pose in the mesh map in the frame '" << mesh_frame << "'!");
       return false;
     }
   }
@@ -431,21 +313,20 @@ bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request
     if (! mbf_utility::transformPose(*tf_listener_ptr_, mesh_frame, request.pose.header.stamp,
                                      ros::Duration(0.5), request.pose, global_frame_, pose))
     {
-      ROS_ERROR_STREAM("Transform target pose to " << mesh_name << " frame '" << mesh_frame << "' failed");
+      ROS_ERROR_STREAM("Transform target pose to the mesh map frame '" << mesh_frame << "' failed!");
       return false;
     }
   }
 
   double x = pose.pose.position.x;
   double y = pose.pose.position.y;
+  double z = pose.pose.position.z;
   double yaw = tf::getYaw(pose.pose.orientation);
 
-  // ensure meshs are active so cost reflects latest sensor readings
-  checkActivateMeshs();
-
+  /*
   // pad raw footprint to the requested safety distance; note that we discard footprint_padding parameter effect
   std::vector<geometry_msgs::Point> footprint = mesh->getUnpaddedRobotFootprint();
-  mesh_2d::padFootprint(footprint, request.safety_dist);
+  mesh_map::padFootprint(footprint, request.safety_dist);
 
   // use a footprint helper instance to get all the cells totally or partially within footprint polygon
   base_local_planner::FootprintHelper fph;
@@ -485,6 +366,7 @@ bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request
       }
     }
   }
+   */
 
   // Provide some details of the outcome
   switch (response.state)
@@ -511,41 +393,17 @@ bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request
       break;
   }
 
-  checkDeactivateMeshs();
   return true;
 }
 
 bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request &request,
                                                        mbf_msgs::CheckPath::Response &response)
 {
-  // selecting the requested mesh
-  MeshPtr mesh;
-  std::string mesh_name;
-  switch (request.mesh)
-  {
-    case mbf_msgs::CheckPath::Request::LOCAL_COSTMAP:
-      mesh = local_mesh_ptr_;
-      mesh_name = "local mesh";
-      break;
-    case mbf_msgs::CheckPath::Request::GLOBAL_COSTMAP:
-      mesh = global_mesh_ptr_;
-      mesh_name = "global mesh";
-      break;
-    default:ROS_ERROR_STREAM("No valid mesh provided; options are "
-                             << mbf_msgs::CheckPath::Request::LOCAL_COSTMAP << ": local mesh, "
-                             << mbf_msgs::CheckPath::Request::GLOBAL_COSTMAP << ": global mesh");
-      return false;
-  }
-
-  // ensure meshs are active so cost reflects latest sensor readings
-  checkActivateMeshs();
 
   // get target pose or current robot pose as x, y, yaw coordinates
-  std::string mesh_frame = mesh->getGlobalFrameID();
+  std::string mesh_frame = mesh_ptr_->getGlobalFrameID();
 
-  // use a footprint helper instance to get all the cells totally or partially within footprint polygon
-  base_local_planner::FootprintHelper fph;
-
+  /*
   std::vector<geometry_msgs::Point> footprint;
   if (!request.path_cells_only)
   {
@@ -653,65 +511,16 @@ bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request
 
     i += request.skip_poses;  // skip some poses to speedup processing (disabled by default)
   }
-
-  checkDeactivateMeshs();
+*/
   return true;
 }
 
-bool MeshNavigationServer::callServiceClearMeshs(std_srvs::Empty::Request &request,
-                                                       std_srvs::Empty::Response &response)
+bool MeshNavigationServer::callServiceClearMesh(
+    std_srvs::Empty::Request &request,
+    std_srvs::Empty::Response &response)
 {
-  local_mesh_ptr_->resetLayers();
-  global_mesh_ptr_->resetLayers();
+  mesh_ptr_->resetLayers();
   return true;
-}
-
-void MeshNavigationServer::checkActivateMeshs()
-{
-  boost::mutex::scoped_lock sl(check_meshs_mutex_);
-
-  shutdown_meshs_timer_.stop();
-
-  // Activate meshs if we shutdown them when not moving and they are not already active. This method must be
-  // synchronized because start mesh can take up to 1/update freq., and concurrent calls to it can lead to segfaults
-  if (shutdown_meshs_ && !local_mesh_active_)
-  {
-    local_mesh_ptr_->start();
-    local_mesh_active_ = true;
-    ROS_DEBUG_STREAM("Local mesh activated.");
-  }
-
-  if (shutdown_meshs_ && !global_mesh_active_)
-  {
-    global_mesh_ptr_->start();
-    global_mesh_active_ = true;
-    ROS_DEBUG_STREAM("Global mesh activated.");
-  }
-}
-
-void MeshNavigationServer::checkDeactivateMeshs()
-{
-  if (shutdown_meshs_ &&
-      ((local_mesh_active_ || global_mesh_active_)))
-  {
-    // Delay meshs shutdown by shutdown_meshs_delay so we don't need to enable at each step of a normal
-    // navigation sequence, what is terribly inefficient; the timer is stopped on meshs re-activation and
-    // reset after every new call to deactivate
-    shutdown_meshs_timer_ =
-      private_nh_.createTimer(shutdown_meshs_delay_, &MeshNavigationServer::deactivateMeshs, this, true);
-  }
-}
-
-void MeshNavigationServer::deactivateMeshs(const ros::TimerEvent &event)
-{
-  boost::mutex::scoped_lock sl(check_meshs_mutex_);
-
-  local_mesh_ptr_->stop();
-  local_mesh_active_ = false;
-  ROS_DEBUG_STREAM("Local mesh deactivated.");
-  global_mesh_ptr_->stop();
-  global_mesh_active_ = false;
-  ROS_DEBUG_STREAM("Global mesh deactivated.");
 }
 
 } /* namespace mbf_mesh_nav */

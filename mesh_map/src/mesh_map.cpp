@@ -40,6 +40,11 @@
 
 namespace mesh_map{
 
+  MeshMap::MeshMap(tf::TransformListener& tf_listener)
+  {
+
+  }
+
   MeshMap::MeshMap(const std::string& mesh_map, const std::string& mesh_part)
   {
     ROS_INFO_STREAM("Reading the mesh map...");
@@ -55,6 +60,16 @@ namespace mesh_map{
       ROS_ERROR_STREAM("Could not load mesh map!");
     }
 
+  }
+
+  bool MeshMap::resetLayers()
+  {
+    return true; //TODO implement
+  }
+
+  const std::string MeshMap::getGlobalFrameID()
+  {
+    return global_frame_;
   }
 
 } /* namespace mesh_map */

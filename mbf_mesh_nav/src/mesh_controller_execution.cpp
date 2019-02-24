@@ -30,11 +30,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_controller_execution.cpp
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
 #include "mbf_mesh_nav/mesh_controller_execution.h"
@@ -48,7 +45,7 @@ MeshControllerExecution::MeshControllerExecution(
     const ros::Publisher& vel_pub,
     const ros::Publisher& goal_pub,
     const TFPtr &tf_listener_ptr,
-    MeshPtr &mesh_ptr,
+    const MeshPtr &mesh_ptr,
     const MoveBaseFlexConfig &config,
     boost::function<void()> setup_fn,
     boost::function<void()> cleanup_fn)
@@ -85,8 +82,9 @@ uint32_t MeshControllerExecution::computeVelocityCmd(
   // Lock the mesh while planning, but following issue #4, we allow to move the responsibility to the planner itself
   if (lock_mesh_)
   {
-    boost::lock_guard<mesh_2d::Mesh2D::mutex_t> lock(*(mesh_ptr_->getMesh()->getMutex()));
-    return controller_->computeVelocityCommands(robot_pose, robot_velocity, vel_cmd, message);
+    // TODO
+    //boost::lock_guard<mesh::Mesh::mutex_t> lock(*(mesh_ptr_->getMutex()));
+    //return controller_->computeVelocityCommands(robot_pose, robot_velocity, vel_cmd, message);
   }
   return controller_->computeVelocityCommands(robot_pose, robot_velocity, vel_cmd, message);
 }

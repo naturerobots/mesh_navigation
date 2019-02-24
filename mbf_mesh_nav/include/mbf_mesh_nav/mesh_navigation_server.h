@@ -30,11 +30,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_navigation_server.h
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
 
@@ -51,6 +48,8 @@
 #include <std_srvs/Empty.h>
 #include <mbf_msgs/CheckPose.h>
 #include <mbf_msgs/CheckPath.h>
+
+#include <pluginlib/class_loader.h>
 
 namespace mbf_mesh_nav
 {
@@ -74,7 +73,7 @@ class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
 {
 public:
 
-  typedef boost::shared_ptr<mesh_2d::Mesh2DROS> MeshPtr;
+  typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
   typedef boost::shared_ptr<MeshNavigationServer> Ptr;
 
@@ -163,22 +162,6 @@ private:
       const std::string& name,
       const mbf_abstract_core::AbstractRecovery::Ptr& behavior_ptr);
 
-
-  /**
-   * @brief Check whether the meshs should be activated.
-   */
-  void checkActivateMeshs();
-
-  /**
-   * @brief Check whether the meshs should and could be deactivated
-   */
-  void checkDeactivateMeshs();
-
-  /**
-   * @brief Timer-triggered deactivation of both meshs.
-   */
-  void deactivateMeshs(const ros::TimerEvent &event);
-
   /**
    * @brief Callback method for the check_pose_cost service
    * @param request Request object, see the mbf_msgs/CheckPose service definition file.
@@ -203,7 +186,7 @@ private:
    * @param response Empty response object.
    * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceClearMeshs(std_srvs::Empty::Request &request, std_srvs::Empty::Response &response);
+  bool callServiceClearMesh(std_srvs::Empty::Request &request, std_srvs::Empty::Response &response);
 
   /**
    * @brief Reconfiguration method called by dynamic reconfigure.
@@ -213,11 +196,8 @@ private:
   void reconfigure(mbf_mesh_nav::MoveBaseFlexConfig &config, uint32_t level);
 
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
-  pluginlib::ClassLoader<nav_core::RecoveryBehavior> nav_core_recovery_plugin_loader_;
   pluginlib::ClassLoader<mbf_mesh_core::MeshController> controller_plugin_loader_;
-  pluginlib::ClassLoader<nav_core::BaseLocalPlanner> nav_core_controller_plugin_loader_;
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
-  pluginlib::ClassLoader<nav_core::BaseGlobalPlanner> nav_core_planner_plugin_loader_;
 
   //! Dynamic reconfigure server for the mbf_mesh2d_specific part
   DynamicReconfigureServerMeshNav dsrv_mesh_;
@@ -231,17 +211,11 @@ private:
   //! true, if the dynamic reconfigure has been setup
   bool setup_reconfigure_;
 
-  //! Shared pointer to the common local mesh
-  MeshPtr local_mesh_ptr_;
-
   //! Shared pointer to the common global mesh
-  MeshPtr global_mesh_ptr_;
+  MeshPtr mesh_ptr_;
 
-  //! true, if the local mesh is active
-  bool local_mesh_active_;
-
-  //! true, if the global mesh is active
-  bool global_mesh_active_;
+  //! Service Server to clear the mesh
+  ros::ServiceServer clear_mesh_srv_;
 
   //! Service Server for the check_pose_cost service
   ros::ServiceServer check_pose_cost_srv_;
@@ -249,18 +223,10 @@ private:
   //! Service Server for the check_path_cost service
   ros::ServiceServer check_path_cost_srv_;
 
-  //! Service Server for the clear_mesh service
-  ros::ServiceServer clear_meshs_srv_;
-
-  //! Stop updating meshs when not planning or controlling, if true
-  bool shutdown_meshs_;
-  ros::Timer shutdown_meshs_timer_;    //!< delayed shutdown timer
-  ros::Duration shutdown_meshs_delay_; //!< delayed shutdown delay
-
   //! Start/stop meshs mutex; concurrent calls to start can lead to segfault
   boost::mutex check_meshs_mutex_;
 };
 
 } /* namespace mbf_mesh_nav */
 
-#endif /* MBF_MESH_NAV__COSTMAP_NAVIGATION_SERVER_H */
+#endif /* MBF_MESH_NAV__MESH_NAVIGATION_SERVER_H */

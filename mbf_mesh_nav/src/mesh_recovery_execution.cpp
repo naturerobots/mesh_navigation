@@ -30,15 +30,10 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_recovery_execution.cpp
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
-#include <nav_core/recovery_behavior.h>
-#include "nav_core_wrapper/wrapper_recovery_behavior.h"
 #include "mbf_mesh_nav/mesh_recovery_execution.h"
 
 namespace mbf_mesh_nav
@@ -48,12 +43,12 @@ MeshRecoveryExecution::MeshRecoveryExecution(
     const std::string name,
     const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
     const TFPtr &tf_listener_ptr,
-    MeshPtr &global_mesh, MeshPtr &local_mesh,
+    const MeshPtr &mesh_ptr,
     const MoveBaseFlexConfig &config,
     boost::function<void()> setup_fn,
     boost::function<void()> cleanup_fn)
       : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config), setup_fn, cleanup_fn),
-        global_mesh_(global_mesh), local_mesh_(local_mesh)
+        mesh_ptr_(mesh_ptr)
 {
 }
 

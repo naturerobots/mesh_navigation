@@ -44,6 +44,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mbf_abstract_core/abstract_controller.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mbf_mesh_core{
 
@@ -110,6 +111,11 @@ namespace mbf_mesh_core{
        * @return True if a cancel has been successfully requested, false if not implemented.
        */
       virtual bool cancel() = 0;
+
+      virtual bool initialize(
+          const std::string& name,
+          const boost::shared_ptr<tf::TransformListener>& tf_ptr,
+          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
 
     protected:
       /**

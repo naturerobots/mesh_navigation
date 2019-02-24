@@ -30,21 +30,18 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_planner_execution.h
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
 
-#ifndef MBF_MESH_NAV__COSTMAP_PLANNER_EXECUTION_H
-#define MBF_MESH_NAV__COSTMAP_PLANNER_EXECUTION_H
+#ifndef MBF_MESH_NAV__MESH_PLANNER_EXECUTION_H
+#define MBF_MESH_NAV__MESH_PLANNER_EXECUTION_H
 
 #include <mbf_abstract_nav/abstract_planner_execution.h>
 #include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mbf_mesh_core/mesh_planner.h>
-#include <mesh_2d/mesh_2d_ros.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mbf_mesh_nav
 {
@@ -57,7 +54,7 @@ namespace mbf_mesh_nav
 class MeshPlannerExecution : public mbf_abstract_nav::AbstractPlannerExecution
 {
 public:
-  typedef boost::shared_ptr<mesh_2d::Mesh2DROS> MeshPtr;
+  typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
   /**
    * @brief Constructor
@@ -67,10 +64,10 @@ public:
   MeshPlannerExecution(
       const std::string name,
       const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
-      MeshPtr &mesh,
+      const MeshPtr &mesh,
       const MoveBaseFlexConfig &config,
-      boost::function<void()> setup_fn,
-      boost::function<void()> cleanup_fn);
+      boost::function<void()> setup_fn = 0,
+      boost::function<void()> cleanup_fn = 0);
 
   /**
    * @brief Destructor
@@ -100,8 +97,8 @@ private:
       double &cost,
       std::string &message);
 
-  //! Shared pointer to the global planner mesh
-  MeshPtr &mesh_ptr_;
+  //! Shared pointer to the mesh for 3d navigation planning
+  const MeshPtr &mesh_ptr_;
 
   //! Whether to lock mesh before calling the planner (see issue #4 for details)
   bool lock_mesh_;
@@ -112,4 +109,4 @@ private:
 
 } /* namespace mbf_mesh_nav */
 
-#endif /* MBF_MESH_NAV__COSTMAP_PLANNER_EXECUTION_H */
+#endif /* MBF_MESH_NAV__MESH_PLANNER_EXECUTION_H */

@@ -40,6 +40,7 @@
 
 #include <lvr2/io/HDF5IO.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
+#include <tf/transform_listener.h>
 
 namespace mesh_map{
 
@@ -48,12 +49,20 @@ using BaseVec = lvr2::BaseVector<float>;
 class MeshMap
 {
  public:
+
+  MeshMap(tf::TransformListener& tf);
+
   MeshMap(const std::string& mesh_map, const std::string& mesh_part);
+
+  const std::string getGlobalFrameID();
+
+  bool resetLayers();
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   lvr2::HalfEdgeMesh<BaseVec> mesh;
 
+  std::string global_frame_;
 
 
 };

@@ -75,10 +75,10 @@ public:
       const ros::Publisher& vel_pub,
       const ros::Publisher& goal_pub,
       const TFPtr &tf_listener_ptr,
-      MeshPtr &mesh_ptr,
+      const MeshPtr &mesh_ptr,
       const MoveBaseFlexConfig &config,
-      boost::function<void()> setup_fn,
-      boost::function<void()> cleanup_fn);
+      boost::function<void()> setup_fn = 0,
+      boost::function<void()> cleanup_fn = 0);
 
   /**
    * @brief Destructor
@@ -107,7 +107,7 @@ private:
   mbf_abstract_nav::MoveBaseFlexConfig toAbstract(const MoveBaseFlexConfig &config);
 
   //! mesh for 3d navigation planning
-  MeshPtr &mesh_ptr_;
+  const MeshPtr &mesh_ptr_;
 
   //! Whether to lock mesh before calling the controller
   bool lock_mesh_;

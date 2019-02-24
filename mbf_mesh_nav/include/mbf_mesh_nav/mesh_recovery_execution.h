@@ -30,21 +30,18 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_recovery_execution.h
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
 
-#ifndef MBF_MESH_NAV__COSTMAP_RECOVERY_EXECUTION_H
-#define MBF_MESH_NAV__COSTMAP_RECOVERY_EXECUTION_H
+#ifndef MBF_MESH_NAV__MESH_RECOVERY_EXECUTION_H
+#define MBF_MESH_NAV__MESH_RECOVERY_EXECUTION_H
 
 #include <mbf_abstract_nav/abstract_recovery_execution.h>
 #include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mbf_mesh_core/mesh_recovery.h>
-#include <mesh_2d/mesh_2d_ros.h>
+#include <mesh_map/mesh_map.h>
 
 
 namespace mbf_mesh_nav
@@ -59,7 +56,7 @@ class MeshRecoveryExecution : public mbf_abstract_nav::AbstractRecoveryExecution
 {
 
 public:
-  typedef boost::shared_ptr<mesh_2d::Mesh2DROS> MeshPtr;
+  typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
   typedef boost::shared_ptr<MeshRecoveryExecution> Ptr;
 
   /**
@@ -72,11 +69,10 @@ public:
       const std::string name,
       const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
       const TFPtr &tf_listener_ptr,
-      MeshPtr &global_mesh,
-      MeshPtr &local_mesh,
+      const MeshPtr &mesh_ptr,
       const MoveBaseFlexConfig &config,
-      boost::function<void()> setup_fn,
-      boost::function<void()> cleanup_fn);
+      boost::function<void()> setup_fn = 0,
+      boost::function<void()> cleanup_fn = 0);
   /**
    * Destructor
    */
@@ -84,11 +80,8 @@ public:
 
 protected:
 
-  //! Shared pointer to the global mesh
-  MeshPtr &global_mesh_;
-
-  //! Shared pointer to thr local mesh
-  MeshPtr &local_mesh_;
+  //! Shared pointer to the mesh for 3D navigation planning
+  const MeshPtr &mesh_ptr_;
 
 private:
 
@@ -97,4 +90,4 @@ private:
 
 } /* namespace mbf_mesh_nav */
 
-#endif /* MBF_MESH_NAV__COSTMAP_RECOVERY_EXECUTION_H */
+#endif /* MBF_MESH_NAV__MESH_RECOVERY_EXECUTION_H */

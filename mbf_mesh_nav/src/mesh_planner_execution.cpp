@@ -30,15 +30,10 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- *  mesh_planner_execution.cpp
- *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *    Jorge Santos Simón <santos@magazino.eu>
  *
  */
-#include <nav_core_wrapper/wrapper_global_planner.h>
-
 #include "mbf_mesh_nav/mesh_planner_execution.h"
 
 namespace mbf_mesh_nav
@@ -47,7 +42,7 @@ namespace mbf_mesh_nav
 MeshPlannerExecution::MeshPlannerExecution(
     const std::string name,
     const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
-    MeshPtr &mesh_ptr,
+    const MeshPtr &mesh_ptr,
     const MoveBaseFlexConfig &config,
     boost::function<void()> setup_fn,
     boost::function<void()> cleanup_fn)
@@ -81,8 +76,9 @@ uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped& start,
 {
   if (lock_mesh_)
   {
-    boost::unique_lock<mesh_2d::Mesh2D::mutex_t> lock(*(mesh_ptr_->getMesh()->getMutex()));
-    return planner_->makePlan(start, goal, tolerance, plan, cost, message);
+    // TODO
+    //boost::unique_lock<mesh_map::MeshMap::mutex_t> lock(*(mesh_ptr_->getMutex()));
+    //return planner_->makePlan(start, goal, tolerance, plan, cost, message);
   }
   return planner_->makePlan(start, goal, tolerance, plan, cost, message);
 }

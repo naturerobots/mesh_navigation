@@ -21,10 +21,10 @@ find_package(LVR2 2 REQUIRED)
 # )
 
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include ${LVR2_INCLUDE_DIRS}
   LIBRARIES mesh_map
   CATKIN_DEPENDS geometry_msgs lvr_ros
-  DEPENDS LVR
+  DEPENDS LVR2
 )
 
 include_directories(
