@@ -69,6 +69,11 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr &tf_listener_ptr) :
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig> >(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
 
+  mesh_ptr_ = MeshPtr(new mesh_map::MeshMap(*tf_listener_ptr));
+
+  ROS_INFO_STREAM("Reading map file...");
+  mesh_ptr_->readMap();
+
   // initialize all plugins
   initializeServerComponents();
 

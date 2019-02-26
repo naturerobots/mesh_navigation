@@ -32,66 +32,43 @@
  *
  *  authors:
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
- *
  */
 
-#ifndef MESH_NAVIGATION__MESH_MAP_H
-#define MESH_NAVIGATION__MESH_MAP_H
+#include "mbf_mesh_nav/mesh_navigation_server.h"
+#include <signal.h>
+#include <mbf_utility/types.h>
+#include <tf2_ros/transform_listener.h>
 
-#include <lvr2/io/HDF5IO.hpp>
-#include <lvr2/geometry/BaseVector.hpp>
-#include <tf/transform_listener.h>
-#include <mesh_msgs/MeshVertexCosts.h>
+mbf_mesh_nav::MeshNavigationServer::Ptr mesh_nav_srv_ptr;
 
-namespace mesh_map{
-
-using BaseVec = lvr2::BaseVector<float>;
-
-class MeshMap
+void sigintHandler(int sig)
 {
- public:
+  ROS_INFO_STREAM("Shutdown mesh navigation server.");
+  if(mesh_nav_srv_ptr)
+  {
+    mesh_nav_srv_ptr->stop();
+  }
+  ros::shutdown();
+}
 
-  typedef boost::shared_ptr<MeshMap> Ptr;
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "mbf_mesh_nav", ros::init_options::NoSigintHandler);
 
-  MeshMap(tf::TransformListener& tf);
+  ros::NodeHandle nh;
+  ros::NodeHandle private_nh("~");
 
-  bool readMap();
+  double cache_time;
+  private_nh.param("tf_cache_time", cache_time, 10.0);
 
-  bool readMap(const std::string& mesh_map, const std::string& mesh_part);
-
-  const std::string getGlobalFrameID();
-
-  bool resetLayers();
-
- private:
-  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  lvr2::HalfEdgeMesh<BaseVec> mesh;
-
-  std::string global_frame_;
-
-  std::string mesh_file_;
-  std::string mesh_part_;
-
-  lvr2::DenseVertexMap<float> roughness_;
-  lvr2::DenseVertexMap<float> height_diff_;
-  lvr2::DenseVertexMap<float> riskiness_;
-  lvr2::DenseVertexMap<float> potential_;
-
-  lvr2::DenseFaceMap<lvr2::Normal<BaseVec>> face_normals_;
-  lvr2::DenseVertexMap<lvr2::Normal<BaseVec>> vertex_normals_;
-
-  ros::Publisher vertex_costs_pub_;
-  ros::Publisher mesh_geometry_pub_;
-
-  ros::NodeHandle private_nh_;
-
-  tf::TransformListener& tf_listener_;
-
-  float local_neighborhood_;
-
-};
-
-} /* namespace mesh_map */
-
-
-#endif //MESH_NAVIGATION__MESH_MAP_H
+  signal(SIGINT, sigintHandler);
+#ifdef USE_OLD_TF
+  TFPtr tf_listener_ptr(new TF(nh, ros::Duration(cache_time), true));
+#else
+  TFPtr tf_listener_ptr(new TF(ros::Duration(cache_time)));
+  tf2_ros::TransformListener tf_listener(*tf_listener_ptr);
+#endif
+  mesh_nav_srv_ptr = boost::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_listener_ptr);
+  ros::spin();
+  return EXIT_SUCCESS;
+}

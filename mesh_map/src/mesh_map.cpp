@@ -39,14 +39,25 @@
 #include <ros/ros.h>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
+#include <mesh_msgs/MeshGeometryStamped.h>
+#include <lvr_ros/conversions.h>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
 
 namespace mesh_map{
 
   MeshMap::MeshMap(tf::TransformListener& tf_listener)
-    : private_nh_("~/mesh_map"),
-      mesh_file_(private_nh_.param<std::string>("mesh_file", "triangle_mesh.h5")),
-      mesh_part_(private_nh_.param<std::string>("mesh_part", "mesh01"))
+    : tf_listener_(tf_listener),
+      private_nh_("~")
   {
+    private_nh_.param<std::string>("mesh_file", mesh_file_, "mesh.h5");
+    private_nh_.param<std::string>("mesh_part", mesh_part_, "mesh");
+    private_nh_.param<std::string>("global_frame", global_frame_, "map");
+    ROS_INFO_STREAM("mesh file is set to: " << mesh_file_);
+
+    mesh_geometry_pub_ = private_nh_.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
+    vertex_costs_pub_ = private_nh_.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
   }
 
   bool MeshMap::readMap()
@@ -69,9 +80,16 @@ namespace mesh_map{
     else
     {
       ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part_ << "' from the map file '" << mesh_file_ << "' ");
+      return false;
     }
 
     private_nh_.param<float>("local_neighborhood", local_neighborhood_, 0.3f);
+
+
+    // TODO read and write uuid
+    boost::uuids::random_generator gen;
+    boost::uuids::uuid uuid = gen();
+    std::string uuid_str = boost::uuids::to_string(uuid);
 
 
     auto face_normals_opt =
@@ -119,6 +137,8 @@ namespace mesh_map{
       }
     }
 
+    mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<lvr2::BaseVec>(mesh, global_frame_, uuid_str, vertex_normals_));
+
     ROS_INFO_STREAM("Try to read roughness from map file...");
     auto roughness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("roughness");
 
@@ -141,6 +161,35 @@ namespace mesh_map{
         ROS_ERROR_STREAM("Could not save roughness to map file!");
       }
     }
+
+    sleep(1);
+
+    vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(roughness_, "Roughness", global_frame_, uuid_str));
+
+    ROS_INFO_STREAM("Try to read height differences from map file...");
+    auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
+
+    if(height_diff_opt)
+    {
+      ROS_INFO_STREAM("Height differences have been read successfully.");
+      height_diff_ = height_diff_opt.get();
+    }
+    else
+    {
+      ROS_INFO_STREAM("Computing height differences...");
+      height_diff_ = lvr2::calcVertexHeightDifferences(mesh, local_neighborhood_);
+      ROS_INFO_STREAM("Saving height_differences to map file...");
+      if(mesh_io_ptr->addDenseAttributeMap(height_diff_, "height_diff"))
+      {
+        ROS_INFO_STREAM("Saved height differences to map file.");
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Could not save height differences to map file!");
+      }
+    }
+
+    vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(height_diff_, "Height Differences", global_frame_, uuid_str));
 
   }
 

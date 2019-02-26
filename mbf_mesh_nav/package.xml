@@ -14,6 +14,7 @@
   <depend>roscpp</depend>
   <buildtool_depend>catkin</buildtool_depend>
   <depend>dynamic_reconfigure</depend>
+  <depend>mbf_abstract_nav</depend>
   <depend>mbf_mesh_core</depend>
   <depend>mesh_map</depend>
   <depend>pluginlib</depend>
