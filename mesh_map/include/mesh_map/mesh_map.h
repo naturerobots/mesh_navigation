@@ -46,15 +46,12 @@
 
 namespace mesh_map{
 
-using BaseVec = lvr2::BaseVector<float>;
-
 class MeshMap
 {
  public:
 
-
-  typedef lvr2::Normal<lvr2::BaseVector<float> > NormalType;
-  typedef lvr2::Vector<lvr2::BaseVector<float> > VectorType;
+  typedef lvr2::Normal<float> NormalType;
+  typedef lvr2::BaseVector<float> VectorType;
 
   typedef boost::shared_ptr<MeshMap> Ptr;
 
@@ -168,7 +165,7 @@ class MeshMap
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  lvr2::HalfEdgeMesh<BaseVec> mesh;
+  lvr2::HalfEdgeMesh<VectorType> mesh;
 
   std::string global_frame_;
 
@@ -195,8 +192,8 @@ class MeshMap
 
   std::set<lvr2::VertexHandle> lethals_;
 
-  lvr2::DenseFaceMap<lvr2::Normal<BaseVec>> face_normals_;
-  lvr2::DenseVertexMap<lvr2::Normal<BaseVec>> vertex_normals_;
+  lvr2::DenseFaceMap<NormalType> face_normals_;
+  lvr2::DenseVertexMap<NormalType> vertex_normals_;
 
   ros::Publisher vertex_costs_pub_;
   ros::Publisher mesh_geometry_pub_;

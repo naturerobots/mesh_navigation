@@ -95,7 +95,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
 
 
   auto face_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<lvr2::Normal<BaseVec>>>("face_normals");
+      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<NormalType>>("face_normals");
 
   if(face_normals_opt)
   {
@@ -118,7 +118,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   }
 
   auto vertex_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<lvr2::Normal<BaseVec>>>("vertex_normals");
+      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<NormalType>>("vertex_normals");
 
   if(vertex_normals_opt)
   {
@@ -139,7 +139,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
     }
   }
 
-  mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<lvr2::BaseVec>(mesh, global_frame_, uuid_str_, vertex_normals_));
+  mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<float>(mesh, global_frame_, uuid_str_, vertex_normals_));
 
   ROS_INFO_STREAM("Try to read roughness from map file...");
   auto roughness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("roughness");
