@@ -39,6 +39,7 @@
 #define MESH_NAVIGATION__MESH_PLANNER_H
 
 #include <mbf_mesh_core/mesh_planner.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mesh_planner{
 
@@ -97,6 +98,7 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
  private:
   mesh_map::MeshMap::Ptr mesh_ptr_;
   std::string name_;
+  ros::NodeHandle private_nh_;
 
 };
 
