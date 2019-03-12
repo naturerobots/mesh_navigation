@@ -45,6 +45,8 @@
 #include <nav_msgs/Path.h>
 #include <mesh_map/MeshMapConfig.h>
 #include <dynamic_reconfigure/server.h>
+#include <mesh_map/abstract_layer.h>
+#include <pluginlib/class_loader.h>
 
 
 namespace mesh_map{
@@ -65,6 +67,8 @@ class MeshMap
   bool readMap();
 
   bool readMap(const std::string& mesh_map, const std::string& mesh_part);
+
+  bool loadLayerPlugins();
 
   inline VectorType toVectorType(const geometry_msgs::Point& point);
 
@@ -174,7 +178,10 @@ class MeshMap
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  lvr2::HalfEdgeMesh<VectorType> mesh;
+  std::shared_ptr<lvr2::HalfEdgeMesh<VectorType>> mesh_ptr;
+
+  pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+  std::map<std::string, mesh_map::AbstractLayer::Ptr> layers;
 
   std::string global_frame_;
 

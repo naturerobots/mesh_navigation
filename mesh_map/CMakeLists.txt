@@ -32,9 +32,6 @@ include_directories(
 
 add_library(${PROJECT_NAME}
   src/mesh_map.cpp
-  src/roughness_layer.cpp
-  src/height_diff_layer.cpp
-  src/inflation_layer.cpp
 )
 
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

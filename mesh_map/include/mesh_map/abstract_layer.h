@@ -13,15 +13,16 @@ class AbstractLayer
 {
 
  public:
+  typedef boost::shared_ptr<mesh_map::AbstractLayer> Ptr;
+
   virtual bool readLayer() = 0;
 
   virtual bool writeLayer() = 0;
 
-  virtual void reconfigure(const MeshMapConfig& config) = 0;
 
   virtual float getThreshold() = 0;
 
-  virtual bool computeLayer() = 0;
+  virtual bool computeLayer(const MeshMapConfig& config) = 0;
 
   virtual lvr2::VertexMap<float>& getCosts() = 0;
 

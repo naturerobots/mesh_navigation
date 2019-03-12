@@ -45,6 +45,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <algorithm>
+#include <XmlRpcException.h>
 
 namespace mesh_map{
 
@@ -52,7 +53,8 @@ MeshMap::MeshMap(tf::TransformListener& tf_listener)
     : tf_listener_(tf_listener),
       private_nh_("~/mesh_map/"),
       first_config_(true),
-      map_loaded_(false)
+      map_loaded_(false),
+      layer_loader("mesh_map", "mesh_map::AbstractLayer")
 {
   private_nh_.param<std::string>("mesh_file", mesh_file_, "mesh.h5");
   private_nh_.param<std::string>("mesh_part", mesh_part_, "mesh");
@@ -69,6 +71,9 @@ MeshMap::MeshMap(tf::TransformListener& tf_listener)
   config_callback = boost::bind(&MeshMap::reconfigureCallback,this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
 
+
+  loadLayerPlugins();
+
 }
 
 bool MeshMap::readMap()
@@ -84,9 +89,9 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
 
   if(mesh_opt)
   {
-    mesh = mesh_opt.get();
-    ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh.numVertices() << " vertices and "
-                                                                  << mesh.numFaces() << " faces and " << mesh.numEdges() << " edges." );
+    *mesh_ptr = mesh_opt.get();
+    ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh_ptr->numVertices() << " vertices and "
+                                                                  << mesh_ptr->numFaces() << " faces and " << mesh_ptr->numEdges() << " edges." );
   }
   else
   {
@@ -111,7 +116,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
-    face_normals_ = lvr2::calcFaceNormals(mesh);
+    face_normals_ = lvr2::calcFaceNormals(*mesh_ptr);
     ROS_INFO_STREAM("Computed "<< face_normals_.numValues() << " face normals.");
     if(mesh_io_ptr->addDenseAttributeMap(face_normals_, "face_normals"))
     {
@@ -134,7 +139,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals_ = lvr2::calcVertexNormals(mesh, face_normals_);
+    vertex_normals_ = lvr2::calcVertexNormals(*mesh_ptr, face_normals_);
     if(mesh_io_ptr->addDenseAttributeMap(vertex_normals_, "vertex_normals"))
     {
       ROS_INFO_STREAM("Saved vertex normals to map file.");
@@ -145,7 +150,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
     }
   }
 
-  mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<float>(mesh, global_frame_, uuid_str_, vertex_normals_));
+  mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<float>(*mesh_ptr, global_frame_, uuid_str_, vertex_normals_));
 
   ROS_INFO_STREAM("Try to read roughness from map file...");
   auto roughness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("roughness");
@@ -158,7 +163,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing roughness...");
-    roughness_ = lvr2::calcVertexRoughness(mesh, config_.roughness_radius, vertex_normals_);
+    roughness_ = lvr2::calcVertexRoughness(*mesh_ptr, config_.roughness_radius, vertex_normals_);
     ROS_INFO_STREAM("Saving roughness to map file...");
     if(mesh_io_ptr->addDenseAttributeMap(roughness_, "roughness"))
     {
@@ -181,7 +186,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing height differences...");
-    height_diff_ = lvr2::calcVertexHeightDifferences(mesh, config_.height_diff_radius);
+    height_diff_ = lvr2::calcVertexHeightDifferences(*mesh_ptr, config_.height_diff_radius);
     ROS_INFO_STREAM("Saving height_differences to map file...");
     if(mesh_io_ptr->addDenseAttributeMap(height_diff_, "height_diff"))
     {
@@ -204,7 +209,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing edge distances...");
-    edge_distances_ = lvr2::calcVertexDistances(mesh);
+    edge_distances_ = lvr2::calcVertexDistances(*mesh_ptr);
     ROS_INFO_STREAM("Saving " << edge_distances_.numValues() << " edge distances to map file...");
 
     if(mesh_io_ptr->addAttributeMap(edge_distances_, "edge_distances"))
@@ -259,6 +264,59 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   return true;
 }
 
+bool MeshMap::loadLayerPlugins()
+{
+    ros::NodeHandle private_nh("~");
+
+    XmlRpc::XmlRpcValue plugin_param_list;
+    if(!private_nh.getParam("layers", plugin_param_list))
+    {
+      ROS_WARN_STREAM("No layer plugins configured! - Use the param \" layers \""
+                      << " which must be a list of tuples with a name and a type.");
+      return false;
+    }
+
+    try
+    {
+      for (int i = 0; i < plugin_param_list.size(); i++)
+      {
+        XmlRpc::XmlRpcValue elem = plugin_param_list[i];
+
+        std::string name = elem["name"];
+        std::string type = elem["type"];
+
+        if (layers.find(name) != layers.end())
+        {
+          ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
+          return false;
+        }
+        typename AbstractLayer::Ptr plugin_ptr = layer_loader.createInstance(type);
+        if(plugin_ptr && plugin_ptr->initialize(mesh_ptr, mesh_io_ptr))
+        {
+
+          layers.insert(std::pair<std::string, typename mesh_map::AbstractLayer::Ptr>(name, plugin_ptr));
+
+          ROS_INFO_STREAM("The layer plugin with the type \"" << type
+            << "\" has been loaded successfully under the name \"" << name << "\".");
+        }
+        else
+        {
+          ROS_ERROR_STREAM("Could not load the layer plugin with the name \""
+                               << name << "\" and the type \"" << type << "\"!");
+        }
+      }
+    }
+    catch (XmlRpc::XmlRpcException &e)
+    {
+      ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter has to be a list of structs "
+                                                            << "with fields \"name\" and \"type\"!");
+      ROS_ERROR_STREAM(e.getMessage());
+      return false;
+    }
+    // is there any plugin in the map?
+    return !layers.empty();
+}
+
 inline MeshMap::VectorType MeshMap::toVectorType(const geometry_msgs::Point& p)
 {
   return VectorType(p.x, p.y, p.z);
@@ -273,13 +331,13 @@ bool MeshMap::dijkstra(
     const VectorType& goal,
     std::list<lvr2::VertexHandle>& path)
 {
-    lvr2::DenseVertexMap<bool> seen(mesh.nextVertexIndex(), false);
+    lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
 
     lvr2::VertexHandle startH = getNearestVertexHandle(start).unwrap();
     lvr2::VertexHandle goalH = getNearestVertexHandle(goal).unwrap();
 
     return lvr2::Dijkstra<lvr2::BaseVector<float>>(
-        mesh, startH, goalH, edge_weights_, path, potential_, predecessors_, seen, vertex_costs_);
+        *mesh_ptr, startH, goalH, edge_weights_, path, potential_, predecessors_, seen, vertex_costs_);
 }
 
 bool MeshMap::waveFrontPropagation(
@@ -336,7 +394,7 @@ void MeshMap::getMinAndMaxValues(
   height_min = std::numeric_limits<float>::max();
 
   // Calculate minimum and maximum values
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     // max values
     if(risk_max < riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_max = riskiness_[vH];
@@ -382,7 +440,7 @@ void MeshMap::findLethalInLayer(
     std::set<lvr2::VertexHandle>& lethals)
 {
   int size = lethals.size();
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     // Store lethal areas by Roughness
     if(layer[vH] >= threshold)
@@ -403,21 +461,21 @@ void MeshMap::findContours(
 
   array<lvr2::OptionalFaceHandle, 2> facepair;
   lvr2::SparseEdgeMap<bool> usedEdges(false);
-  for (auto eHStart: mesh.edges())
+  for (auto eHStart: mesh_ptr->edges())
   {
     lvr2::SparseVertexMap<bool> usedVertices(false);
     lvr2::SparseEdgeMap<bool> local_usedEdges(false);
     int count = 0;
 
     // Look for border Edges
-    facepair = mesh.getFacesOfEdge(eHStart);
+    facepair = mesh_ptr->getFacesOfEdge(eHStart);
 
     // If border Edge found
     if((!facepair[0]||!facepair[1])&&!usedEdges[eHStart])
     {
       std:vector<lvr2::VertexHandle> contour;
       // Set vector which links to the following Edge
-      array<lvr2::VertexHandle, 2> vertexPair = mesh.getVerticesOfEdge(eHStart);
+      array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
       lvr2::VertexHandle vH = vertexPair[1];
       vector<lvr2::EdgeHandle> curEdges;
       lvr2::EdgeHandle eHTemp = eHStart;
@@ -431,7 +489,7 @@ void MeshMap::findContours(
         usedEdges.insert(eHTemp, true);
         local_usedEdges.insert(eHTemp, true);
         // Set vector which links to the following Edge
-        vertexPair = mesh.getVerticesOfEdge(eHTemp);
+        vertexPair = mesh_ptr->getVerticesOfEdge(eHTemp);
         // Eliminate the possibility to choose the previous Vertex
         if(vH != vertexPair[0])
         {
@@ -446,14 +504,14 @@ void MeshMap::findContours(
         usedVertices.insert(vH, true);
         count++;
         contour.push_back(vH);
-        mesh.getEdgesOfVertex(vH, curEdges);
+        mesh_ptr->getEdgesOfVertex(vH, curEdges);
 
         // Look for other edge of vertex that is a border Edge
         for(auto eHT: curEdges)
         {
           if(!usedEdges[eHT] && !local_usedEdges[eHT])
           {
-            facepair = mesh.getFacesOfEdge(eHT);
+            facepair = mesh_ptr->getFacesOfEdge(eHT);
             if(!facepair[0]||!facepair[1])
             {
               eHTemp = eHT;
@@ -496,7 +554,7 @@ void MeshMap::combineVertexCosts(
   float height_min = std::numeric_limits<float>::max();
 
   // Calculate minimum and maximum values
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     if(risk_max < riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_max = riskiness_[vH];
     if(rough_max < roughness_[vH] && std::isfinite(roughness_[vH])) rough_max = roughness_[vH];
@@ -510,7 +568,7 @@ void MeshMap::combineVertexCosts(
   ROS_INFO_STREAM("Height Differences min: " << height_min << " height differences max: " << height_max);
   ROS_INFO_STREAM("Riskiness min: " << risk_min << " riskiness max: " << risk_max);
 
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     vertex_costs_.insert(vH, riskiness_factor * riskiness_[vH] +
         roughness_factor * roughness_[vH] +
@@ -553,11 +611,11 @@ void MeshMap::lethalCostInflation(
     }
   };
 
-  lvr2::DenseVertexMap<bool> seen(mesh.numVertices(), false);
+  lvr2::DenseVertexMap<bool> seen(mesh_ptr->numVertices(), false);
   lvr2::DenseVertexMap<lvr2::VertexHandle> prev;
-  prev.reserve(mesh.numVertices());
+  prev.reserve(mesh_ptr->numVertices());
 
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     riskiness_.insert(vH, 0);
     vertex_distances_.insert(vH, std::numeric_limits<float>::max());
@@ -585,11 +643,11 @@ void MeshMap::lethalCostInflation(
     seen[vH] = true;
 
     std::vector<lvr2::VertexHandle> neighbours;
-    mesh.getNeighboursOfVertex(vH, neighbours);
+    mesh_ptr->getNeighboursOfVertex(vH, neighbours);
     for(auto n : neighbours)
     {
       if(vertex_distances_[n] == 0 || seen[n]) continue;
-      float n_dist = mesh.getVertexPosition(n).squaredDistanceFrom(mesh.getVertexPosition(prev[vH]));
+      float n_dist = mesh_ptr->getVertexPosition(n).squaredDistanceFrom(mesh_ptr->getVertexPosition(prev[vH]));
       if(n_dist < vertex_distances_[n] && n_dist < inflation_radius_squared)
       {
         prev[n] = prev[vH];
@@ -599,7 +657,7 @@ void MeshMap::lethalCostInflation(
     }
   }
 
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
     if(vertex_distances_[vH] > inflation_radius_squared)
     {
@@ -637,10 +695,10 @@ void MeshMap::calculateEdgeWeights(
   ROS_INFO_STREAM("Compute edge weights...");
 
   // For all found Edges
-  for(auto eH: mesh.edges())
+  for(auto eH: mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
-    array<lvr2::VertexHandle, 2> eH_vHs = mesh.getVerticesOfEdge(eH);
+    array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
     lvr2::VertexHandle vH1 = eH_vHs[0];
     lvr2::VertexHandle vH2 = eH_vHs[1];
 
@@ -715,14 +773,14 @@ inline bool MeshMap::waveFrontUpdate(
   const double T2 = distances[v2];
   const double T3 = distances[v3];
 
-  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const lvr2::OptionalEdgeHandle e12h = mesh_ptr->getEdgeBetween(v1, v2);
   const float c = edge_weights[e12h.unwrap()];
 
-  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const lvr2::OptionalEdgeHandle e13h = mesh_ptr->getEdgeBetween(v1, v3);
   const float b = edge_weights[e13h.unwrap()];
   const float b_sq = b*b;
 
-  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const lvr2::OptionalEdgeHandle e23h = mesh_ptr->getEdgeBetween(v2, v3);
   const float a = edge_weights[e23h.unwrap()];
   const float a_sq = a * a;
 
@@ -788,13 +846,13 @@ inline bool MeshMap::waveFrontPropagation(
     return true;
   }
 
-  VectorType start_point = mesh.getVertexPosition(start_vertex);
+  VectorType start_point = mesh_ptr->getVertexPosition(start_vertex);
 
-  lvr2::DenseVertexMap<bool> fixed(mesh.numVertices(), false);
+  lvr2::DenseVertexMap<bool> fixed(mesh_ptr->numVertices(), false);
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
-  for(auto const &vH : mesh.vertices())
+  for(auto const &vH : mesh_ptr->vertices())
   {
     distances.insert(vH, std::numeric_limits<float>::infinity());
     predecessors.insert(vH, vH);
@@ -822,13 +880,13 @@ inline bool MeshMap::waveFrontPropagation(
 
   // initialize around seed / start vertex
   std::vector<lvr2::VertexHandle> neighbours;
-  mesh.getNeighboursOfVertex(start_vertex, neighbours);
+  mesh_ptr->getNeighboursOfVertex(start_vertex, neighbours);
 
   ROS_INFO_STREAM("Number of neighbours " << neighbours.size());
 
   for(auto n_vh : neighbours)
   {
-    lvr2::OptionalEdgeHandle edge = mesh.getEdgeBetween(start_vertex, n_vh);
+    lvr2::OptionalEdgeHandle edge = mesh_ptr->getEdgeBetween(start_vertex, n_vh);
     distances[n_vh] = edge_weights[edge.unwrap()];
     predecessors[n_vh] = start_vertex;
     pq.push(n_vh);
@@ -845,11 +903,11 @@ inline bool MeshMap::waveFrontPropagation(
     fixed[current_vh] = true;
 
     std::vector<lvr2::FaceHandle> faces;
-    mesh.getFacesOfVertex(current_vh, faces);
+    mesh_ptr->getFacesOfVertex(current_vh, faces);
 
     for(auto fh : faces)
     {
-      const auto vertices = mesh.getVerticesOfFace(fh);
+      const auto vertices = mesh_ptr->getVerticesOfFace(fh);
       const lvr2::VertexHandle& a = vertices[0];
       const lvr2::VertexHandle& b = vertices[1];
       const lvr2::VertexHandle& c = vertices[2];
@@ -912,9 +970,9 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const VectorType pos)
   lvr2::OptionalVertexHandle nearest_handle;
 
   // For all Vertices of the BaseMesh
-  for(auto vH: mesh.vertices())
+  for(auto vH: mesh_ptr->vertices())
   {
-    float dist = pos.distanceFrom(mesh.getVertexPosition(vH));
+    float dist = pos.distanceFrom(mesh_ptr->getVertexPosition(vH));
     if(dist < smallest_dist)
     {
       smallest_dist = dist;
@@ -949,7 +1007,7 @@ bool MeshMap::pathPlanning(
   }
   t_end = ros::WallTime::now();
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
-  ROS_INFO_STREAM("Exectution time (ms): " << execution_time << " for " << mesh.numVertices() << " num vertices in the mesh.");
+  ROS_INFO_STREAM("Exectution time (ms): " << execution_time << " for " << mesh_ptr->numVertices() << " num vertices in the mesh_ptr->");
 
   path.reverse();
 
@@ -964,8 +1022,8 @@ bool MeshMap::pathPlanning(
     geometry_msgs::PoseStamped pose;
     pose.header = header;
     if(calculatePose(
-        mesh.getVertexPosition(prev),
-        mesh.getVertexPosition(vH),
+        mesh_ptr->getVertexPosition(prev),
+        mesh_ptr->getVertexPosition(vH),
         vertex_normals_[prev],
         pose.pose
     )){
@@ -1036,11 +1094,11 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t leve
     {
       if(config_.roughness_radius != config.roughness_radius)
       {
-        roughness_ = lvr2::calcVertexRoughness(mesh, config.roughness_radius, vertex_normals_);
+        roughness_ = lvr2::calcVertexRoughness(*mesh_ptr, config.roughness_radius, vertex_normals_);
       }
       else if(config_.height_diff_radius != config.height_diff_radius)
       {
-        height_diff_ = lvr2::calcVertexRoughness(mesh, config.height_diff_radius, vertex_normals_);
+        height_diff_ = lvr2::calcVertexRoughness(*mesh_ptr, config.height_diff_radius, vertex_normals_);
       }
 
       lethalCostInflation(
