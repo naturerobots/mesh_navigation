@@ -50,7 +50,9 @@ namespace mesh_map{
 
 MeshMap::MeshMap(tf::TransformListener& tf_listener)
     : tf_listener_(tf_listener),
-      private_nh_("~")
+      private_nh_("~/mesh_map/"),
+      first_config_(true),
+      map_loaded_(false)
 {
   private_nh_.param<std::string>("mesh_file", mesh_file_, "mesh.h5");
   private_nh_.param<std::string>("mesh_part", mesh_part_, "mesh");
@@ -60,6 +62,13 @@ MeshMap::MeshMap(tf::TransformListener& tf_listener)
   mesh_geometry_pub_ = private_nh_.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
   vertex_costs_pub_ = private_nh_.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
   path_pub_ = private_nh_.advertise<nav_msgs::Path>("path", true, false);
+
+  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > (
+      new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh_));
+
+  config_callback = boost::bind(&MeshMap::reconfigureCallback,this, _1, _2);
+  reconfigure_server_ptr->setCallback(config_callback);
+
 }
 
 bool MeshMap::readMap()
@@ -84,9 +93,6 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
     ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part_ << "' from the map file '" << mesh_file_ << "' ");
     return false;
   }
-
-  private_nh_.param<float>("local_neighborhood", local_neighborhood_, 0.3f);
-
 
   // TODO read and write uuid
   boost::uuids::random_generator gen;
@@ -152,7 +158,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing roughness...");
-    roughness_ = lvr2::calcVertexRoughness(mesh, local_neighborhood_, vertex_normals_);
+    roughness_ = lvr2::calcVertexRoughness(mesh, config_.roughness_radius, vertex_normals_);
     ROS_INFO_STREAM("Saving roughness to map file...");
     if(mesh_io_ptr->addDenseAttributeMap(roughness_, "roughness"))
     {
@@ -175,7 +181,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing height differences...");
-    height_diff_ = lvr2::calcVertexHeightDifferences(mesh, local_neighborhood_);
+    height_diff_ = lvr2::calcVertexHeightDifferences(mesh, config_.height_diff_radius);
     ROS_INFO_STREAM("Saving height_differences to map file...");
     if(mesh_io_ptr->addDenseAttributeMap(height_diff_, "height_diff"))
     {
@@ -223,22 +229,15 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   else
   {
     ROS_INFO_STREAM("Computing riskiness by finding lethal areas...");
-    size_t min_contour_size = 10;
-    float height_diff_threshold = 0.4;
-    float roughness_threshold = 0.4;
-    float inflation_radius = 0.4;
-    float inscribed_radius = 0.2;
-    float inscribed_value = 1.0;
-    float lethal_value = 2.0;
 
     lethalCostInflation(
-        min_contour_size,
-        height_diff_threshold,
-        roughness_threshold,
-        inflation_radius,
-        inscribed_radius,
-        inscribed_value,
-        lethal_value);
+        config_.min_contour_size,
+        config_.height_diff_threshold,
+        config_.roughness_threshold,
+        config_.inflation_radius,
+        config_.inscribed_radius,
+        config_.inscribed_value,
+        config_.lethal_value);
 
     ROS_INFO_STREAM("Saving " << riskiness_.numValues() << " riskiness values to map file...");
 
@@ -253,11 +252,11 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   }
 
   sleep(1);
-  combineVertexCosts(1, 1, 1);
+  combineVertexCosts(config_.riskiness_factor, config_.roughness_factor, config_.height_diff_factor);
+  publishCostLayers();
 
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(roughness_, "Roughness", global_frame_, uuid_str_));
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(height_diff_, "Height Differences", global_frame_, uuid_str_));
-
+  map_loaded_ = true;
+  return true;
 }
 
 inline MeshMap::VectorType MeshMap::toVectorType(const geometry_msgs::Point& p)
@@ -280,7 +279,7 @@ bool MeshMap::dijkstra(
     lvr2::VertexHandle goalH = getNearestVertexHandle(goal).unwrap();
 
     return lvr2::Dijkstra<lvr2::BaseVector<float>>(
-        mesh, startH, goalH, edge_distances_, path, potential_, predecessors_, seen, vertex_costs_);
+        mesh, startH, goalH, edge_weights_, path, potential_, predecessors_, seen, vertex_costs_);
 }
 
 bool MeshMap::waveFrontPropagation(
@@ -288,7 +287,7 @@ bool MeshMap::waveFrontPropagation(
     const VectorType& goal,
     std::list<lvr2::VertexHandle>& path)
 {
-  return waveFrontPropagation(start, goal, edge_distances_, vertex_costs_, path, potential_, predecessors_);
+  return waveFrontPropagation(start, goal, edge_weights_, vertex_costs_, path, potential_, predecessors_);
 }
 
 void MeshMap::combineVertexCosts(
@@ -518,8 +517,6 @@ void MeshMap::combineVertexCosts(
         height_diff_factor * height_diff_[vH]);
   }
 
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(vertex_costs_, "Combined Costs", global_frame_, uuid_str_));
-
   calculateEdgeWeights(roughness_factor, height_diff_factor);
 }
 void MeshMap::lethalCostInflation(
@@ -629,7 +626,6 @@ void MeshMap::lethalCostInflation(
       riskiness_.insert(vH, lethal_value);
     }
   }
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(riskiness_, "Riskiness", global_frame_, uuid_str_));
 
   ROS_INFO_STREAM("lethal cost inflation finished.");
 }
@@ -730,7 +726,7 @@ inline bool MeshMap::waveFrontUpdate(
   const float a = edge_weights[e23h.unwrap()];
   const float a_sq = a * a;
 
-  if(a < 0.005 || b < 0.005 || c < 0.005){
+  if(a < 0.01 || b < 0.01 || c < 0.01){
     double T3tmp = T3;
     if (a < 0.005) T3tmp = T2 + a;
     if (c < 0.005 || b < 0.005) T3tmp = T1 + b;
@@ -993,6 +989,79 @@ bool MeshMap::resetLayers()
 {
   return true; //TODO implement
 }
+
+void MeshMap::publishCostLayers()
+{
+  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(riskiness_, "Riskiness", global_frame_, uuid_str_));
+  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(roughness_, "Roughness", global_frame_, uuid_str_));
+  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(height_diff_, "Height Diff", global_frame_, uuid_str_));
+  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(vertex_costs_, "Combined Costs", global_frame_, uuid_str_));
+}
+
+void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level)
+{
+  ROS_INFO_STREAM("Dynamic reconfigure callback...");
+  if(first_config_)
+  {
+    config_ = config;
+    first_config_ = false;
+  }
+
+  ROS_INFO_STREAM("Reconfigure request: " );
+  ROS_INFO_STREAM("inscribed radius: " << config.inscribed_radius);
+  ROS_INFO_STREAM("inflation radius: " << config.inflation_radius);
+  ROS_INFO_STREAM("roughness threshold: " << config.roughness_threshold);
+  ROS_INFO_STREAM("height diff threshold: " << config.height_diff_threshold);
+  ROS_INFO_STREAM("roughness_radius: " << config.roughness_radius);
+  ROS_INFO_STREAM("height_diff_radius: " << config.height_diff_radius);
+  ROS_INFO_STREAM("riskiness factor: " << config.riskiness_factor);
+  ROS_INFO_STREAM("roughness factor: " << config.roughness_factor);
+  ROS_INFO_STREAM("height diff factor: " << config.height_diff_factor);
+  ROS_INFO_STREAM("min contour size: " << config.min_contour_size);
+  ROS_INFO_STREAM("lethal value: " << config.lethal_value);
+  ROS_INFO_STREAM("inscribed value: " << config.inscribed_value);
+
+  if(!first_config_ && map_loaded_ )
+  {
+    // Check the dynamic local radius parameter
+    if( config_.roughness_radius != config.roughness_radius ||
+        config_.height_diff_radius != config.height_diff_radius ||
+        config_.roughness_threshold != config.roughness_threshold ||
+        config_.height_diff_threshold != config.height_diff_threshold ||
+        config_.min_contour_size != config.min_contour_size ||
+        config_.inscribed_radius != config.inscribed_radius ||
+        config_.inflation_radius != config.inflation_radius ||
+        config_.inscribed_value != config.inscribed_value ||
+        config_.lethal_value != config.lethal_value)
+    {
+      if(config_.roughness_radius != config.roughness_radius)
+      {
+        roughness_ = lvr2::calcVertexRoughness(mesh, config.roughness_radius, vertex_normals_);
+      }
+      else if(config_.height_diff_radius != config.height_diff_radius)
+      {
+        height_diff_ = lvr2::calcVertexRoughness(mesh, config.height_diff_radius, vertex_normals_);
+      }
+
+      lethalCostInflation(
+          config.min_contour_size,
+          config.height_diff_threshold,
+          config.roughness_threshold,
+          config.inflation_radius,
+          config.inscribed_radius,
+          config.inscribed_value,
+          config.lethal_value);
+
+      combineVertexCosts(config.riskiness_factor, config.roughness_factor, config.height_diff_factor);
+      publishCostLayers();
+    }
+
+    config_ = config;
+  }
+  // Apply the current configuration
+}
+
+
 
 const std::string MeshMap::getGlobalFrameID()
 {

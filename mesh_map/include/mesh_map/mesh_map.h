@@ -43,12 +43,17 @@
 #include <tf/transform_listener.h>
 #include <mesh_msgs/MeshVertexCosts.h>
 #include <nav_msgs/Path.h>
+#include <mesh_map/MeshMapConfig.h>
+#include <dynamic_reconfigure/server.h>
+
 
 namespace mesh_map{
 
 class MeshMap
 {
  public:
+
+
 
   typedef lvr2::Normal<float> NormalType;
   typedef lvr2::BaseVector<float> VectorType;
@@ -96,6 +101,8 @@ class MeshMap
       const lvr2::VertexHandle& v3);
 
   lvr2::OptionalVertexHandle getNearestVertexHandle(const VectorType pos);
+
+  void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
   void combineVertexCosts(
       const float& riskiness_factor,
@@ -148,6 +155,8 @@ class MeshMap
       std::vector<std::vector<lvr2::VertexHandle> >& contours,
       int min_contour_size);
 
+  void publishCostLayers();
+
   void findLethalInLayer(
       const lvr2::DenseVertexMap<float>& layer,
       const float& threshold,
@@ -199,11 +208,17 @@ class MeshMap
   ros::Publisher mesh_geometry_pub_;
   ros::Publisher path_pub_;
 
+
+  // Server for Reconfiguration
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
+  bool first_config_;
+  bool map_loaded_;
+  MeshMapConfig config_;
+
   ros::NodeHandle private_nh_;
 
   tf::TransformListener& tf_listener_;
-
-  float local_neighborhood_;
 
   std::string uuid_str_;
 

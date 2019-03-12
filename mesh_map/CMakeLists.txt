@@ -13,12 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(LVR2 2 REQUIRED)
 
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/MeshMap.cfg
+)
 
 catkin_package(
   INCLUDE_DIRS include ${LVR2_INCLUDE_DIRS}
@@ -35,6 +32,9 @@ include_directories(
 
 add_library(${PROJECT_NAME}
   src/mesh_map.cpp
+  src/roughness_layer.cpp
+  src/height_diff_layer.cpp
+  src/inflation_layer.cpp
 )
 
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

@@ -61,9 +61,9 @@ namespace mesh_planner{
       double &cost,
       std::string &message)
   {
-    bool use_dijkstra = private_nh_.param<bool>("use_fmm", true);
+    bool use_fmm = private_nh_.param<bool>("use_fmm", true);
 
-    if(mesh_ptr_->pathPlanning(start, goal, plan, use_dijkstra))
+    if(mesh_ptr_->pathPlanning(start, goal, plan, use_fmm))
     {
       return mbf_msgs::GetPathResult::SUCCESS;
     }
