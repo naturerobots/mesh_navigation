@@ -40,7 +40,7 @@ namespace mesh_layers{
     }
   }
 
-  float InflationLayer::getThreshold()
+  float InflationLayer::threshold()
   {
 
   }
@@ -153,7 +153,7 @@ namespace mesh_layers{
     return true;
   }
 
-  lvr2::VertexMap<float>& InflationLayer::getCosts()
+  lvr2::VertexMap<float>& InflationLayer::costs()
   {
     return riskiness;
   }

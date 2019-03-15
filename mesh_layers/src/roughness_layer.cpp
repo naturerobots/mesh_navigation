@@ -34,7 +34,7 @@ namespace mesh_layers{
     }
   }
 
-  float RoughnessLayer::getThreshold()
+  float RoughnessLayer::threshold()
   {
 
   }
@@ -94,7 +94,7 @@ namespace mesh_layers{
     roughness = lvr2::calcVertexRoughness(*mesh_ptr, config.roughness_radius, vertex_normals);
   }
 
-  lvr2::VertexMap<float>& RoughnessLayer::getCosts()
+  lvr2::VertexMap<float>& RoughnessLayer::costs()
   {
     return roughness;
   }

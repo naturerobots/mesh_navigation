@@ -11,7 +11,9 @@ namespace mesh_layers{
 
   virtual bool writeLayer();
 
-  virtual float getThreshold();
+  virtual float defaultValue(){ return 0; }
+
+  virtual float threshold();
 
   void lethalCostInflation(
       const std::set<lvr2::VertexHandle>& lethals,
@@ -22,7 +24,7 @@ namespace mesh_layers{
 
   virtual bool computeLayer(const mesh_map::MeshMapConfig& config);
 
-  virtual lvr2::VertexMap<float>& getCosts();
+  virtual lvr2::VertexMap<float>& costs();
 
   virtual const std::string getName();
 

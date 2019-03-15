@@ -50,35 +50,33 @@
 namespace mesh_map{
 
 MeshMap::MeshMap(tf::TransformListener& tf_listener)
-    : tf_listener_(tf_listener),
-      private_nh_("~/mesh_map/"),
-      first_config_(true),
-      map_loaded_(false),
-      layer_loader("mesh_map", "mesh_map::AbstractLayer")
+    : tf_listener(tf_listener),
+      private_nh("~/mesh_map/"),
+      first_config(true),
+      map_loaded(false),
+      layer_loader("mesh_map", "mesh_map::AbstractLayer"),
+      mesh_ptr(new lvr2::HalfEdgeMesh<VectorType>())
 {
-  private_nh_.param<std::string>("mesh_file", mesh_file_, "mesh.h5");
-  private_nh_.param<std::string>("mesh_part", mesh_part_, "mesh");
-  private_nh_.param<std::string>("global_frame", global_frame_, "map");
-  ROS_INFO_STREAM("mesh file is set to: " << mesh_file_);
+  private_nh.param<std::string>("mesh_file", mesh_file, "mesh.h5");
+  private_nh.param<std::string>("mesh_part", mesh_part, "mesh");
+  private_nh.param<std::string>("global_frame", global_frame, "map");
+  ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
-  mesh_geometry_pub_ = private_nh_.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
-  vertex_costs_pub_ = private_nh_.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
-  path_pub_ = private_nh_.advertise<nav_msgs::Path>("path", true, false);
+  mesh_geometry_pub = private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
+  vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
+  path_pub = private_nh.advertise<nav_msgs::Path>("path", true, false);
 
   reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > (
-      new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh_));
+      new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
 
   config_callback = boost::bind(&MeshMap::reconfigureCallback,this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
-
-
-  loadLayerPlugins();
 
 }
 
 bool MeshMap::readMap()
 {
-  return readMap(mesh_file_, mesh_part_);
+  return readMap(mesh_file, mesh_part);
 }
 
 bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part)
@@ -95,30 +93,32 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   }
   else
   {
-    ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part_ << "' from the map file '" << mesh_file_ << "' ");
+    ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
     return false;
   }
+
+  vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+  edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
 
   // TODO read and write uuid
   boost::uuids::random_generator gen;
   boost::uuids::uuid uuid = gen();
-  uuid_str_ = boost::uuids::to_string(uuid);
-
+  uuid_str = boost::uuids::to_string(uuid);
 
   auto face_normals_opt =
       mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<NormalType>>("face_normals");
 
   if(face_normals_opt)
   {
-    face_normals_ = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals_.numValues() << " face normals in map file.");
+    face_normals = face_normals_opt.get();
+    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
   }
   else
   {
     ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
-    face_normals_ = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed "<< face_normals_.numValues() << " face normals.");
-    if(mesh_io_ptr->addDenseAttributeMap(face_normals_, "face_normals"))
+    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+    ROS_INFO_STREAM("Computed "<< face_normals.numValues() << " face normals.");
+    if(mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
     {
       ROS_INFO_STREAM("Saved face normals to map file.");
     }
@@ -133,14 +133,14 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
 
   if(vertex_normals_opt)
   {
-    vertex_normals_ = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found "<< vertex_normals_.numValues() << " vertex normals in map file!");
+    vertex_normals = vertex_normals_opt.get();
+    ROS_INFO_STREAM("Found "<< vertex_normals.numValues() << " vertex normals in map file!");
   }
   else
   {
     ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals_ = lvr2::calcVertexNormals(*mesh_ptr, face_normals_);
-    if(mesh_io_ptr->addDenseAttributeMap(vertex_normals_, "vertex_normals"))
+    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+    if(mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
       ROS_INFO_STREAM("Saved vertex normals to map file.");
     }
@@ -150,53 +150,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
     }
   }
 
-  mesh_geometry_pub_.publish(lvr_ros::toMeshGeometryStamped<float>(*mesh_ptr, global_frame_, uuid_str_, vertex_normals_));
-
-  ROS_INFO_STREAM("Try to read roughness from map file...");
-  auto roughness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("roughness");
-
-  if(roughness_opt)
-  {
-    ROS_INFO_STREAM("Roughness has been read successfully.");
-    roughness_ = roughness_opt.get();
-  }
-  else
-  {
-    ROS_INFO_STREAM("Computing roughness...");
-    roughness_ = lvr2::calcVertexRoughness(*mesh_ptr, config_.roughness_radius, vertex_normals_);
-    ROS_INFO_STREAM("Saving roughness to map file...");
-    if(mesh_io_ptr->addDenseAttributeMap(roughness_, "roughness"))
-    {
-      ROS_INFO_STREAM("Saved roughness to map file.");
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Could not save roughness to map file!");
-    }
-  }
-
-  ROS_INFO_STREAM("Try to read height differences from map file...");
-  auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
-
-  if(height_diff_opt)
-  {
-    ROS_INFO_STREAM("Height differences have been read successfully.");
-    height_diff_ = height_diff_opt.get();
-  }
-  else
-  {
-    ROS_INFO_STREAM("Computing height differences...");
-    height_diff_ = lvr2::calcVertexHeightDifferences(*mesh_ptr, config_.height_diff_radius);
-    ROS_INFO_STREAM("Saving height_differences to map file...");
-    if(mesh_io_ptr->addDenseAttributeMap(height_diff_, "height_diff"))
-    {
-      ROS_INFO_STREAM("Saved height differences to map file.");
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Could not save height differences to map file!");
-    }
-  }
+  mesh_geometry_pub.publish(lvr_ros::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
   ROS_INFO_STREAM("Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
@@ -204,15 +158,15 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   if(edge_distances_opt)
   {
     ROS_INFO_STREAM("Vertex distances have been read successfully.");
-    edge_distances_ = edge_distances_opt.get();
+    edge_distances = edge_distances_opt.get();
   }
   else
   {
     ROS_INFO_STREAM("Computing edge distances...");
-    edge_distances_ = lvr2::calcVertexDistances(*mesh_ptr);
-    ROS_INFO_STREAM("Saving " << edge_distances_.numValues() << " edge distances to map file...");
+    edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
+    ROS_INFO_STREAM("Saving " << edge_distances.numValues() << " edge distances to map file...");
 
-    if(mesh_io_ptr->addAttributeMap(edge_distances_, "edge_distances"))
+    if(mesh_io_ptr->addAttributeMap(edge_distances, "edge_distances"))
     {
       ROS_INFO_STREAM("Saved edge distances to map file.");
     }
@@ -222,99 +176,122 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
     }
   }
 
-  // riskiness
-  ROS_INFO_STREAM("Try to read riskiness from map file...");
-  auto riskiness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("riskiness");
-
-  if(riskiness_opt)
+  if(!loadLayerPlugins())
   {
-    ROS_INFO_STREAM("Riskiness has been read successfully.");
-    riskiness_ = riskiness_opt.get();
+    ROS_FATAL_STREAM("Could not load any layer plugin!");
+    return false;
   }
-  else
+  if(!initLayerPlugins())
   {
-    ROS_INFO_STREAM("Computing riskiness by finding lethal areas...");
-
-    lethalCostInflation(
-        config_.min_contour_size,
-        config_.height_diff_threshold,
-        config_.roughness_threshold,
-        config_.inflation_radius,
-        config_.inscribed_radius,
-        config_.inscribed_value,
-        config_.lethal_value);
-
-    ROS_INFO_STREAM("Saving " << riskiness_.numValues() << " riskiness values to map file...");
-
-    if(mesh_io_ptr->addDenseAttributeMap(riskiness_, "riskiness"))
-    {
-      ROS_INFO_STREAM("Saved riskiness to map file.");
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Could not save riskiness to map file!");
-    }
+    ROS_FATAL_STREAM("Could not initialize plugins!");
+    return false;
   }
 
   sleep(1);
-  combineVertexCosts(config_.riskiness_factor, config_.roughness_factor, config_.height_diff_factor);
+
+  combineVertexCosts();
   publishCostLayers();
 
-  map_loaded_ = true;
+  map_loaded = true;
   return true;
 }
 
 bool MeshMap::loadLayerPlugins()
 {
-    ros::NodeHandle private_nh("~");
+  XmlRpc::XmlRpcValue plugin_param_list;
+  if(!private_nh.getParam("layers", plugin_param_list))
+  {
+    ROS_WARN_STREAM("No layer plugins configured! - Use the param \"layers\" in the namespace \""
+                        << private_nh.getNamespace() << "\". \"layers\" must be must be a list of "
+                                                        "tuples with a name and a type.");
+    return false;
+  }
 
-    XmlRpc::XmlRpcValue plugin_param_list;
-    if(!private_nh.getParam("layers", plugin_param_list))
+  try
+  {
+    for (int i = 0; i < plugin_param_list.size(); i++)
     {
-      ROS_WARN_STREAM("No layer plugins configured! - Use the param \" layers \""
-                      << " which must be a list of tuples with a name and a type.");
-      return false;
-    }
+      XmlRpc::XmlRpcValue elem = plugin_param_list[i];
 
-    try
-    {
-      for (int i = 0; i < plugin_param_list.size(); i++)
+      std::string name = elem["name"];
+      std::string type = elem["type"];
+
+      typename AbstractLayer::Ptr plugin_ptr;
+
+      if (layers.find(name) != layers.end())
       {
-        XmlRpc::XmlRpcValue elem = plugin_param_list[i];
+        ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
+        return false;
+      }
 
-        std::string name = elem["name"];
-        std::string type = elem["type"];
+      try
+      {
+        plugin_ptr = layer_loader.createInstance(type);
+      }
+      catch(pluginlib::LibraryLoadException &e)
+      {
+        ROS_ERROR_STREAM(e.what());
+      }
 
-        if (layers.find(name) != layers.end())
-        {
-          ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
-          return false;
-        }
-        typename AbstractLayer::Ptr plugin_ptr = layer_loader.createInstance(type);
-        if(plugin_ptr && plugin_ptr->initialize(mesh_ptr, mesh_io_ptr))
-        {
-
+      if(plugin_ptr)
+      {
+        if(plugin_ptr->initialize(mesh_ptr, mesh_io_ptr)){
           layers.insert(std::pair<std::string, typename mesh_map::AbstractLayer::Ptr>(name, plugin_ptr));
-
+          layer_names.push_back(name);
           ROS_INFO_STREAM("The layer plugin with the type \"" << type
-            << "\" has been loaded successfully under the name \"" << name << "\".");
+            << "\" has been loaded and initialized successfully under the name \"" << name << "\".");
         }
         else
         {
-          ROS_ERROR_STREAM("Could not load the layer plugin with the name \""
-                               << name << "\" and the type \"" << type << "\"!");
+          ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \""
+            << name << "\" and the type \"" << type << "\"!");
         }
       }
+      else
+      {
+        ROS_ERROR_STREAM("Could not load the layer plugin with the name \""
+          << name << "\" and the type \"" << type << "\"!");
+      }
     }
-    catch (XmlRpc::XmlRpcException &e)
+  }
+  catch (XmlRpc::XmlRpcException &e)
+  {
+    ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter has to be a list of structs "
+                         << "with fields \"name\" and \"type\"!");
+    ROS_ERROR_STREAM(e.getMessage());
+    return false;
+  }
+  // is there any layer plugin loaded for the map?
+  return !layers.empty();
+}
+
+bool MeshMap::initLayerPlugins()
+{
+  lethals.clear();
+  for(auto& layer_name : layer_names)
+  {
+    auto& layer_plugin = layers[layer_name];
+    layer_plugin->setLethals(lethals);
+    if(!layer_plugin->readLayer())
     {
-      ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter has to be a list of structs "
-                                                            << "with fields \"name\" and \"type\"!");
-      ROS_ERROR_STREAM(e.getMessage());
-      return false;
+      layer_plugin->computeLayer(config);
     }
-    // is there any plugin in the map?
-    return !layers.empty();
+
+    // compute lethal vertices
+    const auto& threshold = layer_plugin->threshold();
+    auto& mesh = *mesh_ptr;
+    auto& costs = layer_plugin->costs();
+    auto& layer_lethals = lethal_indices[layer_name];
+    layer_lethals.clear();
+    for(auto vH : mesh.vertices())
+    {
+      if(costs[vH] > threshold)
+      {
+        layer_lethals.insert(vH);
+        lethals.insert(vH);
+      }
+    }
+  }
 }
 
 inline MeshMap::VectorType MeshMap::toVectorType(const geometry_msgs::Point& p)
@@ -322,8 +299,8 @@ inline MeshMap::VectorType MeshMap::toVectorType(const geometry_msgs::Point& p)
   return VectorType(p.x, p.y, p.z);
 }
 
-bool MeshMap::isLethal(const lvr2::VertexHandle& vH){
-  return vertex_costs_[vH] >= 1;
+inline bool MeshMap::isLethal(const lvr2::VertexHandle& vH){
+  return vertex_costs[vH] >= 1;
 }
 
 bool MeshMap::dijkstra(
@@ -331,13 +308,13 @@ bool MeshMap::dijkstra(
     const VectorType& goal,
     std::list<lvr2::VertexHandle>& path)
 {
-    lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
+  lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
 
-    lvr2::VertexHandle startH = getNearestVertexHandle(start).unwrap();
-    lvr2::VertexHandle goalH = getNearestVertexHandle(goal).unwrap();
+  lvr2::VertexHandle startH = getNearestVertexHandle(start).unwrap();
+  lvr2::VertexHandle goalH = getNearestVertexHandle(goal).unwrap();
 
-    return lvr2::Dijkstra<lvr2::BaseVector<float>>(
-        *mesh_ptr, startH, goalH, edge_weights_, path, potential_, predecessors_, seen, vertex_costs_);
+  return lvr2::Dijkstra<lvr2::BaseVector<float>>(
+      *mesh_ptr, startH, goalH, edge_weights, path, potential, predecessors, seen, vertex_costs);
 }
 
 bool MeshMap::waveFrontPropagation(
@@ -345,65 +322,62 @@ bool MeshMap::waveFrontPropagation(
     const VectorType& goal,
     std::list<lvr2::VertexHandle>& path)
 {
-  return waveFrontPropagation(start, goal, edge_weights_, vertex_costs_, path, potential_, predecessors_);
+  return waveFrontPropagation(start, goal, edge_weights, vertex_costs, path, potential, predecessors);
 }
 
-void MeshMap::combineVertexCosts(
-    const float& riskiness_factor,
-    const float& roughness_factor,
-    const float& height_diff_factor)
+void MeshMap::combineVertexCosts()
 {
-
   ROS_INFO_STREAM("Combining costs...");
 
-  float riskiness_min, riskiness_max, roughness_min, roughness_max, height_diff_min, height_diff_max;
-  // Get normalized values
-  getMinAndMaxValues(riskiness_min, riskiness_max, roughness_min, roughness_max, height_diff_min, height_diff_max);
-  float riskiness_norm = riskiness_max - riskiness_min;
-  float roughness_norm = roughness_max - roughness_min;
-  float height_diff_norm = height_diff_max - height_diff_min;
+  float combined_min = std::numeric_limits<float>::max();
+  float combined_max = std::numeric_limits<float>::min();
 
-  ROS_INFO_STREAM("Riskiness norm: " << riskiness_norm);
-  ROS_INFO_STREAM("Roughness norm: " << roughness_norm);
-  ROS_INFO_STREAM("Height differences norm: " << height_diff_norm);
+  for(auto layer : layers)
+  {
+    const auto& costs = layer.second->costs();
+    float min, max;
+    getMinMax(costs, min, max);
+    const float norm = max - min;
+    const float factor = private_nh.param<float>(layer.first + "/factor", 1.0) / norm;
+    ROS_INFO_STREAM("Layer \"" << layer.first
+                               << "\" max value: " << max << " min value: " << min
+                               << " norm: " << norm << " factor: " << factor);
 
-  combineVertexCosts(
-      riskiness_factor,
-      riskiness_norm,
-      roughness_factor,
-      roughness_norm,
-      height_diff_factor,
-      height_diff_norm
-  );
-  ROS_INFO("Combined costs successfully!");
+    for(auto vH: mesh_ptr->vertices())
+    {
+      vertex_costs[vH] += factor * costs[vH];
+      combined_max = std::max(combined_max, vertex_costs[vH]);
+      combined_min = std::max(combined_min, vertex_costs[vH]);
+    }
+  }
+
+  const float combined_norm = combined_max - combined_min;
+
+  for(auto eH: mesh_ptr->edges())
+  {
+    // Get both Vertices of the current Edge
+    std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
+    lvr2::VertexHandle vH1 = eH_vHs[0];
+    lvr2::VertexHandle vH2 = eH_vHs[1];
+    // Get the Riskiness for the current Edge (the maximum value from both Vertices)
+    float cost_diff = std::abs(vertex_costs[vH1] - vertex_costs[vH2]);
+    edge_weights[eH] = edge_distances[eH]; // + (edge_distances[eH] * config.path_layer_factor * cost_diff);
+  }
+
+  ROS_INFO("Successfully combined costs!");
 }
 
 
-void MeshMap::getMinAndMaxValues(
-    float& risk_min, float& risk_max,
-    float& rough_min, float& rough_max,
-    float& height_min, float& height_max)
+void MeshMap::getMinMax(const lvr2::VertexMap<float>& costs, float& min, float& max)
 {
-  risk_max = std::numeric_limits<float>::min();
-  risk_min = std::numeric_limits<float>::max();
-
-  rough_max = std::numeric_limits<float>::min();
-  rough_min = std::numeric_limits<float>::max();
-
-  height_max = std::numeric_limits<float>::min();
-  height_min = std::numeric_limits<float>::max();
+  max = std::numeric_limits<float>::min();
+  min = std::numeric_limits<float>::max();
 
   // Calculate minimum and maximum values
   for(auto vH: mesh_ptr->vertices())
   {
-    // max values
-    if(risk_max < riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_max = riskiness_[vH];
-    if(rough_max < roughness_[vH] && std::isfinite(roughness_[vH])) rough_max = roughness_[vH];
-    if(height_max < height_diff_[vH] && std::isfinite(height_diff_[vH])) height_max = height_diff_[vH];
-    // min values
-    if(risk_min > riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_min = riskiness_[vH];
-    if(rough_min > roughness_[vH] && std::isfinite(roughness_[vH])) rough_min = roughness_[vH];
-    if(height_min > height_diff_[vH] && std::isfinite(height_diff_[vH])) height_min = height_diff_[vH];
+    if(max < costs[vH] && std::isfinite(costs[vH])) max = costs[vH];
+    if(min > costs[vH] && std::isfinite(costs[vH])) min = costs[vH];
   }
 }
 
@@ -428,27 +402,8 @@ void MeshMap::findLethalAreas(
     const float roughness_threshold)
 {
   ROS_INFO_STREAM("Find lethal vertices...");
-  lethals_.clear();
-  findLethalByContours(min_contour_size, lethals_);
-  findLethalInLayer(height_diff_, height_diff_threshold, lethals_);
-  findLethalInLayer(roughness_, roughness_threshold, lethals_);
-}
-
-void MeshMap::findLethalInLayer(
-    const lvr2::DenseVertexMap<float>& layer,
-    const float& threshold,
-    std::set<lvr2::VertexHandle>& lethals)
-{
-  int size = lethals.size();
-  for(auto vH: mesh_ptr->vertices())
-  {
-    // Store lethal areas by Roughness
-    if(layer[vH] >= threshold)
-    {
-      lethals.insert(vH);
-    }
-  }
-  ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices exceeding the threshold " << threshold << "!");
+  lethals.clear();
+  findLethalByContours(min_contour_size, lethals);
 }
 
 void MeshMap::findContours(
@@ -532,196 +487,6 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
-void MeshMap::combineVertexCosts(
-    float riskiness_factor,
-    float riskiness_norm,
-    float roughness_factor,
-    float roughness_norm,
-    float height_diff_factor,
-    float height_diff_norm)
-{
-  if(riskiness_norm != 0) riskiness_factor /= riskiness_norm;
-  if(roughness_norm != 0) roughness_factor /= roughness_norm;
-  if(height_diff_norm != 0) height_diff_factor /= height_diff_norm;
-
-  float risk_max = std::numeric_limits<float>::min();
-  float risk_min = std::numeric_limits<float>::max();
-
-  float rough_max = std::numeric_limits<float>::min();
-  float rough_min = std::numeric_limits<float>::max();
-
-  float height_max = std::numeric_limits<float>::min();
-  float height_min = std::numeric_limits<float>::max();
-
-  // Calculate minimum and maximum values
-  for(auto vH: mesh_ptr->vertices())
-  {
-    if(risk_max < riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_max = riskiness_[vH];
-    if(rough_max < roughness_[vH] && std::isfinite(roughness_[vH])) rough_max = roughness_[vH];
-    if(height_max < height_diff_[vH] && std::isfinite(height_diff_[vH])) height_max = height_diff_[vH];
-    if(risk_min > riskiness_[vH] && std::isfinite(riskiness_[vH])) risk_min = riskiness_[vH];
-    if(rough_min > roughness_[vH] && std::isfinite(roughness_[vH])) rough_min = roughness_[vH];
-    if(height_min > height_diff_[vH] && std::isfinite(height_diff_[vH])) height_min = height_diff_[vH];
-  }
-
-  ROS_INFO_STREAM("Roughness min: " << rough_min << " roughness max: " << rough_max);
-  ROS_INFO_STREAM("Height Differences min: " << height_min << " height differences max: " << height_max);
-  ROS_INFO_STREAM("Riskiness min: " << risk_min << " riskiness max: " << risk_max);
-
-  for(auto vH: mesh_ptr->vertices())
-  {
-    vertex_costs_.insert(vH, riskiness_factor * riskiness_[vH] +
-        roughness_factor * roughness_[vH] +
-        height_diff_factor * height_diff_[vH]);
-  }
-
-  calculateEdgeWeights(roughness_factor, height_diff_factor);
-}
-void MeshMap::lethalCostInflation(
-    const int min_contour_size,
-    const float height_diff_threshold,
-    const float roughness_threshold,
-    const float inflation_radius,
-    const float inscribed_radius,
-    const float inscribed_value,
-    const float lethal_value)
-{
-  findLethalAreas(min_contour_size, height_diff_threshold, roughness_threshold);
-  lethalCostInflation(lethals_, inflation_radius, inscribed_radius, inscribed_value, lethal_value);
-
-}
-
-void MeshMap::lethalCostInflation(
-    const std::set<lvr2::VertexHandle>& lethals,
-    float inflation_radius,
-    float inscribed_radius,
-    float inscribed_value,
-    float lethal_value)
-{
-
-  ROS_INFO_STREAM("lethal cost inflation.");
-
-  struct Cmp{
-    const lvr2::DenseVertexMap<float>& distances;
-    Cmp(const lvr2::DenseVertexMap<float>& distances) : distances(distances) {}
-
-    bool operator() (lvr2::VertexHandle& left, lvr2::VertexHandle& right)
-    {
-      return distances[left] > distances[right];
-    }
-  };
-
-  lvr2::DenseVertexMap<bool> seen(mesh_ptr->numVertices(), false);
-  lvr2::DenseVertexMap<lvr2::VertexHandle> prev;
-  prev.reserve(mesh_ptr->numVertices());
-
-  for(auto vH: mesh_ptr->vertices())
-  {
-    riskiness_.insert(vH, 0);
-    vertex_distances_.insert(vH, std::numeric_limits<float>::max());
-    prev.insert(vH, vH);
-  }
-
-  Cmp cmp(vertex_distances_);
-  std::priority_queue<lvr2::VertexHandle, std::vector<lvr2::VertexHandle>, Cmp> pq(cmp);
-
-  for(auto vH: lethals)
-  {
-    vertex_distances_[vH] = 0;
-    pq.push(vH);
-  }
-
-  float inflation_radius_squared = inflation_radius * inflation_radius;
-  float inscribed_radius_squared = inscribed_radius * inscribed_radius;
-
-  while (!pq.empty())
-  {
-    lvr2::VertexHandle vH = pq.top();
-    pq.pop();
-
-    if(seen[vH]) continue;
-    seen[vH] = true;
-
-    std::vector<lvr2::VertexHandle> neighbours;
-    mesh_ptr->getNeighboursOfVertex(vH, neighbours);
-    for(auto n : neighbours)
-    {
-      if(vertex_distances_[n] == 0 || seen[n]) continue;
-      float n_dist = mesh_ptr->getVertexPosition(n).squaredDistanceFrom(mesh_ptr->getVertexPosition(prev[vH]));
-      if(n_dist < vertex_distances_[n] && n_dist < inflation_radius_squared)
-      {
-        prev[n] = prev[vH];
-        vertex_distances_[n] = n_dist;
-        pq.push(n);
-      }
-    }
-  }
-
-  for(auto vH: mesh_ptr->vertices())
-  {
-    if(vertex_distances_[vH] > inflation_radius_squared)
-    {
-      riskiness_.insert(vH, 0);
-    }
-
-      // Inflation radius
-    else if(vertex_distances_[vH] > inscribed_radius_squared)
-    {
-      float alpha = (sqrt(vertex_distances_[vH]) - inscribed_radius) /
-          (inflation_radius - inscribed_radius) * M_PI;
-      riskiness_.insert(vH, inscribed_value * (cos(alpha) + 1) / 2.0);
-    }
-
-      // Inscribed radius
-    else if(vertex_distances_[vH] > 0)
-    {
-      riskiness_.insert(vH, inscribed_value);
-    }
-
-      // Lethality
-    else
-    {
-      riskiness_.insert(vH, lethal_value);
-    }
-  }
-
-  ROS_INFO_STREAM("lethal cost inflation finished.");
-}
-
-void MeshMap::calculateEdgeWeights(
-    float roughness_factor,
-    float height_diff_factor)
-{
-  ROS_INFO_STREAM("Compute edge weights...");
-
-  // For all found Edges
-  for(auto eH: mesh_ptr->edges())
-  {
-    // Get both Vertices of the current Edge
-    array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
-    lvr2::VertexHandle vH1 = eH_vHs[0];
-    lvr2::VertexHandle vH2 = eH_vHs[1];
-
-    // Get the Riskiness for the current Edge (the maximum value from both Vertices)
-    double edge_risk = std::max(riskiness_[vH1], riskiness_[vH2]);
-
-    // Get the Roughness for the current Edge, using the given Roughness-Factor
-    double edge_roughness_factor = std::max(roughness_[vH1], roughness_[vH2]) * roughness_factor + 1;
-
-    // Get the Height Difference for Edge, using the given Height Difference-Factor
-    double edge_height_diff_factor = std::max(
-        height_diff_[vH1], height_diff_[vH2])
-        * height_diff_factor + 1;
-
-    // Save calculated edge weight
-    edge_weights_.insert(eH, edge_distances_[eH] * edge_roughness_factor
-        * edge_height_diff_factor + edge_risk);
-  }
-  ROS_INFO_STREAM("Compute edge weights done.");
-}
-
-
-
 bool MeshMap::calculatePose(
     const VectorType& current,
     const VectorType& next,
@@ -791,8 +556,8 @@ inline bool MeshMap::waveFrontUpdate(
 
     if (T3tmp < T3)
     {
-        distances[v3] = static_cast<float>(T3tmp);
-        return true;
+      distances[v3] = static_cast<float>(T3tmp);
+      return true;
     }
     return false;
   }
@@ -995,6 +760,7 @@ bool MeshMap::pathPlanning(
   if(fmm){
     ROS_INFO("start wave front propagation.");
     if(!waveFrontPropagation(toVectorType(goal.pose.position), toVectorType(start.pose.position), path)){
+      vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential Debug", global_frame, uuid_str));
       return false;
     }
   }
@@ -1002,6 +768,7 @@ bool MeshMap::pathPlanning(
   {
     ROS_INFO("start dijkstra.");
     if(!dijkstra(toVectorType(goal.pose.position), toVectorType(start.pose.position), path)){
+      vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential Debug", global_frame, uuid_str));
       return false;
     }
   }
@@ -1013,7 +780,7 @@ bool MeshMap::pathPlanning(
 
   std_msgs::Header header;
   header.stamp = ros::Time::now();
-  header.frame_id = global_frame_;
+  header.frame_id = global_frame;
 
   lvr2::VertexHandle prev = path.front();
 
@@ -1024,7 +791,7 @@ bool MeshMap::pathPlanning(
     if(calculatePose(
         mesh_ptr->getVertexPosition(prev),
         mesh_ptr->getVertexPosition(vH),
-        vertex_normals_[prev],
+        vertex_normals[prev],
         pose.pose
     )){
       plan.push_back(pose);
@@ -1036,8 +803,8 @@ bool MeshMap::pathPlanning(
   path_msg.poses = plan;
   path_msg.header = header;
 
-  path_pub_.publish(path_msg);
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(potential_, "Potential", global_frame_, uuid_str_));
+  path_pub.publish(path_msg);
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential", global_frame, uuid_str));
 
   return true;
 }
@@ -1050,19 +817,28 @@ bool MeshMap::resetLayers()
 
 void MeshMap::publishCostLayers()
 {
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(riskiness_, "Riskiness", global_frame_, uuid_str_));
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(roughness_, "Roughness", global_frame_, uuid_str_));
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(height_diff_, "Height Diff", global_frame_, uuid_str_));
-  vertex_costs_pub_.publish(lvr_ros::toVertexCostsStamped(vertex_costs_, "Combined Costs", global_frame_, uuid_str_));
+
+  for(auto& layer : layers)
+  {
+    vertex_costs_pub.publish(
+        lvr_ros::toVertexCostsStamped(
+            layer.second->costs(),
+            mesh_ptr->numVertices(),
+            layer.second->defaultValue(),
+            layer.first,
+            global_frame,
+            uuid_str));
+  }
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 }
 
-void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level)
+void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& cfg, uint32_t level)
 {
   ROS_INFO_STREAM("Dynamic reconfigure callback...");
-  if(first_config_)
+  if(first_config)
   {
-    config_ = config;
-    first_config_ = false;
+    config = cfg;
+    first_config = false;
   }
 
   ROS_INFO_STREAM("Reconfigure request: " );
@@ -1079,19 +855,20 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t leve
   ROS_INFO_STREAM("lethal value: " << config.lethal_value);
   ROS_INFO_STREAM("inscribed value: " << config.inscribed_value);
 
-  if(!first_config_ && map_loaded_ )
+  if(!first_config && map_loaded)
   {
     // Check the dynamic local radius parameter
-    if( config_.roughness_radius != config.roughness_radius ||
-        config_.height_diff_radius != config.height_diff_radius ||
-        config_.roughness_threshold != config.roughness_threshold ||
-        config_.height_diff_threshold != config.height_diff_threshold ||
-        config_.min_contour_size != config.min_contour_size ||
-        config_.inscribed_radius != config.inscribed_radius ||
-        config_.inflation_radius != config.inflation_radius ||
-        config_.inscribed_value != config.inscribed_value ||
-        config_.lethal_value != config.lethal_value)
+    if( config.roughness_radius != cfg.roughness_radius ||
+        config.height_diff_radius != cfg.height_diff_radius ||
+        config.roughness_threshold != cfg.roughness_threshold ||
+        config.height_diff_threshold != cfg.height_diff_threshold ||
+        config.min_contour_size != cfg.min_contour_size ||
+        config.inscribed_radius != cfg.inscribed_radius ||
+        config.inflation_radius != cfg.inflation_radius ||
+        config.inscribed_value != cfg.inscribed_value ||
+        config.lethal_value != cfg.lethal_value)
     {
+      /*
       if(config_.roughness_radius != config.roughness_radius)
       {
         roughness_ = lvr2::calcVertexRoughness(*mesh_ptr, config.roughness_radius, vertex_normals_);
@@ -1110,11 +887,13 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t leve
           config.inscribed_value,
           config.lethal_value);
 
-      combineVertexCosts(config.riskiness_factor, config.roughness_factor, config.height_diff_factor);
+      */
+
+      combineVertexCosts();
       publishCostLayers();
     }
 
-    config_ = config;
+    config = cfg;
   }
   // Apply the current configuration
 }
@@ -1123,7 +902,7 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t leve
 
 const std::string MeshMap::getGlobalFrameID()
 {
-  return global_frame_;
+  return global_frame;
 }
 
 } /* namespace mesh_map */

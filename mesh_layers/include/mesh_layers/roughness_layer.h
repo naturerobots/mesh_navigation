@@ -11,11 +11,13 @@ namespace mesh_layers{
 
   virtual bool writeLayer();
 
-  virtual float getThreshold();
+  virtual float threshold();
+
+  virtual float defaultValue(){ return std::numeric_limits<float>::infinity(); }
 
   virtual bool computeLayer(const mesh_map::MeshMapConfig& config);
 
-  virtual lvr2::VertexMap<float>& getCosts();
+  virtual lvr2::VertexMap<float>& costs();
 
   virtual const std::string getName();
 

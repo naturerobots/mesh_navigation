@@ -37,8 +37,7 @@ namespace mesh_layers{
       }
   }
 
-
-  float HeightDiffLayer::getThreshold()
+  float HeightDiffLayer::threshold()
   {
 
   }
@@ -49,7 +48,7 @@ namespace mesh_layers{
     return true;
   }
 
-  lvr2::VertexMap<float>& HeightDiffLayer::getCosts()
+  lvr2::VertexMap<float>& HeightDiffLayer::costs()
   {
     return height_diff;
   }

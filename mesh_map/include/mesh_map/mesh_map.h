@@ -70,6 +70,8 @@ class MeshMap
 
   bool loadLayerPlugins();
 
+  bool initLayerPlugins();
+
   inline VectorType toVectorType(const geometry_msgs::Point& point);
 
   bool pathPlanning(
@@ -108,48 +110,14 @@ class MeshMap
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
-  void combineVertexCosts(
-      const float& riskiness_factor,
-      const float& roughness_factor,
-      const float& height_diff_factor);
+  void combineVertexCosts();
 
-  void getMinAndMaxValues(
-      float& risk_min, float& risk_max,
-      float& rough_min, float& rough_max,
-      float& height_min, float& height_max);
-
-  void lethalCostInflation(
-      const int min_contour_size,
-      const float height_diff_threshold,
-      const float roughness_threshold,
-      const float inflation_radius,
-      const float inscribed_radius,
-      const float inscribed_value,
-      const float lethal_value);
-
-  void lethalCostInflation(
-      const std::set<lvr2::VertexHandle>& lethals,
-      float inflation_radius,
-      float inscribed_radius,
-      float inscribed_value,
-      float lethal_value);
-
-  void combineVertexCosts(
-      float riskiness_factor,
-      float riskiness_norm,
-      float roughness_factor,
-      float roughness_norm,
-      float height_diff_factor,
-      float height_diff_norm);
+  void getMinMax(const lvr2::VertexMap<float>& map, float& min, float& max);
 
   void findLethalAreas(
       const int min_contour_size,
       const float height_diff_threshold,
       const float roughness_threshold);
-
-  void calculateEdgeWeights(
-      float roughness_factor,
-      float height_diff_factor);
 
   bool calculatePose(const VectorType& current,
                      const VectorType& next,
@@ -172,7 +140,7 @@ class MeshMap
 
   const std::string getGlobalFrameID();
 
-  bool isLethal(const lvr2::VertexHandle& vH);
+  inline bool isLethal(const lvr2::VertexHandle& vH);
 
   bool resetLayers();
 
@@ -181,53 +149,54 @@ class MeshMap
   std::shared_ptr<lvr2::HalfEdgeMesh<VectorType>> mesh_ptr;
 
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+
+  std::vector<std::string> layer_names;
+
   std::map<std::string, mesh_map::AbstractLayer::Ptr> layers;
 
-  std::string global_frame_;
+  std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
 
-  std::string mesh_file_;
-  std::string mesh_part_;
+  std::set<lvr2::VertexHandle> lethals;
 
-  // layers
-  lvr2::DenseVertexMap<float> roughness_;
-  lvr2::DenseVertexMap<float> height_diff_;
-  lvr2::DenseVertexMap<float> riskiness_;
+  std::string global_frame;
+
+  std::string mesh_file;
+  std::string mesh_part;
 
   // combined layers
-  lvr2::DenseVertexMap<float> vertex_costs_;
-  lvr2::DenseVertexMap<float> vertex_distances_;
+  lvr2::DenseVertexMap<float> vertex_costs;
+  lvr2::DenseVertexMap<float> vertex_distances;
 
   // path surface potential
-  lvr2::DenseVertexMap<float> potential_;
+  lvr2::DenseVertexMap<float> potential;
   // predecessors while wave propagation
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors_;
+  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
 
   // edge vertex distances
-  lvr2::DenseEdgeMap<float> edge_distances_;
-  lvr2::DenseEdgeMap<float> edge_weights_;
+  lvr2::DenseEdgeMap<float> edge_distances;
+  lvr2::DenseEdgeMap<float> edge_weights;
 
-  std::set<lvr2::VertexHandle> lethals_;
 
-  lvr2::DenseFaceMap<NormalType> face_normals_;
-  lvr2::DenseVertexMap<NormalType> vertex_normals_;
+  lvr2::DenseFaceMap<NormalType> face_normals;
+  lvr2::DenseVertexMap<NormalType> vertex_normals;
 
-  ros::Publisher vertex_costs_pub_;
-  ros::Publisher mesh_geometry_pub_;
-  ros::Publisher path_pub_;
+  ros::Publisher vertex_costs_pub;
+  ros::Publisher mesh_geometry_pub;
+  ros::Publisher path_pub;
 
 
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > reconfigure_server_ptr;
   dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
-  bool first_config_;
-  bool map_loaded_;
-  MeshMapConfig config_;
+  bool first_config;
+  bool map_loaded;
+  MeshMapConfig config;
 
-  ros::NodeHandle private_nh_;
+  ros::NodeHandle private_nh;
 
-  tf::TransformListener& tf_listener_;
+  tf::TransformListener& tf_listener;
 
-  std::string uuid_str_;
+  std::string uuid_str;
 
 };
 

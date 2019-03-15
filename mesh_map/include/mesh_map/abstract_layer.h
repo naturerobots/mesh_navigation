@@ -19,12 +19,13 @@ class AbstractLayer
 
   virtual bool writeLayer() = 0;
 
+  virtual float defaultValue() = 0;
 
-  virtual float getThreshold() = 0;
+  virtual float threshold() = 0;
 
   virtual bool computeLayer(const MeshMapConfig& config) = 0;
 
-  virtual lvr2::VertexMap<float>& getCosts() = 0;
+  virtual lvr2::VertexMap<float>& costs() = 0;
 
   virtual const std::string getName() = 0;
 
@@ -36,6 +37,7 @@ class AbstractLayer
   {
     mesh_ptr = mesh;
     mesh_io_ptr = io;
+    return true;
   }
 
  protected:
