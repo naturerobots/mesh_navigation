@@ -46,6 +46,7 @@
 #include <boost/uuid/random_generator.hpp>
 #include <algorithm>
 #include <XmlRpcException.h>
+#include <lvr2/util/Meap.hpp>
 
 namespace mesh_map{
 
@@ -332,23 +333,35 @@ void MeshMap::combineVertexCosts()
   float combined_min = std::numeric_limits<float>::max();
   float combined_max = std::numeric_limits<float>::min();
 
+  vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+
   for(auto layer : layers)
   {
     const auto& costs = layer.second->costs();
     float min, max;
     getMinMax(costs, min, max);
     const float norm = max - min;
-    const float factor = private_nh.param<float>(layer.first + "/factor", 1.0) / norm;
+    const float factor = private_nh.param<float>(layer.first + "/factor", 1.0);
+    const float norm_factor = factor / norm;
     ROS_INFO_STREAM("Layer \"" << layer.first
                                << "\" max value: " << max << " min value: " << min
-                               << " norm: " << norm << " factor: " << factor);
+                               << " norm: " << norm << " factor: " << factor << " norm factor: " << norm_factor);
 
+
+    const float default_value = layer.second->defaultValue();
+    bool hasNaN = false;
     for(auto vH: mesh_ptr->vertices())
     {
-      vertex_costs[vH] += factor * costs[vH];
-      combined_max = std::max(combined_max, vertex_costs[vH]);
-      combined_min = std::max(combined_min, vertex_costs[vH]);
+      const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
+      if(std::isnan(cost)) hasNaN = true;
+      vertex_costs[vH] += factor * cost;
+      if(std::isfinite(cost))
+      {
+        combined_max = std::max(combined_max, vertex_costs[vH]);
+        combined_min = std::max(combined_min, vertex_costs[vH]);
+      }
     }
+    if(hasNaN) ROS_WARN_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
   }
 
   const float combined_norm = combined_max - combined_min;
@@ -361,7 +374,7 @@ void MeshMap::combineVertexCosts()
     lvr2::VertexHandle vH2 = eH_vHs[1];
     // Get the Riskiness for the current Edge (the maximum value from both Vertices)
     float cost_diff = std::abs(vertex_costs[vH1] - vertex_costs[vH2]);
-    edge_weights[eH] = edge_distances[eH]; // + (edge_distances[eH] * config.path_layer_factor * cost_diff);
+    edge_weights[eH] = edge_distances[eH]; //+ (edge_distances[eH] * config.path_layer_factor * cost_diff);
   }
 
   ROS_INFO("Successfully combined costs!");
@@ -549,6 +562,7 @@ inline bool MeshMap::waveFrontUpdate(
   const float a = edge_weights[e23h.unwrap()];
   const float a_sq = a * a;
 
+  /*
   if(a < 0.01 || b < 0.01 || c < 0.01){
     double T3tmp = T3;
     if (a < 0.005) T3tmp = T2 + a;
@@ -561,6 +575,7 @@ inline bool MeshMap::waveFrontUpdate(
     }
     return false;
   }
+  */
 
   const double T1sq = T1*T1;
   const double T2sq = T2*T2;
@@ -577,7 +592,6 @@ inline bool MeshMap::waveFrontUpdate(
     distances[v3] = static_cast<float>(T3tmp);
     return true;
   }
-
   return false;
 }
 
@@ -613,7 +627,7 @@ inline bool MeshMap::waveFrontPropagation(
 
   VectorType start_point = mesh_ptr->getVertexPosition(start_vertex);
 
-  lvr2::DenseVertexMap<bool> fixed(mesh_ptr->numVertices(), false);
+  lvr2::DenseVertexMap<bool> fixed(mesh_ptr->nextVertexIndex(), false);
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
@@ -623,18 +637,7 @@ inline bool MeshMap::waveFrontPropagation(
     predecessors.insert(vH, vH);
   }
 
-  struct Cmp{
-    const lvr2::DenseVertexMap<float>& distances;
-    Cmp(const lvr2::DenseVertexMap<float>& distances) : distances(distances) {}
-    bool operator() (lvr2::VertexHandle& left, lvr2::VertexHandle& right)
-    {
-      return distances[left] > distances[right];
-    }
-  };
-
-  Cmp cmp(distances);
-
-  std::priority_queue<lvr2::VertexHandle, std::vector<lvr2::VertexHandle>, Cmp> pq(cmp);
+  lvr2::Meap<lvr2::VertexHandle, float> pq;
 
   // Set start distance to zero
   // add start vertex to priority queue
@@ -654,17 +657,17 @@ inline bool MeshMap::waveFrontPropagation(
     lvr2::OptionalEdgeHandle edge = mesh_ptr->getEdgeBetween(start_vertex, n_vh);
     distances[n_vh] = edge_weights[edge.unwrap()];
     predecessors[n_vh] = start_vertex;
-    pq.push(n_vh);
+    fixed[n_vh] = true;
+    pq.insert(n_vh, distances[n_vh]);
   }
   ROS_INFO_STREAM("Start wave front propagation");
 
-  while(!pq.empty())
+  while(!pq.isEmpty())
   {
-    lvr2::VertexHandle current_vh = pq.top();
-    pq.pop();
+    lvr2::VertexHandle current_vh = pq.popMin().key;
 
     // check if already fixed
-    if(fixed[current_vh]) continue;
+    //if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
 
     std::vector<lvr2::FaceHandle> faces;
@@ -677,31 +680,43 @@ inline bool MeshMap::waveFrontPropagation(
       const lvr2::VertexHandle& b = vertices[1];
       const lvr2::VertexHandle& c = vertices[2];
 
-      if(fixed[a] && fixed[b] && fixed[c]){
+      if(fixed[a] && fixed[b] && fixed[c])
+      {
         continue;
-      }else if(fixed[a] && fixed[b] && !fixed[c]){
+      }
+      else if(fixed[a] && fixed[b] && !fixed[c]){
         // c is free
-        if(costs[c] <= 1 && waveFrontUpdate(distances, edge_weights, a, b, c)){
-          predecessors[c] = (distances[a] < distances[b]) ? a : b;
-          pq.push(c);
+        if(costs[c] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, a, b, c))
+        {
+            predecessors[c] = (distances[a] < distances[b]) ? a : b;
+            pq.insert(c, distances[c]);
         }
-      }else if(fixed[a] && !fixed[b] && fixed[c]){
+      }
+      else if(fixed[a] && !fixed[b] && fixed[c]){
         // b is free
-        if(costs[b] <= 1 && waveFrontUpdate(distances, edge_weights, c, a, b)){
-          predecessors[b] = (distances[c] < distances[a]) ? c : a;
-          pq.push(b);
+        if(costs[b] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, c, a, b))
+        {
+            predecessors[b] = (distances[c] < distances[a]) ? c : a;
+            pq.insert(b, distances[b]);
         }
-      }else if(!fixed[a] && fixed[b] && fixed[c]){
+      }
+      else if(!fixed[a] && fixed[b] && fixed[c]){
         // a if free
-        if(costs[a] <= 1 && waveFrontUpdate(distances, edge_weights, b, c, a)){
-          predecessors[a] = (distances[b] < distances[c]) ? b : c;
-          pq.push(a);
+        if(costs[a] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, b, c, a))
+        {
+            predecessors[a] = (distances[b] < distances[c]) ? b : c;
+            pq.insert(a, distances[a]);
         }
-      }else{
+      }
+      else
+      {
         // two free vertices -> skip that face
         ROS_DEBUG_STREAM("two vertices are free.");
         continue;
       }
+
+      //TODO animation mode
+      //vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(distances, "Potential Debug", global_frame, uuid_str));
     }
   }
 
@@ -711,6 +726,7 @@ inline bool MeshMap::waveFrontPropagation(
 
   if(prev == goal_vertex)
   {
+    ROS_WARN("Predecessor of goal not set!");
     return false;
   }
 
@@ -718,7 +734,7 @@ inline bool MeshMap::waveFrontPropagation(
   {
     path.push_front(prev);
     if(predecessors[prev] == prev){
-      ROS_INFO_STREAM("No path found!");
+      ROS_WARN_STREAM("No path found!");
       return false;
     }
     prev = predecessors[prev];
@@ -755,6 +771,7 @@ bool MeshMap::pathPlanning(
 {
   std::list<lvr2::VertexHandle> path;
 
+  combineVertexCosts();
   ros::WallTime t_start, t_end;
   t_start = ros::WallTime::now();
   if(fmm){
