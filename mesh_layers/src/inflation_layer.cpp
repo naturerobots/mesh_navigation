@@ -148,7 +148,8 @@ namespace mesh_layers{
         config.inflation_radius,
         config.inscribed_radius,
         config.inscribed_value,
-        config.lethal_value);
+        std::numeric_limits<float>::infinity());
+        //config.lethal_value);
 
     return true;
   }
