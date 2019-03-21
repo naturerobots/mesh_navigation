@@ -119,10 +119,11 @@ class MeshMap
       const float height_diff_threshold,
       const float roughness_threshold);
 
-  bool calculatePose(const VectorType& current,
-                     const VectorType& next,
-                     const NormalType& normal,
-                     geometry_msgs::Pose& pose);
+  geometry_msgs::Pose calculatePose(
+      const VectorType& current,
+      const VectorType& next,
+      const NormalType& normal);
+
   void findContours(
       std::vector<std::vector<lvr2::VertexHandle> >& contours,
       int min_contour_size);
@@ -141,6 +142,8 @@ class MeshMap
   const std::string getGlobalFrameID();
 
   inline bool isLethal(const lvr2::VertexHandle& vH);
+
+  inline const geometry_msgs::Point toPoint(const VectorType& vec);
 
   bool resetLayers();
 
@@ -183,7 +186,7 @@ class MeshMap
   ros::Publisher vertex_costs_pub;
   ros::Publisher mesh_geometry_pub;
   ros::Publisher path_pub;
-
+  ros::Publisher vector_pub;
 
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > reconfigure_server_ptr;

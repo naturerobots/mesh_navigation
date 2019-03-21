@@ -9,12 +9,9 @@
 
   <depend>roscpp</depend>
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>lvr_ros</build_depend>
-  <build_export_depend>geometry_msgs</build_export_depend>
-  <build_export_depend>lvr_ros</build_export_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>lvr_ros</exec_depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>lvr_ros</depend>
 
   <export>
 

@@ -8,7 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   lvr_ros
-)
+  visualization_msgs
+  )
 
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(LVR2 2 REQUIRED)
@@ -20,7 +21,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include ${LVR2_INCLUDE_DIRS}
   LIBRARIES mesh_map
-  CATKIN_DEPENDS geometry_msgs lvr_ros
+  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs
   DEPENDS LVR2
 )
 

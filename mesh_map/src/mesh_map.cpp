@@ -47,6 +47,9 @@
 #include <algorithm>
 #include <XmlRpcException.h>
 #include <lvr2/util/Meap.hpp>
+#include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/Vector3.h>
+#include <lvr_ros/colors.h>
 
 namespace mesh_map{
 
@@ -65,8 +68,8 @@ MeshMap::MeshMap(tf::TransformListener& tf_listener)
 
   mesh_geometry_pub = private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
   vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
-  path_pub = private_nh.advertise<nav_msgs::Path>("path", true, false);
-
+  path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, false);
+  vector_pub = private_nh.advertise<visualization_msgs::MarkerArray>("vector_field", 1, true);
   reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > (
       new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
 
@@ -500,24 +503,14 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
-bool MeshMap::calculatePose(
+geometry_msgs::Pose MeshMap::calculatePose(
     const VectorType& current,
     const VectorType& next,
-    const NormalType& normal,
-    geometry_msgs::Pose& pose)
+    const NormalType& normal)
 {
-  // Check the pose integrity
   VectorType direction(next - current);
-  if(!isfinite(direction.x)) return false;
-  if(!isfinite(direction.y)) return false;
-  if(!isfinite(direction.z)) return false;
 
-  if(direction.x == 0 && direction.y == 0 && direction.z == 0)
-  {
-    return false;
-  }
-
-  NormalType ez = normal;
+  NormalType ez = normal.normalized();
   NormalType ey = normal.cross(direction).normalized();
   NormalType ex = ey.cross(normal).normalized();
 
@@ -533,10 +526,11 @@ bool MeshMap::calculatePose(
 
   tf::Pose tf_pose;
   tf_pose.setBasis(tf_basis);
+  tf_pose.setRotation(tf_pose.getRotation().normalize());
   tf_pose.setOrigin(tf_origin);
+  geometry_msgs::Pose pose;
   tf::poseTFToMsg(tf_pose, pose);
-
-  return true;
+  return pose;
 }
 
 inline bool MeshMap::waveFrontUpdate(
@@ -763,6 +757,16 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const VectorType pos)
   return nearest_handle;
 }
 
+inline const geometry_msgs::Point MeshMap::toPoint(const VectorType& vec)
+{
+  geometry_msgs::Point p;
+  p.x = vec.x;
+  p.y = vec.y;
+  p.z = vec.z;
+  return p;
+}
+
+
 bool MeshMap::pathPlanning(
     const geometry_msgs::PoseStamped& start,
     const geometry_msgs::PoseStamped& goal,
@@ -793,11 +797,41 @@ bool MeshMap::pathPlanning(
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
   ROS_INFO_STREAM("Exectution time (ms): " << execution_time << " for " << mesh_ptr->numVertices() << " num vertices in the mesh_ptr->");
 
-  path.reverse();
 
+  visualization_msgs::MarkerArray vector_field;
   std_msgs::Header header;
   header.stamp = ros::Time::now();
   header.frame_id = global_frame;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.07;
+  scale.y = 0.02;
+  scale.z = 0.02;
+
+  unsigned int cnt = 0;
+  vector_field.markers.reserve(predecessors.numValues());
+  for(auto vH : mesh_ptr->vertices())
+  {
+    if(vertex_costs[vH] > config.cost_limit || !predecessors.containsKey(vH)) continue;
+    const lvr2::VertexHandle& pre = predecessors[vH];
+    if(pre != vH)
+    {
+      visualization_msgs::Marker vector;
+      vector.type = visualization_msgs::Marker::ARROW;
+      vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
+      const auto& v1 = mesh_ptr->getVertexPosition(vH);
+      const auto& v2 = mesh_ptr->getVertexPosition(pre);
+      vector.pose = calculatePose(v1, v2, vertex_normals[vH]);
+      vector.header = header;
+      vector.header.seq = cnt;
+      vector.scale = scale;
+      vector.id = cnt++;
+      vector.ns = "vector_field";
+      vector_field.markers.push_back(vector);
+    }
+  }
+  vector_pub.publish(vector_field);
+
+  path.reverse();
 
   lvr2::VertexHandle prev = path.front();
 
@@ -805,15 +839,12 @@ bool MeshMap::pathPlanning(
   {
     geometry_msgs::PoseStamped pose;
     pose.header = header;
-    if(calculatePose(
+    pose.pose = calculatePose(
         mesh_ptr->getVertexPosition(prev),
         mesh_ptr->getVertexPosition(vH),
-        vertex_normals[prev],
-        pose.pose
-    )){
-      plan.push_back(pose);
-      prev = vH;
-    }
+        vertex_normals[prev]);
+    prev = vH;
+    plan.push_back(pose);
   }
 
   nav_msgs::Path path_msg;

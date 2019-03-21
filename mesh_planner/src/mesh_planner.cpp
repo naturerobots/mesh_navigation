@@ -63,11 +63,14 @@ namespace mesh_planner{
   {
     bool use_fmm = private_nh_.param<bool>("use_fmm", true);
 
+    ROS_INFO("make plan...");
     if(mesh_ptr_->pathPlanning(start, goal, plan, use_fmm))
     {
+      ROS_INFO("Found a plan!");
       return mbf_msgs::GetPathResult::SUCCESS;
     }
 
+    ROS_WARN("Could not find a plan!");
     return mbf_msgs::GetPathResult::NO_PATH_FOUND;
   }
 
