@@ -172,8 +172,11 @@ class MeshMap
 
   // path surface potential
   lvr2::DenseVertexMap<float> potential;
+  lvr2::DenseVertexMap<float> direction;
   // predecessors while wave propagation
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces2;
 
   // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;

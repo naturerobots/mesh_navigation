@@ -103,6 +103,7 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
   edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
+  direction = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
   // TODO read and write uuid
   boost::uuids::random_generator gen;
@@ -541,16 +542,17 @@ inline bool MeshMap::waveFrontUpdate(
     const lvr2::VertexHandle& v3)
 {
 
-  const double T1 = distances[v1];
-  const double T2 = distances[v2];
-  const double T3 = distances[v3];
+  const double u1 = distances[v1];
+  const double u2 = distances[v2];
+  const double u3 = distances[v3];
 
   const lvr2::OptionalEdgeHandle e12h = mesh_ptr->getEdgeBetween(v1, v2);
   const float c = edge_weights[e12h.unwrap()];
+  const float c_sq = c * c;
 
   const lvr2::OptionalEdgeHandle e13h = mesh_ptr->getEdgeBetween(v1, v3);
   const float b = edge_weights[e13h.unwrap()];
-  const float b_sq = b*b;
+  const float b_sq = b * b;
 
   const lvr2::OptionalEdgeHandle e23h = mesh_ptr->getEdgeBetween(v2, v3);
   const float a = edge_weights[e23h.unwrap()];
@@ -571,19 +573,90 @@ inline bool MeshMap::waveFrontUpdate(
   }
   */
 
-  const double T1sq = T1*T1;
-  const double T2sq = T2*T2;
+  const double u1sq = u1*u1;
+  const double u2sq = u2*u2;
 
-  double A = std::max<double>((-T1+T2+c)*(T1-T2+c)*(T1+T2-c)*(T1+T2+c), 0);
-  double B = std::max<double>((-a+b+c)*(a-b+c)*(a+b-c)*(a+b+c), 0);
+  const double A = sqrt(std::max<double>((-u1+u2+c)*(u1-u2+c)*(u1+u2-c)*(u1+u2+c), 0));
+  const double B = sqrt(std::max<double>((-a+b+c)*(a-b+c)*(a+b-c)*(a+b+c), 0));
 
-  const double dy = (sqrt(A) + sqrt(B)) / (2*c);
-  const double dx = (T2sq - T1sq + b_sq - a_sq) / (2*c);
+  const double sx = (c_sq+u1sq-u2sq) / (2*c);
+  const double sx_sq = sx * sx;
 
-  const double T3tmp = sqrt(dx*dx + dy*dy);
+  const double sy = -A/(2*c);
+  const double sy_sq = sy * sy;
 
-  if(T3tmp < T3){
-    distances[v3] = static_cast<float>(T3tmp);
+  const double p  = (-a_sq+b_sq+c_sq) / (2*c);
+  const double hc = B / (2*c);
+
+  const double dy = (A + B) / (2*c);
+  //const double dx = (u2sq - u1sq + b_sq - a_sq) / (2*c);
+  const double dx = p-sx;
+
+  //const double x = dx != sx ? (A*sx - B*p)/((A + B)*c) : dx/c;
+  //const double dy = hc-sy;
+
+  const double u3tmp_sq = dx * dx + dy * dy;
+  const double u3tmp = sqrt(u3tmp_sq);
+
+
+  if(u3tmp < u3){
+    distances[v3] = static_cast<float>(u3tmp);
+
+    /**
+     * compute cutting face
+     */
+
+    // left face check
+
+    double S = 0;
+    double gamma = 0;
+    const lvr2::FaceHandle f0 = mesh_ptr->getFaceBetween(v1, v2, v3).unwrap();
+    if(distances[v1] < distances[v2])
+    {
+      predecessors[v3] = v1;
+      S = sy*p - sx*hc;
+      gamma = acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2*u3tmp*b));
+    }
+    else  // right face check
+    {
+      predecessors[v3] = v2;
+      S = sx*hc - hc*c + sy*c - sy*p;
+      gamma = -acos((a_sq + u3tmp_sq + 2*sx*c - sx_sq - c_sq - sy_sq)/(2*a*u3tmp));
+    }
+
+    auto faces = mesh_ptr->getFacesOfEdge(mesh_ptr->getEdgeBetween(predecessors[v3], v3).unwrap());
+    lvr2::OptionalFaceHandle f1;
+
+    direction[v3] = static_cast<float>(gamma);
+
+    if(!faces[0] || !faces[1]){  // if contour face, cutting face is the current one
+      f1 = f0;
+      direction[v3] = 0; // direction lies on g1 or a of the triangle
+    }
+    else if(faces[0].unwrap() != f0){
+      f1 = faces[0]; // since faces[0] must be f1, set it as cutting face
+    }
+    else if(faces[1].unwrap() != f0){
+      f1 = faces[1];
+    }
+
+    if (S > 0){
+      cutting_faces.insert(v3, f1.unwrap());
+      cutting_faces2.insert(v3, f0);
+    }
+    else if( S < 0)
+    {
+      cutting_faces.insert(v3, f0);
+      cutting_faces2.insert(v3, f1.unwrap());
+      direction[v3] *= -1;
+    }
+    else
+    {
+      cutting_faces.insert(v3, f0);
+      cutting_faces2.insert(v3, f0);
+      direction[v3] = 0; // direction lies on g1 or g2
+    }
+
     return true;
   }
   return false;
@@ -682,7 +755,7 @@ inline bool MeshMap::waveFrontPropagation(
         // c is free
         if(costs[c] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, a, b, c))
         {
-            predecessors[c] = (distances[a] < distances[b]) ? a : b;
+            //predecessors[c] = (distances[a] < distances[b]) ? a : b;
             pq.insert(c, distances[c]);
         }
       }
@@ -690,7 +763,7 @@ inline bool MeshMap::waveFrontPropagation(
         // b is free
         if(costs[b] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, c, a, b))
         {
-            predecessors[b] = (distances[c] < distances[a]) ? c : a;
+            //predecessors[b] = (distances[c] < distances[a]) ? c : a;
             pq.insert(b, distances[b]);
         }
       }
@@ -698,7 +771,7 @@ inline bool MeshMap::waveFrontPropagation(
         // a if free
         if(costs[a] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, b, c, a))
         {
-            predecessors[a] = (distances[b] < distances[c]) ? b : c;
+            //predecessors[a] = (distances[b] < distances[c]) ? b : c;
             pq.insert(a, distances[a]);
         }
       }
@@ -808,25 +881,112 @@ bool MeshMap::pathPlanning(
   scale.z = 0.02;
 
   unsigned int cnt = 0;
-  vector_field.markers.reserve(predecessors.numValues());
-  for(auto vH : mesh_ptr->vertices())
+  vector_field.markers.reserve(2*predecessors.numValues());
+
+  visualization_msgs::Marker vector;
+  vector.type = visualization_msgs::Marker::ARROW;
+  vector.header = header;
+  vector.ns = "vector_field";
+
+
+  for(auto v3 : mesh_ptr->vertices())
   {
-    if(vertex_costs[vH] > config.cost_limit || !predecessors.containsKey(vH)) continue;
-    const lvr2::VertexHandle& pre = predecessors[vH];
-    if(pre != vH)
+    if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
+    const lvr2::VertexHandle& v1 = predecessors[v3];
+    if(v1 != v3)
     {
-      visualization_msgs::Marker vector;
-      vector.type = visualization_msgs::Marker::ARROW;
-      vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
-      const auto& v1 = mesh_ptr->getVertexPosition(vH);
-      const auto& v2 = mesh_ptr->getVertexPosition(pre);
-      vector.pose = calculatePose(v1, v2, vertex_normals[vH]);
-      vector.header = header;
-      vector.header.seq = cnt;
+      vector.color = lvr_ros::getRainbowColor(vertex_costs[v3]);
+
+      // find b of the corresponding face
+      const auto& edge_b = mesh_ptr->getEdgeBetween(v3, v1).unwrap();
+      const auto& faces = mesh_ptr->getFacesOfEdge(edge_b);
+
+      lvr2::OptionalVertexHandle v2;
+      lvr2::OptionalVertexHandle v22;
+
+      /*
+      lvr2::OptionalFaceHandle face;
+      for(auto fH : faces)
+      {
+        if(!fH) continue;
+        const auto& vertices = mesh_ptr->getVerticesOfFace(fH.unwrap());
+        for(auto vH : vertices)
+        {
+          if(vH != v3 && vH != v1 && (!v2 || potential[vH] < potential[v2.unwrap()]))
+          {
+            face = fH;
+            v2 = vH;
+            break;
+          }
+        }
+      }
+      */
+
+      const auto& optFh = cutting_faces.get(v3);
+      const auto& optFh2 = cutting_faces2.get(v3);
+      if(!optFh || !optFh2) continue;
+      const lvr2::FaceHandle& fH = optFh.get();
+      const lvr2::FaceHandle& fH2 = optFh2.get();
+
+      auto face = mesh_ptr->getVerticesOfFace(fH);
+      auto face2 = mesh_ptr->getVerticesOfFace(fH2);
+
       vector.scale = scale;
-      vector.id = cnt++;
-      vector.ns = "vector_field";
-      vector_field.markers.push_back(vector);
+      for(auto vH : face)
+      {
+        if (vH!=v1 && vH!=v3)
+        {
+          v2 = vH;
+          break;
+        }
+      }
+
+      for(auto vH : face2)
+      {
+        if (vH!=v1 && vH!=v3)
+        {
+          v22 = vH;
+          break;
+        }
+      }
+
+      const auto& vec3 = mesh_ptr->getVertexPosition(v3);
+      const auto& vec1 = mesh_ptr->getVertexPosition(v1);
+
+      if(v2 && v22)
+      {
+        const auto& vec2 = mesh_ptr->getVertexPosition(v2.unwrap());
+        const auto& vec22 = mesh_ptr->getVertexPosition(v22.unwrap());
+        //const auto dirVec = vec2 - vec1;
+        const auto dir2Vec = vec22 - vec1;
+        //VectorType sVec = vec1+(dirVec*0.5);//direction[v3]);
+        VectorType sVec2 = vec1+(dir2Vec*0.5);//direction[v3]);
+
+        const auto dirVec = vec1 - vec3;
+        VectorType sVec = vec3 + dirVec.rotated(face_normals[fH], -direction[v3]);
+        vector.pose = calculatePose(vec3, sVec, face_normals[fH]);
+        //vector.scale.x = (vec3-sVec).length();
+        vector.header.seq = cnt;
+        vector.id = cnt++;
+        vector_field.markers.push_back(vector);
+
+        vector.color = lvr_ros::getRainbowColor(1);
+        //const auto dirVec = vec3 - vec1;
+        //VectorType sVec = vec1 + dirVec.rotated(face_normals[face.unwrap()], direction[v3]);
+        vector.pose = calculatePose(vec3, sVec2, face_normals[fH2]);
+        //vector.scale.x = (vec3-sVec).length();
+        vector.header.seq = cnt;
+        vector.id = cnt++;
+        vector_field.markers.push_back(vector);
+      }
+      else{
+        ROS_ERROR_STREAM("v2 does not exists!");
+        vector.pose = calculatePose(vec3, vec1, vertex_normals[v3]);
+        vector.header.seq = cnt;
+        vector.id = cnt++;
+        vector_field.markers.push_back(vector);
+      }
+
     }
   }
   vector_pub.publish(vector_field);
