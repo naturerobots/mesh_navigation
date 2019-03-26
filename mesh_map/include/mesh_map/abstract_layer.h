@@ -6,7 +6,7 @@
 #define MESH_MAP__ABSTRACT_LAYER_H
 namespace mesh_map{
 
-typedef lvr2::BaseVector<float> VectorType;
+typedef lvr2::BaseVector<float> Vector;
 typedef lvr2::Normal<float> NormalType;
 
 class AbstractLayer
@@ -32,7 +32,7 @@ class AbstractLayer
   virtual void setLethals(std::set<lvr2::VertexHandle>& lethal) = 0;
 
   virtual bool initialize(
-      std::shared_ptr<lvr2::HalfEdgeMesh<VectorType>>& mesh,
+      std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh,
       std::shared_ptr<lvr2::AttributeMeshIOBase>& io)
   {
     mesh_ptr = mesh;
@@ -42,7 +42,7 @@ class AbstractLayer
 
  protected:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::HalfEdgeMesh<VectorType>> mesh_ptr;
+  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 };
 
 } /* namespace mesh_map */

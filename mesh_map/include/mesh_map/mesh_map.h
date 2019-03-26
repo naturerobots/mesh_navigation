@@ -55,10 +55,8 @@ class MeshMap
 {
  public:
 
-
-
   typedef lvr2::Normal<float> NormalType;
-  typedef lvr2::BaseVector<float> VectorType;
+  typedef lvr2::BaseVector<float> Vector;
 
   typedef boost::shared_ptr<MeshMap> Ptr;
 
@@ -72,7 +70,7 @@ class MeshMap
 
   bool initLayerPlugins();
 
-  inline VectorType toVectorType(const geometry_msgs::Point& point);
+  inline Vector toVector(const geometry_msgs::Point& point);
 
   bool pathPlanning(
       const geometry_msgs::PoseStamped& start,
@@ -81,18 +79,18 @@ class MeshMap
       bool fmm = true);
 
   bool dijkstra(
-      const VectorType& start,
-      const VectorType& goal,
+      const Vector& start,
+      const Vector& goal,
       std::list<lvr2::VertexHandle>& path);
 
   bool waveFrontPropagation(
-      const VectorType& start,
-      const VectorType& goal,
+      const Vector& start,
+      const Vector& goal,
       std::list<lvr2::VertexHandle>& path);
 
   inline bool waveFrontPropagation(
-      const VectorType& start,
-      const VectorType& goal,
+      const Vector& start,
+      const Vector& goal,
       const lvr2::DenseEdgeMap<float>& edge_weights,
       const lvr2::DenseVertexMap<float>& costs,
       std::list<lvr2::VertexHandle>& path,
@@ -106,7 +104,7 @@ class MeshMap
       const lvr2::VertexHandle& v2,
       const lvr2::VertexHandle& v3);
 
-  lvr2::OptionalVertexHandle getNearestVertexHandle(const VectorType pos);
+  lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector pos);
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
@@ -119,9 +117,14 @@ class MeshMap
       const float height_diff_threshold,
       const float roughness_threshold);
 
-  geometry_msgs::Pose calculatePose(
-      const VectorType& current,
-      const VectorType& next,
+  geometry_msgs::Pose calculatePoseFromDirection(
+      const Vector& position,
+      const Vector& direction,
+      const NormalType& normal);
+
+  geometry_msgs::Pose calculatePoseFromPosition(
+      const Vector& current,
+      const Vector& next,
       const NormalType& normal);
 
   void findContours(
@@ -129,6 +132,12 @@ class MeshMap
       int min_contour_size);
 
   void publishCostLayers();
+
+  void publishVectorField();
+
+  bool barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v);
+
+  bool barycentricCoords(const Vector &p, const Vector &v0, const Vector &v1, const Vector &v2, float &u, float &v);
 
   void findLethalInLayer(
       const lvr2::DenseVertexMap<float>& layer,
@@ -145,18 +154,18 @@ class MeshMap
 
   inline bool isLethal(const lvr2::VertexHandle& vH);
 
-  inline const geometry_msgs::Point toPoint(const VectorType& vec);
+  inline const geometry_msgs::Point toPoint(const Vector& vec);
 
   bool rayTriangleIntersect(
-      const VectorType &orig, const VectorType &dir,
-      const VectorType &v0, const VectorType &v1, const VectorType &v2,
+      const Vector &orig, const Vector &dir,
+      const Vector &v0, const Vector &v1, const Vector &v2,
       float &t, float &u, float &v);
 
   bool resetLayers();
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::HalfEdgeMesh<VectorType>> mesh_ptr;
+  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -184,7 +193,7 @@ class MeshMap
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
   lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
 
-  lvr2::DenseVertexMap<VectorType> vector_map;
+  lvr2::DenseVertexMap<Vector> vector_map;
 
   // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;

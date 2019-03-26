@@ -59,7 +59,7 @@ MeshMap::MeshMap(tf::TransformListener& tf_listener)
       first_config(true),
       map_loaded(false),
       layer_loader("mesh_map", "mesh_map::AbstractLayer"),
-      mesh_ptr(new lvr2::HalfEdgeMesh<VectorType>())
+      mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
   private_nh.param<std::string>("mesh_file", mesh_file, "mesh.h5");
   private_nh.param<std::string>("mesh_part", mesh_part, "mesh");
@@ -299,9 +299,9 @@ bool MeshMap::initLayerPlugins()
   }
 }
 
-inline MeshMap::VectorType MeshMap::toVectorType(const geometry_msgs::Point& p)
+inline MeshMap::Vector MeshMap::toVector(const geometry_msgs::Point& p)
 {
-  return VectorType(p.x, p.y, p.z);
+  return Vector(p.x, p.y, p.z);
 }
 
 inline bool MeshMap::isLethal(const lvr2::VertexHandle& vH){
@@ -309,8 +309,8 @@ inline bool MeshMap::isLethal(const lvr2::VertexHandle& vH){
 }
 
 bool MeshMap::dijkstra(
-    const VectorType& start,
-    const VectorType& goal,
+    const Vector& start,
+    const Vector& goal,
     std::list<lvr2::VertexHandle>& path)
 {
   lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
@@ -323,8 +323,8 @@ bool MeshMap::dijkstra(
 }
 
 bool MeshMap::waveFrontPropagation(
-    const VectorType& start,
-    const VectorType& goal,
+    const Vector& start,
+    const Vector& goal,
     std::list<lvr2::VertexHandle>& path)
 {
   return waveFrontPropagation(start, goal, edge_weights, vertex_costs, path, potential, predecessors);
@@ -504,13 +504,9 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
-geometry_msgs::Pose MeshMap::calculatePose(
-    const VectorType& current,
-    const VectorType& next,
-    const NormalType& normal)
+geometry_msgs::Pose MeshMap::calculatePoseFromDirection(
+    const Vector& position, const Vector& direction, const NormalType& normal)
 {
-  VectorType direction(next - current);
-
   NormalType ez = normal.normalized();
   NormalType ey = normal.cross(direction).normalized();
   NormalType ex = ey.cross(normal).normalized();
@@ -521,9 +517,9 @@ geometry_msgs::Pose MeshMap::calculatePose(
       ex.z, ey.z, ez.z);
 
   tf::Vector3 tf_origin(
-      current.x,
-      current.y,
-      current.z);
+      position.x,
+      position.y,
+      position.z);
 
   tf::Pose tf_pose;
   tf_pose.setBasis(tf_basis);
@@ -532,6 +528,15 @@ geometry_msgs::Pose MeshMap::calculatePose(
   geometry_msgs::Pose pose;
   tf::poseTFToMsg(tf_pose, pose);
   return pose;
+
+}
+
+geometry_msgs::Pose MeshMap::calculatePoseFromPosition(
+    const Vector& current,
+    const Vector& next,
+    const NormalType& normal)
+{
+  return calculatePoseFromDirection(current, next - current, normal);
 }
 
 inline bool MeshMap::waveFrontUpdate(
@@ -660,8 +665,8 @@ inline bool MeshMap::waveFrontUpdate(
 }
 
 inline bool MeshMap::waveFrontPropagation(
-    const VectorType& start,
-    const VectorType& goal,
+    const Vector& start,
+    const Vector& goal,
     const lvr2::DenseEdgeMap<float>& edge_weights,
     const lvr2::DenseVertexMap<float>& costs,
     std::list<lvr2::VertexHandle>& path,
@@ -689,7 +694,7 @@ inline bool MeshMap::waveFrontPropagation(
     return true;
   }
 
-  VectorType start_point = mesh_ptr->getVertexPosition(start_vertex);
+  Vector start_point = mesh_ptr->getVertexPosition(start_vertex);
 
   lvr2::DenseVertexMap<bool> fixed(mesh_ptr->nextVertexIndex(), false);
 
@@ -745,32 +750,21 @@ inline bool MeshMap::waveFrontPropagation(
       const lvr2::VertexHandle& c = vertices[2];
 
       if(fixed[a] && fixed[b] && fixed[c])
-      {
         continue;
-      }
       else if(fixed[a] && fixed[b] && !fixed[c]){
         // c is free
         if(costs[c] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, a, b, c))
-        {
-            //predecessors[c] = (distances[a] < distances[b]) ? a : b;
             pq.insert(c, distances[c]);
-        }
       }
       else if(fixed[a] && !fixed[b] && fixed[c]){
         // b is free
         if(costs[b] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, c, a, b))
-        {
-            //predecessors[b] = (distances[c] < distances[a]) ? c : a;
             pq.insert(b, distances[b]);
-        }
       }
       else if(!fixed[a] && fixed[b] && fixed[c]){
         // a if free
         if(costs[a] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, b, c, a))
-        {
-            //predecessors[a] = (distances[b] < distances[c]) ? b : c;
             pq.insert(a, distances[a]);
-        }
       }
       else
       {
@@ -786,6 +780,49 @@ inline bool MeshMap::waveFrontPropagation(
 
   ROS_INFO_STREAM("Finished wave front propagation.");
 
+  if(goal_vertex == predecessors[goal_vertex])
+  {
+    ROS_WARN("Predecessor of goal not set!");
+    return false;
+  }
+
+  Vector v = mesh_ptr->getVertexPosition(goal_vertex);
+  Vector s = mesh_ptr->getVertexPosition(start_vertex);
+  constexpr float step_width = 0.05;
+
+  lvr2::FaceHandle current_face = cutting_faces[goal_vertex];
+  auto face = mesh_ptr->getVerticesOfFace(current_face);
+  auto vertices = mesh_ptr->getVertexPositionsOfFace(current_face);
+  Vector dir = vector_map[goal_vertex].normalized() * step_width;
+
+  while(v.distance2(s) > 0.2)
+  {
+    Vector p = v + dir;
+    float u, v;
+    if(barycentricCoords(p, vertices[0], vertices[1], vertices[2], u, v))
+    {
+      float w = 1 - u - v;
+      dir += vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w;
+    }
+    else
+    {
+      const auto& neighbour_faces = mesh_ptr->getNeighboursOfFace(face);
+      for(auto fH : neighbour_faces)
+      {
+        // TODO project p onto new face compute new dir vec
+        vertices = mesh_ptr->getVertexPositionsOfFace(current_face);
+        if(barycentricCoords(p, vertices[0], vertices[1], vertices[2], u, v))
+        {
+          face = mesh_ptr->getVerticesOfFace(fH);
+          float w = 1 - u - v;
+          dir += vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w;
+          break;
+        }
+      }
+    }
+  }
+
+  /*
   lvr2::VertexHandle prev = predecessors[goal_vertex];
 
   if(prev == goal_vertex)
@@ -804,12 +841,13 @@ inline bool MeshMap::waveFrontPropagation(
     prev = predecessors[prev];
   }
   path.push_front(start_vertex);
+*/
 
   return true;
 
 }
 
-lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const VectorType pos)
+lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector pos)
 {
   double smallest_dist = std::numeric_limits<double>::max();
   lvr2::OptionalVertexHandle nearest_handle;
@@ -827,7 +865,7 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const VectorType pos)
   return nearest_handle;
 }
 
-inline const geometry_msgs::Point MeshMap::toPoint(const VectorType& vec)
+inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
 {
   geometry_msgs::Point p;
   p.x = vec.x;
@@ -836,9 +874,8 @@ inline const geometry_msgs::Point MeshMap::toPoint(const VectorType& vec)
   return p;
 }
 
-void MeshMap::computeVectorMap()
+void MeshMap::publishVectorField()
 {
-
   visualization_msgs::MarkerArray vector_field;
   std_msgs::Header header;
   header.stamp = ros::Time::now();
@@ -848,15 +885,54 @@ void MeshMap::computeVectorMap()
   scale.y = 0.02;
   scale.z = 0.02;
 
-  unsigned int cnt = 0;
-  vector_field.markers.reserve(2*predecessors.numValues());
+  vector_field.markers.reserve(vector_map.numValues());
 
+  unsigned int cnt = 0;
   visualization_msgs::Marker vector;
   vector.type = visualization_msgs::Marker::ARROW;
   vector.header = header;
   vector.ns = "vector_field";
   vector.scale = scale;
 
+  for(auto vH : vector_map)
+  {
+    vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
+    vector.pose = calculatePoseFromDirection(mesh_ptr->getVertexPosition(vH), vector_map[vH], face_normals[cutting_faces[vH]]);
+    vector.header.seq = cnt;
+    vector.id = cnt++;
+    vector_field.markers.push_back(vector);
+  }
+
+  for(auto fH : mesh_ptr->faces())
+  {
+    const auto& face = mesh_ptr->getVerticesOfFace(fH);
+    if(vector_map.containsKey(face[0]) && vector_map.containsKey(face[1]) && vector_map.containsKey(face[2]))
+    {
+      const auto& vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+      Vector center = (vertices[0] + vertices[1] + vertices[2]) /3;
+      float u, v;
+      if(barycentricCoords(center, vertices[0], vertices[1], vertices[2], u, v))
+      {
+        float w = 1 - u - v;
+        Vector direction = vector_map[face[0]] * u + vector_map[face[1]] * v + vector_map[face[2]] * w;
+        vector.color = lvr_ros::getRainbowColor(u * vertex_costs[face[0]] + v * vertex_costs[face[1]] + w * vertex_costs[face[2]]);
+        vector.pose = calculatePoseFromDirection(center, direction, face_normals[fH]);
+        vector.header.seq = cnt;
+        vector.id = cnt++;
+        vector_field.markers.push_back(vector);
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Could not compute the barycentric coords!");
+      }
+    }
+  }
+
+  vector_pub.publish(vector_field);
+}
+
+void MeshMap::computeVectorMap()
+{
   for(auto v3 : mesh_ptr->vertices())
   {
     if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
@@ -868,28 +944,14 @@ void MeshMap::computeVectorMap()
     const auto& optFh = cutting_faces.get(v3);
     if(!optFh) continue;
     const lvr2::FaceHandle& fH = optFh.get();
-    const auto& face = mesh_ptr->getVerticesOfFace(fH);
-
-    // select the third vertex of the cut triangle
-    const lvr2::VertexHandle& v2
-        = (face[0]!=v1 && face[0]!=v3) ? face[0] : (face[1]!=v1 && face[1]!=v3) ? face[1] : face[2];
 
     const auto& vec3 = mesh_ptr->getVertexPosition(v3);
-    const auto& vec2 = mesh_ptr->getVertexPosition(v2);
     const auto& vec1 = mesh_ptr->getVertexPosition(v1);
 
     // compute the direction vector and rotate it by theta, which is stored in the direction vertex map
-    const auto dirVec = vec1 - vec3;
-    VectorType sVec = vec3 + dirVec.rotated(face_normals[fH], -direction[v3]);
-    vector_map.insert(v3, sVec);
-
-    vector.color = lvr_ros::getRainbowColor(vertex_costs[v3]);
-    vector.pose = calculatePose(vec3, sVec, face_normals[fH]);
-    vector.header.seq = cnt;
-    vector.id = cnt++;
-    vector_field.markers.push_back(vector);
+    const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
+    vector_map.insert(v3, dirVec);
   }
-  vector_pub.publish(vector_field);
 }
 
 bool MeshMap::pathPlanning(
@@ -905,7 +967,7 @@ bool MeshMap::pathPlanning(
   t_start = ros::WallTime::now();
   if(fmm){
     ROS_INFO("start wave front propagation.");
-    if(!waveFrontPropagation(toVectorType(goal.pose.position), toVectorType(start.pose.position), path)){
+    if(!waveFrontPropagation(toVector(goal.pose.position), toVector(start.pose.position), path)){
       vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential Debug", global_frame, uuid_str));
       return false;
     }
@@ -913,7 +975,7 @@ bool MeshMap::pathPlanning(
   else
   {
     ROS_INFO("start dijkstra.");
-    if(!dijkstra(toVectorType(goal.pose.position), toVectorType(start.pose.position), path)){
+    if(!dijkstra(toVector(goal.pose.position), toVector(start.pose.position), path)){
       vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential Debug", global_frame, uuid_str));
       return false;
     }
@@ -934,7 +996,7 @@ bool MeshMap::pathPlanning(
   {
     geometry_msgs::PoseStamped pose;
     pose.header = header;
-    pose.pose = calculatePose(
+    pose.pose = calculatePoseFromPosition(
         mesh_ptr->getVertexPosition(prev),
         mesh_ptr->getVertexPosition(vH),
         vertex_normals[prev]);
@@ -949,21 +1011,71 @@ bool MeshMap::pathPlanning(
   path_pub.publish(path_msg);
   vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential", global_frame, uuid_str));
 
+  computeVectorMap();
+  publishVectorField();
+
   return true;
 }
 
 constexpr float kEpsilon = 1e-8;
 
-bool MeshMap::rayTriangleIntersect(const VectorType &orig, const VectorType &dir,
-    const VectorType &v0, const VectorType &v1, const VectorType &v2,
+bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v)
+{
+  const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
+  return barycentricCoords(p, face[0], face[1], face[2], u, v);
+}
+
+bool MeshMap::barycentricCoords(
+    const Vector &p,
+    const Vector &v0, const Vector &v1, const Vector &v2,
+    float &u, float &v)
+{
+  // compute plane's normal
+  Vector v0v1 = v1 - v0;
+  Vector v0v2 = v2 - v0;
+
+  // no need to normalize
+  Vector N = v0v1.cross(v0v2); // N
+  float denom = N.dot(N);
+
+  // Step 2: inside-outside test
+  Vector C; // vector perpendicular to triangle's plane
+
+  // edge 0
+  Vector edge0 = v1 - v0;
+  Vector vp0 = p - v0;
+  C = edge0.cross(vp0);
+  if (N.dot(C) < 0) return false; // P is on the right side
+
+  // edge 1
+  Vector edge1 = v2 - v1;
+  Vector vp1 = p - v1;
+  C = edge1.cross(vp1);
+  if ((u = N.dot(C)) < 0) return false; // P is on the right side
+
+  // edge 2
+  Vector edge2 = v0 - v2;
+  Vector vp2 = p - v2;
+  C = edge2.cross(vp2);
+  if ((v = N.dot(C)) < 0) return false; // P is on the right side;
+
+  u /= denom;
+  v /= denom;
+
+  return true; // this ray hits the triangle
+
+}
+
+bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
+    const Vector &v0, const Vector &v1, const Vector &v2,
     float &t, float &u, float &v)
 {
   // compute plane's normal
-  VectorType v0v1 = v1 - v0;
-  VectorType v0v2 = v2 - v0;
+  Vector v0v1 = v1 - v0;
+  Vector v0v2 = v2 - v0;
 
   // no need to normalize
-  VectorType N = v0v1.cross(v0v2); // N
+  Vector N = v0v1.cross(v0v2); // N
   float denom = N.dot(N);
 
   // Step 1: finding P
@@ -983,26 +1095,26 @@ bool MeshMap::rayTriangleIntersect(const VectorType &orig, const VectorType &dir
   if (t < 0) return false; // the triangle is behind
 
   // compute the intersection point using equation 1
-  VectorType P = orig + dir * t;
+  Vector P = orig + dir * t;
 
   // Step 2: inside-outside test
-  VectorType C; // vector perpendicular to triangle's plane
+  Vector C; // vector perpendicular to triangle's plane
 
   // edge 0
-  VectorType edge0 = v1 - v0;
-  VectorType vp0 = P - v0;
+  Vector edge0 = v1 - v0;
+  Vector vp0 = P - v0;
   C = edge0.cross(vp0);
   if (N.dot(C) < 0) return false; // P is on the right side
 
   // edge 1
-  VectorType edge1 = v2 - v1;
-  VectorType vp1 = P - v1;
+  Vector edge1 = v2 - v1;
+  Vector vp1 = P - v1;
   C = edge1.cross(vp1);
   if ((u = N.dot(C)) < 0) return false; // P is on the right side
 
   // edge 2
-  VectorType edge2 = v0 - v2;
-  VectorType vp2 = P - v2;
+  Vector edge2 = v0 - v2;
+  Vector vp2 = P - v2;
   C = edge2.cross(vp2);
   if ((v = N.dot(C)) < 0) return false; // P is on the right side;
 
