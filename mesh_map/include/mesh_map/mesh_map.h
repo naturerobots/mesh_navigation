@@ -135,6 +135,8 @@ class MeshMap
       const float& threshold,
       std::set<lvr2::VertexHandle>& lethals);
 
+  void computeVectorMap();
+
   void findLethalByContours(
       const int& min_contour_size,
       std::set<lvr2::VertexHandle>& lethals);
@@ -144,6 +146,11 @@ class MeshMap
   inline bool isLethal(const lvr2::VertexHandle& vH);
 
   inline const geometry_msgs::Point toPoint(const VectorType& vec);
+
+  bool rayTriangleIntersect(
+      const VectorType &orig, const VectorType &dir,
+      const VectorType &v0, const VectorType &v1, const VectorType &v2,
+      float &t, float &u, float &v);
 
   bool resetLayers();
 
@@ -176,7 +183,8 @@ class MeshMap
   // predecessors while wave propagation
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
   lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces2;
+
+  lvr2::DenseVertexMap<VectorType> vector_map;
 
   // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;

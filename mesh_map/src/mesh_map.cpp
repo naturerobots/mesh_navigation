@@ -615,13 +615,13 @@ inline bool MeshMap::waveFrontUpdate(
     {
       predecessors[v3] = v1;
       S = sy*p - sx*hc;
-      gamma = acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2*u3tmp*b));
+      gamma = -acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2*u3tmp*b));
     }
     else  // right face check
     {
       predecessors[v3] = v2;
       S = sx*hc - hc*c + sy*c - sy*p;
-      gamma = -acos((a_sq + u3tmp_sq + 2*sx*c - sx_sq - c_sq - sy_sq)/(2*a*u3tmp));
+      gamma = acos((a_sq + u3tmp_sq + 2*sx*c - sx_sq - c_sq - sy_sq)/(2*a*u3tmp));
     }
 
     auto faces = mesh_ptr->getFacesOfEdge(mesh_ptr->getEdgeBetween(predecessors[v3], v3).unwrap());
@@ -642,18 +642,15 @@ inline bool MeshMap::waveFrontUpdate(
 
     if (S > 0){
       cutting_faces.insert(v3, f1.unwrap());
-      cutting_faces2.insert(v3, f0);
     }
     else if( S < 0)
     {
       cutting_faces.insert(v3, f0);
-      cutting_faces2.insert(v3, f1.unwrap());
       direction[v3] *= -1;
     }
     else
     {
       cutting_faces.insert(v3, f0);
-      cutting_faces2.insert(v3, f0);
       direction[v3] = 0; // direction lies on g1 or g2
     }
 
@@ -839,6 +836,61 @@ inline const geometry_msgs::Point MeshMap::toPoint(const VectorType& vec)
   return p;
 }
 
+void MeshMap::computeVectorMap()
+{
+
+  visualization_msgs::MarkerArray vector_field;
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = global_frame;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.07;
+  scale.y = 0.02;
+  scale.z = 0.02;
+
+  unsigned int cnt = 0;
+  vector_field.markers.reserve(2*predecessors.numValues());
+
+  visualization_msgs::Marker vector;
+  vector.type = visualization_msgs::Marker::ARROW;
+  vector.header = header;
+  vector.ns = "vector_field";
+  vector.scale = scale;
+
+  for(auto v3 : mesh_ptr->vertices())
+  {
+    if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
+    const lvr2::VertexHandle& v1 = predecessors[v3];
+    // if not predecessor it is pointing to it self
+    if(v1 == v3) continue;
+
+    //get the cut face
+    const auto& optFh = cutting_faces.get(v3);
+    if(!optFh) continue;
+    const lvr2::FaceHandle& fH = optFh.get();
+    const auto& face = mesh_ptr->getVerticesOfFace(fH);
+
+    // select the third vertex of the cut triangle
+    const lvr2::VertexHandle& v2
+        = (face[0]!=v1 && face[0]!=v3) ? face[0] : (face[1]!=v1 && face[1]!=v3) ? face[1] : face[2];
+
+    const auto& vec3 = mesh_ptr->getVertexPosition(v3);
+    const auto& vec2 = mesh_ptr->getVertexPosition(v2);
+    const auto& vec1 = mesh_ptr->getVertexPosition(v1);
+
+    // compute the direction vector and rotate it by theta, which is stored in the direction vertex map
+    const auto dirVec = vec1 - vec3;
+    VectorType sVec = vec3 + dirVec.rotated(face_normals[fH], -direction[v3]);
+    vector_map.insert(v3, sVec);
+
+    vector.color = lvr_ros::getRainbowColor(vertex_costs[v3]);
+    vector.pose = calculatePose(vec3, sVec, face_normals[fH]);
+    vector.header.seq = cnt;
+    vector.id = cnt++;
+    vector_field.markers.push_back(vector);
+  }
+  vector_pub.publish(vector_field);
+}
 
 bool MeshMap::pathPlanning(
     const geometry_msgs::PoseStamped& start,
@@ -870,130 +922,13 @@ bool MeshMap::pathPlanning(
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
   ROS_INFO_STREAM("Exectution time (ms): " << execution_time << " for " << mesh_ptr->numVertices() << " num vertices in the mesh_ptr->");
 
-
-  visualization_msgs::MarkerArray vector_field;
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
-  header.frame_id = global_frame;
-  geometry_msgs::Vector3 scale;
-  scale.x = 0.07;
-  scale.y = 0.02;
-  scale.z = 0.02;
-
-  unsigned int cnt = 0;
-  vector_field.markers.reserve(2*predecessors.numValues());
-
-  visualization_msgs::Marker vector;
-  vector.type = visualization_msgs::Marker::ARROW;
-  vector.header = header;
-  vector.ns = "vector_field";
-
-
-  for(auto v3 : mesh_ptr->vertices())
-  {
-    if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
-    const lvr2::VertexHandle& v1 = predecessors[v3];
-    if(v1 != v3)
-    {
-      vector.color = lvr_ros::getRainbowColor(vertex_costs[v3]);
-
-      // find b of the corresponding face
-      const auto& edge_b = mesh_ptr->getEdgeBetween(v3, v1).unwrap();
-      const auto& faces = mesh_ptr->getFacesOfEdge(edge_b);
-
-      lvr2::OptionalVertexHandle v2;
-      lvr2::OptionalVertexHandle v22;
-
-      /*
-      lvr2::OptionalFaceHandle face;
-      for(auto fH : faces)
-      {
-        if(!fH) continue;
-        const auto& vertices = mesh_ptr->getVerticesOfFace(fH.unwrap());
-        for(auto vH : vertices)
-        {
-          if(vH != v3 && vH != v1 && (!v2 || potential[vH] < potential[v2.unwrap()]))
-          {
-            face = fH;
-            v2 = vH;
-            break;
-          }
-        }
-      }
-      */
-
-      const auto& optFh = cutting_faces.get(v3);
-      const auto& optFh2 = cutting_faces2.get(v3);
-      if(!optFh || !optFh2) continue;
-      const lvr2::FaceHandle& fH = optFh.get();
-      const lvr2::FaceHandle& fH2 = optFh2.get();
-
-      auto face = mesh_ptr->getVerticesOfFace(fH);
-      auto face2 = mesh_ptr->getVerticesOfFace(fH2);
-
-      vector.scale = scale;
-      for(auto vH : face)
-      {
-        if (vH!=v1 && vH!=v3)
-        {
-          v2 = vH;
-          break;
-        }
-      }
-
-      for(auto vH : face2)
-      {
-        if (vH!=v1 && vH!=v3)
-        {
-          v22 = vH;
-          break;
-        }
-      }
-
-      const auto& vec3 = mesh_ptr->getVertexPosition(v3);
-      const auto& vec1 = mesh_ptr->getVertexPosition(v1);
-
-      if(v2 && v22)
-      {
-        const auto& vec2 = mesh_ptr->getVertexPosition(v2.unwrap());
-        const auto& vec22 = mesh_ptr->getVertexPosition(v22.unwrap());
-        //const auto dirVec = vec2 - vec1;
-        const auto dir2Vec = vec22 - vec1;
-        //VectorType sVec = vec1+(dirVec*0.5);//direction[v3]);
-        VectorType sVec2 = vec1+(dir2Vec*0.5);//direction[v3]);
-
-        const auto dirVec = vec1 - vec3;
-        VectorType sVec = vec3 + dirVec.rotated(face_normals[fH], -direction[v3]);
-        vector.pose = calculatePose(vec3, sVec, face_normals[fH]);
-        //vector.scale.x = (vec3-sVec).length();
-        vector.header.seq = cnt;
-        vector.id = cnt++;
-        vector_field.markers.push_back(vector);
-
-        vector.color = lvr_ros::getRainbowColor(1);
-        //const auto dirVec = vec3 - vec1;
-        //VectorType sVec = vec1 + dirVec.rotated(face_normals[face.unwrap()], direction[v3]);
-        vector.pose = calculatePose(vec3, sVec2, face_normals[fH2]);
-        //vector.scale.x = (vec3-sVec).length();
-        vector.header.seq = cnt;
-        vector.id = cnt++;
-        vector_field.markers.push_back(vector);
-      }
-      else{
-        ROS_ERROR_STREAM("v2 does not exists!");
-        vector.pose = calculatePose(vec3, vec1, vertex_normals[v3]);
-        vector.header.seq = cnt;
-        vector.id = cnt++;
-        vector_field.markers.push_back(vector);
-      }
-
-    }
-  }
-  vector_pub.publish(vector_field);
-
   path.reverse();
 
   lvr2::VertexHandle prev = path.front();
+
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = global_frame;
 
   for(auto &vH : path)
   {
@@ -1017,6 +952,65 @@ bool MeshMap::pathPlanning(
   return true;
 }
 
+constexpr float kEpsilon = 1e-8;
+
+bool MeshMap::rayTriangleIntersect(const VectorType &orig, const VectorType &dir,
+    const VectorType &v0, const VectorType &v1, const VectorType &v2,
+    float &t, float &u, float &v)
+{
+  // compute plane's normal
+  VectorType v0v1 = v1 - v0;
+  VectorType v0v2 = v2 - v0;
+
+  // no need to normalize
+  VectorType N = v0v1.cross(v0v2); // N
+  float denom = N.dot(N);
+
+  // Step 1: finding P
+
+  // check if ray and plane are parallel ?
+  float NdotRayDirection = N.dot(dir);
+  if (fabs(NdotRayDirection) < kEpsilon) // almost 0
+    return false; // they are parallel so they don't intersect !
+
+  // compute d parameter using equation 2
+  float d = N.dot(v0);
+
+  // compute t (equation 3)
+  t = (N.dot(orig) + d) / NdotRayDirection;
+
+  // check if the triangle is in behind the ray
+  if (t < 0) return false; // the triangle is behind
+
+  // compute the intersection point using equation 1
+  VectorType P = orig + dir * t;
+
+  // Step 2: inside-outside test
+  VectorType C; // vector perpendicular to triangle's plane
+
+  // edge 0
+  VectorType edge0 = v1 - v0;
+  VectorType vp0 = P - v0;
+  C = edge0.cross(vp0);
+  if (N.dot(C) < 0) return false; // P is on the right side
+
+  // edge 1
+  VectorType edge1 = v2 - v1;
+  VectorType vp1 = P - v1;
+  C = edge1.cross(vp1);
+  if ((u = N.dot(C)) < 0) return false; // P is on the right side
+
+  // edge 2
+  VectorType edge2 = v0 - v2;
+  VectorType vp2 = P - v2;
+  C = edge2.cross(vp2);
+  if ((v = N.dot(C)) < 0) return false; // P is on the right side;
+
+  u /= denom;
+  v /= denom;
+
+  return true; // this ray hits the triangle
+}
 
 bool MeshMap::resetLayers()
 {
