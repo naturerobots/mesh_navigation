@@ -325,7 +325,7 @@ bool MeshMap::dijkstra(
 bool MeshMap::waveFrontPropagation(
     const Vector& start,
     const Vector& goal,
-    std::list<lvr2::VertexHandle>& path)
+    std::list<std::pair<Vector, lvr2::FaceHandle>>& path)
 {
   return waveFrontPropagation(start, goal, edge_weights, vertex_costs, path, potential, predecessors);
 }
@@ -664,39 +664,48 @@ inline bool MeshMap::waveFrontUpdate(
   return false;
 }
 
+inline Vector MeshMap::projectVectorOntoPlane(const Vector &vec, const Vector &ref, const NormalType &normal)
+{
+  return vec - (normal * (vec.dot(normal) - (ref.dot(normal))));
+}
+
 inline bool MeshMap::waveFrontPropagation(
     const Vector& start,
     const Vector& goal,
     const lvr2::DenseEdgeMap<float>& edge_weights,
     const lvr2::DenseVertexMap<float>& costs,
-    std::list<lvr2::VertexHandle>& path,
+    std::list<std::pair<Vector, lvr2::FaceHandle>>& path,
     lvr2::DenseVertexMap<float>& distances,
     lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
-  // Find nearest Vertex to start and end
-  const auto& start_opt = getNearestVertexHandle(start);
-  const auto& goal_opt = getNearestVertexHandle(goal);
+  ROS_INFO_STREAM("Init wave front propagation.");
+
+  // Find the containing faces of start and goal
+  const auto& start_opt = getContainingFaceHandle(start);
+  const auto& goal_opt = getContainingFaceHandle(goal);
 
   if(!start_opt || !goal_opt)
   {
     return false;
   }
 
-  const auto& start_vertex = start_opt.unwrap();
-  const auto& goal_vertex = goal_opt.unwrap();
+  const auto& start_face = start_opt.unwrap();
+  const auto& goal_face = goal_opt.unwrap();
 
   path.clear();
   distances.clear();
   predecessors.clear();
 
-  if(goal_vertex == start_vertex)
+  // TODO in face planning for a single face
+  if(goal_face == start_face)
   {
     return true;
   }
 
-  Vector start_point = mesh_ptr->getVertexPosition(start_vertex);
-
   lvr2::DenseVertexMap<bool> fixed(mesh_ptr->nextVertexIndex(), false);
+
+  // clear vector field map
+  vector_map.clear();
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
@@ -707,14 +716,20 @@ inline bool MeshMap::waveFrontPropagation(
   }
 
   lvr2::Meap<lvr2::VertexHandle, float> pq;
-
   // Set start distance to zero
   // add start vertex to priority queue
-  distances[start_vertex] = 0;
-  fixed[start_vertex] = true;
+  for(auto vH : mesh_ptr->getVerticesOfFace(start_face))
+  {
+    const Vector diff = start - mesh_ptr->getVertexPosition(vH);
+    const float dist = diff.length();
+    distances[vH] = dist;
+    vector_map.insert(vH, diff);
+    cutting_faces.insert(vH, start_face);
+    fixed[vH] = true;
+    pq.insert(vH, dist);
+  }
 
-  ROS_INFO_STREAM("Init wave front propagation.");
-
+  /*
   // initialize around seed / start vertex
   std::vector<lvr2::VertexHandle> neighbours;
   mesh_ptr->getNeighboursOfVertex(start_vertex, neighbours);
@@ -729,6 +744,9 @@ inline bool MeshMap::waveFrontPropagation(
     fixed[n_vh] = true;
     pq.insert(n_vh, distances[n_vh]);
   }
+
+  */
+
   ROS_INFO_STREAM("Start wave front propagation");
 
   while(!pq.isEmpty())
@@ -780,47 +798,98 @@ inline bool MeshMap::waveFrontPropagation(
 
   ROS_INFO_STREAM("Finished wave front propagation.");
 
-  if(goal_vertex == predecessors[goal_vertex])
+  /*
+   * Sampling the path by backtracking the vector field
+   */
+
+  computeVectorMap();
+
+  bool path_exists = false;
+  for(auto goal_vertex : mesh_ptr->getVerticesOfFace(goal_face))
   {
-    ROS_WARN("Predecessor of goal not set!");
+    if(goal_vertex != predecessors[goal_vertex])
+    {
+      path_exists = true;
+      break;
+    }
+  }
+
+  if(!path_exists)
+  {
+    ROS_WARN("Predecessor of the goal is not set! No path found!");
     return false;
   }
 
-  Vector v = mesh_ptr->getVertexPosition(goal_vertex);
-  Vector s = mesh_ptr->getVertexPosition(start_vertex);
-  constexpr float step_width = 0.05;
+  ROS_INFO_STREAM("Start vector field back tracking!");
 
-  lvr2::FaceHandle current_face = cutting_faces[goal_vertex];
+  constexpr float step_width = 0.03;
+
+  lvr2::FaceHandle current_face = goal_face;
   auto face = mesh_ptr->getVerticesOfFace(current_face);
   auto vertices = mesh_ptr->getVertexPositionsOfFace(current_face);
-  Vector dir = vector_map[goal_vertex].normalized() * step_width;
+  Vector vec = projectVectorOntoPlane(goal, vertices[0], face_normals[current_face]);
+  path.push_front(std::pair<Vector, lvr2::FaceHandle>(vec, current_face));
 
-  while(v.distance2(s) > 0.2)
+  Vector dir;
+  while(vec.distance2(start) > step_width)
   {
-    Vector p = v + dir;
-    float u, v;
-    if(barycentricCoords(p, vertices[0], vertices[1], vertices[2], u, v))
+    float u, v, t;
+    if(barycentricCoords(vec, vertices[0], vertices[1], vertices[2], u, v))
     {
       float w = 1 - u - v;
-      dir += vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w;
+      dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width ;
     }
     else
     {
-      const auto& neighbour_faces = mesh_ptr->getNeighboursOfFace(face);
-      for(auto fH : neighbour_faces)
+      bool foundConnectedFace = false;
+      std::list<lvr2::FaceHandle> possible_faces;
+      std::vector<lvr2::FaceHandle> neighbour_faces;
+      mesh_ptr->getNeighboursOfFace(current_face, neighbour_faces);
+      possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+      std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
+
+      int cnt = 0;
+      int max = 40; // TODO to config
+
+      while(possible_faces.end() != current && max != cnt++)
       {
-        // TODO project p onto new face compute new dir vec
-        vertices = mesh_ptr->getVertexPositionsOfFace(current_face);
-        if(barycentricCoords(p, vertices[0], vertices[1], vertices[2], u, v))
+        lvr2::FaceHandle fH = *current;
+        vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+        face = mesh_ptr->getVerticesOfFace(fH);
+
+        // Projection onto the triangle plane
+        Vector tmp_vec = projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
+
+        // Check if the projected point lies in the current testing face
+        if(vector_map.containsKey(face[0]) && vector_map.containsKey(face[1]) && vector_map.containsKey(face[2])
+         && barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
         {
-          face = mesh_ptr->getVerticesOfFace(fH);
+          foundConnectedFace = true;
+          current_face = fH;
+          vec = tmp_vec;
           float w = 1 - u - v;
-          dir += vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w;
+          dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width ;
           break;
         }
+        else
+        {
+          // add neighbour of neighbour, if we overstep a small face or the peak of it
+          std::vector<lvr2::FaceHandle> nn_faces;
+          mesh_ptr->getNeighboursOfFace(fH, nn_faces);
+          possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
+        }
+        current++;
+      }
+      if(!foundConnectedFace){
+        ROS_ERROR_STREAM("Sample path failed! Could not find a connected face in vector direction!");
+        return true; // TODO
       }
     }
+    path.push_front(std::pair<Vector, lvr2::FaceHandle>(vec, current_face));
+    vec += dir;
   }
+  path.push_front(std::pair<Vector, lvr2::FaceHandle>(vec, current_face));
+  path.push_front(std::pair<Vector, lvr2::FaceHandle>(start, current_face));
 
   /*
   lvr2::VertexHandle prev = predecessors[goal_vertex];
@@ -847,7 +916,30 @@ inline bool MeshMap::waveFrontPropagation(
 
 }
 
-lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector pos)
+lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
+{
+  lvr2::OptionalFaceHandle fH;
+  lvr2::OptionalVertexHandle vH_opt = getNearestVertexHandle(pos);
+  if(vH_opt)
+  {
+    lvr2::VertexHandle vH = vH_opt.unwrap();
+    std::vector<lvr2::FaceHandle> faces;
+    mesh_ptr->getFacesOfVertex(vH, faces);
+
+    for(auto face : faces)
+    {
+      float u, v;
+      if(barycentricCoords(pos, face, u, v))
+      {
+        fH = face;
+        break;
+      }
+    }
+  }
+  return fH;
+}
+
+lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos)
 {
   double smallest_dist = std::numeric_limits<double>::max();
   lvr2::OptionalVertexHandle nearest_handle;
@@ -960,7 +1052,7 @@ bool MeshMap::pathPlanning(
     std::vector<geometry_msgs::PoseStamped> &plan,
     bool fmm)
 {
-  std::list<lvr2::VertexHandle> path;
+  std::list<std::pair<Vector, lvr2::FaceHandle>> path;
 
   combineVertexCosts();
   ros::WallTime t_start, t_end;
@@ -972,6 +1064,8 @@ bool MeshMap::pathPlanning(
       return false;
     }
   }
+
+  /*
   else
   {
     ROS_INFO("start dijkstra.");
@@ -980,28 +1074,36 @@ bool MeshMap::pathPlanning(
       return false;
     }
   }
+   */
   t_end = ros::WallTime::now();
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
   ROS_INFO_STREAM("Exectution time (ms): " << execution_time << " for " << mesh_ptr->numVertices() << " num vertices in the mesh_ptr->");
 
   path.reverse();
 
-  lvr2::VertexHandle prev = path.front();
-
   std_msgs::Header header;
   header.stamp = ros::Time::now();
   header.frame_id = global_frame;
 
-  for(auto &vH : path)
-  {
-    geometry_msgs::PoseStamped pose;
-    pose.header = header;
-    pose.pose = calculatePoseFromPosition(
-        mesh_ptr->getVertexPosition(prev),
-        mesh_ptr->getVertexPosition(vH),
-        vertex_normals[prev]);
-    prev = vH;
-    plan.push_back(pose);
+
+  if(!path.empty()){
+    Vector vec = path.front().first;
+    lvr2::FaceHandle fH = path.front().second;
+    path.pop_front();
+
+    for(auto &next : path)
+    {
+      geometry_msgs::PoseStamped pose;
+      pose.header = header;
+      pose.pose = calculatePoseFromPosition(
+          vec,
+          next.first,
+          face_normals[fH]);
+      vec = next.first;
+      fH = next.second;
+      plan.push_back(pose);
+    }
+
   }
 
   nav_msgs::Path path_msg;
@@ -1011,7 +1113,7 @@ bool MeshMap::pathPlanning(
   path_pub.publish(path_msg);
   vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(potential, "Potential", global_frame, uuid_str));
 
-  computeVectorMap();
+  //computeVectorMap();
   publishVectorField();
 
   return true;
@@ -1068,7 +1170,7 @@ bool MeshMap::barycentricCoords(
 
 bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
     const Vector &v0, const Vector &v1, const Vector &v2,
-    float &t, float &u, float &v)
+    float &t, float &u, float &v, Vector &p)
 {
   // compute plane's normal
   Vector v0v1 = v1 - v0;
@@ -1092,29 +1194,29 @@ bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
   t = (N.dot(orig) + d) / NdotRayDirection;
 
   // check if the triangle is in behind the ray
-  if (t < 0) return false; // the triangle is behind
+  //if (t < 0) return false; // the triangle is behind
 
   // compute the intersection point using equation 1
-  Vector P = orig + dir * t;
+  p = orig + dir * t;
 
   // Step 2: inside-outside test
   Vector C; // vector perpendicular to triangle's plane
 
   // edge 0
   Vector edge0 = v1 - v0;
-  Vector vp0 = P - v0;
+  Vector vp0 = p - v0;
   C = edge0.cross(vp0);
   if (N.dot(C) < 0) return false; // P is on the right side
 
   // edge 1
   Vector edge1 = v2 - v1;
-  Vector vp1 = P - v1;
+  Vector vp1 = p - v1;
   C = edge1.cross(vp1);
   if ((u = N.dot(C)) < 0) return false; // P is on the right side
 
   // edge 2
   Vector edge2 = v0 - v2;
-  Vector vp2 = P - v2;
+  Vector vp2 = p - v2;
   C = edge2.cross(vp2);
   if ((v = N.dot(C)) < 0) return false; // P is on the right side;
 

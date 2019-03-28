@@ -86,14 +86,14 @@ class MeshMap
   bool waveFrontPropagation(
       const Vector& start,
       const Vector& goal,
-      std::list<lvr2::VertexHandle>& path);
+      std::list<std::pair<Vector, lvr2::FaceHandle>>& path);
 
   inline bool waveFrontPropagation(
       const Vector& start,
       const Vector& goal,
       const lvr2::DenseEdgeMap<float>& edge_weights,
       const lvr2::DenseVertexMap<float>& costs,
-      std::list<lvr2::VertexHandle>& path,
+      std::list<std::pair<Vector, lvr2::FaceHandle>>& path,
       lvr2::DenseVertexMap<float>& distances,
       lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
@@ -104,11 +104,15 @@ class MeshMap
       const lvr2::VertexHandle& v2,
       const lvr2::VertexHandle& v3);
 
-  lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector pos);
+  lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector &pos);
+
+  lvr2::OptionalFaceHandle getContainingFaceHandle(const Vector &pos);
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
   void combineVertexCosts();
+
+  inline Vector projectVectorOntoPlane(const Vector &vec, const Vector &ref, const NormalType &normal);
 
   void getMinMax(const lvr2::VertexMap<float>& map, float& min, float& max);
 
@@ -159,7 +163,7 @@ class MeshMap
   bool rayTriangleIntersect(
       const Vector &orig, const Vector &dir,
       const Vector &v0, const Vector &v1, const Vector &v2,
-      float &t, float &u, float &v);
+      float &t, float &u, float &v, Vector &p);
 
   bool resetLayers();
 
