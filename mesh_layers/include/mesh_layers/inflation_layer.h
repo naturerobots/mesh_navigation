@@ -2,6 +2,8 @@
 #define MESH_MAP__INFLATION_LAYER_H
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_layers/InflationLayerConfig.h>
+#include <dynamic_reconfigure/server.h>
 
 namespace mesh_layers{
 
@@ -22,18 +24,29 @@ namespace mesh_layers{
       const float inscribed_value,
       const float lethal_value);
 
-  virtual bool computeLayer(const mesh_map::MeshMapConfig& config);
+  virtual bool computeLayer();
 
   virtual lvr2::VertexMap<float>& costs();
 
-  virtual const std::string getName();
+  virtual std::set<lvr2::VertexHandle>& lethals(){return lethal_vertices;} // TODO remove... layer types
 
-  virtual void setLethals(std::set<lvr2::VertexHandle>& lethal){lethal_vertices = lethal;};
+  virtual void updateLethal(
+       std::set<lvr2::VertexHandle>& added_lethal,
+       std::set<lvr2::VertexHandle>& removed_lethal);
+
+  virtual bool initialize(const std::string &name);
 
   lvr2::DenseVertexMap<float> riskiness;
 
   std::set<lvr2::VertexHandle> lethal_vertices;
 
+  // Server for Reconfiguration
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig> > reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig>::CallbackType config_callback;
+  bool first_config;
+  InflationLayerConfig config;
+
+  void reconfigureCallback(mesh_layers::InflationLayerConfig& cfg, uint32_t level);
 
 };
 

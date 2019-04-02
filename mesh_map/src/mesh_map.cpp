@@ -50,6 +50,8 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/Vector3.h>
 #include <lvr_ros/colors.h>
+#include <functional>
+#include <mutex>
 
 namespace mesh_map{
 
@@ -223,7 +225,7 @@ bool MeshMap::loadLayerPlugins()
 
       typename AbstractLayer::Ptr plugin_ptr;
 
-      if (layers.find(name) != layers.end())
+      if (layer_names.find(name) != layer_names.end())
       {
         ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
         return false;
@@ -240,17 +242,14 @@ bool MeshMap::loadLayerPlugins()
 
       if(plugin_ptr)
       {
-        if(plugin_ptr->initialize(mesh_ptr, mesh_io_ptr)){
-          layers.insert(std::pair<std::string, typename mesh_map::AbstractLayer::Ptr>(name, plugin_ptr));
-          layer_names.push_back(name);
-          ROS_INFO_STREAM("The layer plugin with the type \"" << type
-            << "\" has been loaded and initialized successfully under the name \"" << name << "\".");
-        }
-        else
-        {
-          ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \""
-            << name << "\" and the type \"" << type << "\"!");
-        }
+        std::pair<std::string, typename mesh_map::AbstractLayer::Ptr> elem(name, plugin_ptr);
+
+        layers.push_back(elem);
+        layer_names.insert(elem);
+
+        ROS_INFO_STREAM("The layer plugin with the type \"" << type
+          << "\" has been loaded successfully under the name \"" << name << "\".");
+
       }
       else
       {
@@ -270,42 +269,96 @@ bool MeshMap::loadLayerPlugins()
   return !layers.empty();
 }
 
+void MeshMap::layerChanged(const std::string &layer_name){
+
+  std::lock_guard<std::mutex> lock(layer_mtx);
+
+  ROS_INFO_STREAM("Layer \"" << layer_name << "\" changed.");
+
+  lethals.clear();
+
+  ROS_INFO_STREAM("Combine underlining lethal sets...");
+
+  // TODO pre-compute combined lethals upto a layer level
+  auto layer_iter = layers.begin();
+  for(;layer_iter != layers.end(); layer_iter++)
+  {
+    lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
+    // TODO merge with std::set_merge
+    if(layer_iter->first == layer_name) break;
+  }
+
+  vertex_costs_pub.publish(
+      lvr_ros::toVertexCostsStamped(
+          layer_iter->second->costs(),
+          mesh_ptr->numVertices(),
+          layer_iter->second->defaultValue(),
+          layer_iter->first,
+          global_frame,
+          uuid_str));
+
+  if(layer_iter != layers.end()) layer_iter++;
+
+  ROS_INFO_STREAM("Combine  lethal sets...");
+
+  for(;layer_iter != layers.end(); layer_iter++)
+  {
+
+    layer_iter->second->updateLethal(lethals, lethals);
+
+    lethals.insert(
+        layer_iter->second->lethals().begin(),
+        layer_iter->second->lethals().end());
+
+    vertex_costs_pub.publish(
+        lvr_ros::toVertexCostsStamped(
+            layer_iter->second->costs(),
+            mesh_ptr->numVertices(),
+            layer_iter->second->defaultValue(),
+            layer_iter->first,
+            global_frame,
+            uuid_str));
+  }
+
+  ROS_INFO_STREAM("Found " << lethals.size() << " lethal vertices");
+  ROS_INFO_STREAM("Combine layer costs...");
+
+  combineVertexCosts();
+  // TODO new lethals old lethals -> renew potential field! around this areas
+
+}
+
 bool MeshMap::initLayerPlugins()
 {
   lethals.clear();
-  for(auto& layer_name : layer_names)
+  lethal_indices.clear();
+  for(auto& layer : layers)
   {
-    auto& layer_plugin = layers[layer_name];
-    layer_plugin->setLethals(lethals);
-    if(!layer_plugin->readLayer())
-    {
-      layer_plugin->computeLayer(config);
+    auto& layer_plugin = layer.second;
+    const auto& layer_name = layer.first;
+
+    auto callback = [this](const std::string &layer_name){layerChanged(layer_name);};
+    if(!layer_plugin->initialize(layer_name, callback, mesh_ptr, mesh_io_ptr)){
+      ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
+      return false;
     }
 
-    // compute lethal vertices
-    const auto& threshold = layer_plugin->threshold();
-    auto& mesh = *mesh_ptr;
-    auto& costs = layer_plugin->costs();
-    auto& layer_lethals = lethal_indices[layer_name];
-    layer_lethals.clear();
-    for(auto vH : mesh.vertices())
+    std::set<lvr2::VertexHandle> empty;
+    layer_plugin->updateLethal(lethals, empty);
+    if(!layer_plugin->readLayer())
     {
-      if(costs[vH] > threshold)
-      {
-        layer_lethals.insert(vH);
-        lethals.insert(vH);
-      }
+      layer_plugin->computeLayer();
     }
+
+    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
+    lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
   }
+  return true;
 }
 
 inline MeshMap::Vector MeshMap::toVector(const geometry_msgs::Point& p)
 {
   return Vector(p.x, p.y, p.z);
-}
-
-inline bool MeshMap::isLethal(const lvr2::VertexHandle& vH){
-  return vertex_costs[vH] >= 1;
 }
 
 bool MeshMap::dijkstra(
@@ -339,6 +392,7 @@ void MeshMap::combineVertexCosts()
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
+  bool hasNaN = false;
   for(auto layer : layers)
   {
     const auto& costs = layer.second->costs();
@@ -353,7 +407,7 @@ void MeshMap::combineVertexCosts()
 
 
     const float default_value = layer.second->defaultValue();
-    bool hasNaN = false;
+    hasNaN = false;
     for(auto vH: mesh_ptr->vertices())
     {
       const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
@@ -362,24 +416,55 @@ void MeshMap::combineVertexCosts()
       if(std::isfinite(cost))
       {
         combined_max = std::max(combined_max, vertex_costs[vH]);
-        combined_min = std::max(combined_min, vertex_costs[vH]);
+        combined_min = std::min(combined_min, vertex_costs[vH]);
       }
     }
-    if(hasNaN) ROS_WARN_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
+    if(hasNaN) ROS_ERROR_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
   }
 
   const float combined_norm = combined_max - combined_min;
 
+  for(auto vH : lethals)
+  {
+    vertex_costs[vH] = std::numeric_limits<float>::infinity();
+  }
+
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+
+  hasNaN = false;
+
+  ROS_INFO_STREAM("Layer weighting factor is: " << config.layer_factor);
   for(auto eH: mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
     std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
-    lvr2::VertexHandle vH1 = eH_vHs[0];
-    lvr2::VertexHandle vH2 = eH_vHs[1];
+    const lvr2::VertexHandle &vH1 = eH_vHs[0];
+    const lvr2::VertexHandle &vH2 = eH_vHs[1];
     // Get the Riskiness for the current Edge (the maximum value from both Vertices)
-    float cost_diff = std::abs(vertex_costs[vH1] - vertex_costs[vH2]);
-    edge_weights[eH] = edge_distances[eH]; //+ (edge_distances[eH] * config.path_layer_factor * cost_diff);
+    if(config.layer_factor != 0)
+    {
+      if(std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2]))
+      {
+        edge_weights[eH] = edge_distances[eH];
+        //edge_weights[eH] = std::numeric_limits<float>::infinity();
+      }
+      else
+      {
+        float cost_diff = std::fabs(vertex_costs[vH1] - vertex_costs[vH2]);
+
+        float vertex_factor = config.layer_factor * cost_diff;
+        if(std::isnan(vertex_factor))
+          ROS_INFO_STREAM("NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
+            << " vertex_factor:" << vertex_factor << " cost_diff:" << cost_diff);
+        edge_weights[eH] = edge_distances[eH] * (1 + vertex_factor);
+      }
+    }
+    else
+    {
+      edge_weights[eH] = edge_distances[eH];
+    }
   }
+
 
   ROS_INFO("Successfully combined costs!");
 }
@@ -547,6 +632,8 @@ inline bool MeshMap::waveFrontUpdate(
     const lvr2::VertexHandle& v3)
 {
 
+  //TODO all maps as parameters?
+
   const double u1 = distances[v1];
   const double u2 = distances[v2];
   const double u3 = distances[v3];
@@ -659,7 +746,7 @@ inline bool MeshMap::waveFrontUpdate(
       direction[v3] = 0; // direction lies on g1 or g2
     }
 
-    return true;
+    return vertex_costs[v3] <= config.cost_limit;
   }
   return false;
 }
@@ -683,6 +770,9 @@ inline bool MeshMap::waveFrontPropagation(
   // Find the containing faces of start and goal
   const auto& start_opt = getContainingFaceHandle(start);
   const auto& goal_opt = getContainingFaceHandle(goal);
+
+  // reset cancel planning
+  cancel_planning = false;
 
   if(!start_opt || !goal_opt)
   {
@@ -749,7 +839,7 @@ inline bool MeshMap::waveFrontPropagation(
 
   ROS_INFO_STREAM("Start wave front propagation");
 
-  while(!pq.isEmpty())
+  while(!pq.isEmpty() && !cancel_planning)
   {
     lvr2::VertexHandle current_vh = pq.popMin().key;
 
@@ -771,17 +861,17 @@ inline bool MeshMap::waveFrontPropagation(
         continue;
       else if(fixed[a] && fixed[b] && !fixed[c]){
         // c is free
-        if(costs[c] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, a, b, c))
+        if(waveFrontUpdate(distances, edge_weights, a, b, c))
             pq.insert(c, distances[c]);
       }
       else if(fixed[a] && !fixed[b] && fixed[c]){
         // b is free
-        if(costs[b] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, c, a, b))
+        if(waveFrontUpdate(distances, edge_weights, c, a, b))
             pq.insert(b, distances[b]);
       }
       else if(!fixed[a] && fixed[b] && fixed[c]){
         // a if free
-        if(costs[a] <= config.cost_limit && waveFrontUpdate(distances, edge_weights, b, c, a))
+        if(waveFrontUpdate(distances, edge_weights, b, c, a))
             pq.insert(a, distances[a]);
       }
       else
@@ -794,6 +884,11 @@ inline bool MeshMap::waveFrontPropagation(
       //TODO animation mode
       //vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(distances, "Potential Debug", global_frame, uuid_str));
     }
+  }
+
+  if(cancel_planning){
+    ROS_WARN_STREAM("Wave front propagation has been canceled!");
+    return false;
   }
 
   ROS_INFO_STREAM("Finished wave front propagation.");
@@ -831,7 +926,7 @@ inline bool MeshMap::waveFrontPropagation(
   path.push_front(std::pair<Vector, lvr2::FaceHandle>(vec, current_face));
 
   Vector dir;
-  while(vec.distance2(start) > step_width)
+  while(vec.distance2(start) > step_width && !cancel_planning)
   {
     float u, v, t;
     if(barycentricCoords(vec, vertices[0], vertices[1], vertices[2], u, v))
@@ -890,6 +985,11 @@ inline bool MeshMap::waveFrontPropagation(
   }
   path.push_front(std::pair<Vector, lvr2::FaceHandle>(vec, current_face));
   path.push_front(std::pair<Vector, lvr2::FaceHandle>(start, current_face));
+
+  if(cancel_planning){
+    ROS_WARN_STREAM("Wave front propagation has been canceled!");
+    return false;
+  }
 
   /*
   lvr2::VertexHandle prev = predecessors[goal_vertex];
@@ -1027,7 +1127,8 @@ void MeshMap::computeVectorMap()
 {
   for(auto v3 : mesh_ptr->vertices())
   {
-    if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
+    //if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3)) continue;
+    if(predecessors[v3] == v3) continue;
     const lvr2::VertexHandle& v1 = predecessors[v3];
     // if not predecessor it is pointing to it self
     if(v1 == v3) continue;
@@ -1257,61 +1358,10 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& cfg, uint32_t level)
     first_config = false;
   }
 
-  ROS_INFO_STREAM("Reconfigure request: " );
-  ROS_INFO_STREAM("inscribed radius: " << config.inscribed_radius);
-  ROS_INFO_STREAM("inflation radius: " << config.inflation_radius);
-  ROS_INFO_STREAM("roughness threshold: " << config.roughness_threshold);
-  ROS_INFO_STREAM("height diff threshold: " << config.height_diff_threshold);
-  ROS_INFO_STREAM("roughness_radius: " << config.roughness_radius);
-  ROS_INFO_STREAM("height_diff_radius: " << config.height_diff_radius);
-  ROS_INFO_STREAM("riskiness factor: " << config.riskiness_factor);
-  ROS_INFO_STREAM("roughness factor: " << config.roughness_factor);
-  ROS_INFO_STREAM("height diff factor: " << config.height_diff_factor);
-  ROS_INFO_STREAM("min contour size: " << config.min_contour_size);
-  ROS_INFO_STREAM("lethal value: " << config.lethal_value);
-  ROS_INFO_STREAM("inscribed value: " << config.inscribed_value);
-
   if(!first_config && map_loaded)
   {
-    // Check the dynamic local radius parameter
-    if( config.roughness_radius != cfg.roughness_radius ||
-        config.height_diff_radius != cfg.height_diff_radius ||
-        config.roughness_threshold != cfg.roughness_threshold ||
-        config.height_diff_threshold != cfg.height_diff_threshold ||
-        config.min_contour_size != cfg.min_contour_size ||
-        config.inscribed_radius != cfg.inscribed_radius ||
-        config.inflation_radius != cfg.inflation_radius ||
-        config.inscribed_value != cfg.inscribed_value ||
-        config.lethal_value != cfg.lethal_value)
-    {
-      /*
-      if(config_.roughness_radius != config.roughness_radius)
-      {
-        roughness_ = lvr2::calcVertexRoughness(*mesh_ptr, config.roughness_radius, vertex_normals_);
-      }
-      else if(config_.height_diff_radius != config.height_diff_radius)
-      {
-        height_diff_ = lvr2::calcVertexRoughness(*mesh_ptr, config.height_diff_radius, vertex_normals_);
-      }
-
-      lethalCostInflation(
-          config.min_contour_size,
-          config.height_diff_threshold,
-          config.roughness_threshold,
-          config.inflation_radius,
-          config.inscribed_radius,
-          config.inscribed_value,
-          config.lethal_value);
-
-      */
-
-      combineVertexCosts();
-      publishCostLayers();
-    }
-
     config = cfg;
   }
-  // Apply the current configuration
 }
 
 

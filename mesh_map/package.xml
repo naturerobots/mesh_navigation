@@ -9,6 +9,7 @@
 
   <depend>roscpp</depend>
   <buildtool_depend>catkin</buildtool_depend>
+  <depend>dynamic_reconfigure</depend>
   <depend>geometry_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>lvr_ros</depend>

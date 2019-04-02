@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   lvr_ros
   visualization_msgs
+  dynamic_reconfigure
   )
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -35,7 +36,11 @@ add_library(${PROJECT_NAME}
   src/mesh_map.cpp
 )
 
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_gencfg
+)
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context

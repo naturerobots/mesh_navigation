@@ -47,7 +47,8 @@
 #include <dynamic_reconfigure/server.h>
 #include <mesh_map/abstract_layer.h>
 #include <pluginlib/class_loader.h>
-
+#include <mutex>
+#include <atomic>
 
 namespace mesh_map{
 
@@ -71,6 +72,8 @@ class MeshMap
   bool initLayerPlugins();
 
   inline Vector toVector(const geometry_msgs::Point& point);
+
+  void cancelPlanning(){cancel_planning = false;}
 
   bool pathPlanning(
       const geometry_msgs::PoseStamped& start,
@@ -148,6 +151,8 @@ class MeshMap
       const float& threshold,
       std::set<lvr2::VertexHandle>& lethals);
 
+  void layerChanged(const std::string &layer_name);
+
   void computeVectorMap();
 
   void findLethalByContours(
@@ -173,9 +178,9 @@ class MeshMap
 
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
-  std::vector<std::string> layer_names;
+  std::map<std::string, mesh_map::AbstractLayer::Ptr> layer_names;
 
-  std::map<std::string, mesh_map::AbstractLayer::Ptr> layers;
+  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> layers;
 
   std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
 
@@ -225,6 +230,9 @@ class MeshMap
 
   std::string uuid_str;
 
+  std::mutex layer_mtx;
+
+  std::atomic_bool cancel_planning;
 };
 
 } /* namespace mesh_map */

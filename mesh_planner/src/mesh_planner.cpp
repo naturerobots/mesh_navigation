@@ -75,7 +75,8 @@ namespace mesh_planner{
   }
 
   bool MeshPlanner::cancel(){
-    return false;
+    mesh_ptr_->cancelPlanning();
+    return true;
   }
 
   bool MeshPlanner::initialize(

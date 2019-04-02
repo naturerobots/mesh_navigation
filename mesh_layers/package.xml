@@ -12,6 +12,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>lvr_ros</depend>
   <depend>mesh_map</depend>
+  <depend>dynamic_reconfigure</depend>
 
   <export>
   	<mesh_map plugin="${prefix}/mesh_layers.xml" />

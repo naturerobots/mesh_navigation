@@ -2,6 +2,8 @@
 #define MESH_MAP__HEIGHTDIFF_LAYER_H
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_layers/HeightDiffLayerConfig.h>
+#include <dynamic_reconfigure/server.h>
 
 namespace mesh_layers{
 
@@ -15,16 +17,30 @@ namespace mesh_layers{
 
   virtual float threshold();
 
-  virtual bool computeLayer(const mesh_map::MeshMapConfig& config);
+  virtual bool computeLayer();
 
   virtual lvr2::VertexMap<float>& costs();
 
-  virtual const std::string getName();
+  virtual std::set<lvr2::VertexHandle>& lethals(){return lethal_vertices;}
 
-  virtual void setLethals(std::set<lvr2::VertexHandle>& lethal){};
+  virtual void updateLethal(
+       std::set<lvr2::VertexHandle>& added_lethal,
+       std::set<lvr2::VertexHandle>& removed_lethal){}
 
-  lvr2::DenseVertexMap<float> height_diff;
+  virtual bool initialize(const std::string &name);
 
+ private:
+  // Server for Reconfiguration
+   boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig> > reconfigure_server_ptr;
+   dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>::CallbackType config_callback;
+   bool first_config;
+   HeightDiffLayerConfig config;
+
+   lvr2::DenseVertexMap<float> height_diff;
+
+   std::set<lvr2::VertexHandle> lethal_vertices;
+
+   void reconfigureCallback(mesh_layers::HeightDiffLayerConfig& cfg, uint32_t level);
 
 };
 

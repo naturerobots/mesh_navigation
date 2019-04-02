@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(catkin REQUIRED COMPONENTS
   lvr_ros
   mesh_map
+  dynamic_reconfigure
 )
 
 ## System dependencies are found with CMake's conventions
@@ -85,10 +86,11 @@ find_package(catkin REQUIRED COMPONENTS
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/HeightDiffLayer.cfg
+  cfg/InflationLayer.cfg
+  cfg/RoughnessLayer.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -122,6 +124,12 @@ add_library(${PROJECT_NAME}
   src/roughness_layer.cpp
   src/height_diff_layer.cpp
   src/inflation_layer.cpp
+)
+
+add_dependencies(${PROJECT_NAME}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_gencfg
 )
 
 ## Add cmake target dependencies of the library
