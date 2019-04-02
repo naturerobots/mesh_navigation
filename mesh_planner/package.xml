@@ -12,6 +12,7 @@
   <depend>roscpp</depend>
   <depend>mbf_mesh_core</depend>
   <depend>mesh_map</depend>
+  <depend>lvr_ros</depend>
 
   <export>
     <mbf_mesh_core plugin="${prefix}/mesh_planner.xml" />

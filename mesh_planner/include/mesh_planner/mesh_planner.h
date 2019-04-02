@@ -40,6 +40,9 @@
 
 #include <mbf_mesh_core/mesh_planner.h>
 #include <mesh_map/mesh_map.h>
+#include <nav_msgs/Path.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <mesh_planner/MeshPlannerConfig.h>
 
 namespace mesh_planner{
 
@@ -95,11 +98,61 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
       const std::string& name,
       const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
- private:
-  mesh_map::MeshMap::Ptr mesh_ptr_;
-  std::string name_;
-  ros::NodeHandle private_nh_;
+ protected:
 
+  bool waveFrontPropagation(
+      const mesh_map::Vector& start,
+      const mesh_map::Vector& goal,
+      std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path);
+
+  bool waveFrontPropagation(
+      const mesh_map::Vector& start,
+      const mesh_map::Vector& goal,
+      const lvr2::DenseEdgeMap<float>& edge_weights,
+      const lvr2::DenseVertexMap<float>& costs,
+      std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+      lvr2::DenseVertexMap<float>& distances,
+      lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
+
+  inline bool waveFrontUpdate(
+      lvr2::DenseVertexMap<float>& distances,
+      const lvr2::DenseEdgeMap<float>& edge_weights,
+      const lvr2::VertexHandle& v1,
+      const lvr2::VertexHandle& v2,
+      const lvr2::VertexHandle& v3);
+
+  void publishVectorField();
+
+  void computeVectorMap();
+
+  void reconfigureCallback(mesh_planner::MeshPlannerConfig& cfg, uint32_t level);
+
+ private:
+  mesh_map::MeshMap::Ptr mesh_map;
+  std::string name;
+  ros::NodeHandle private_nh;
+  std::atomic_bool cancel_planning;
+  ros::Publisher path_pub;
+  ros::Publisher vector_pub;
+
+  std::string map_frame;
+
+  // Server for Reconfiguration
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig> > reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig>::CallbackType config_callback;
+  bool first_config;
+  MeshPlannerConfig config;
+
+  // theta angles to the source of the wave front propagation vertices
+  lvr2::DenseVertexMap<float> direction;
+  // predecessors while wave propagation
+  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+  // the face which is cut by line to the source
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
+  // stores the current vector map containing vectors pointing to the source (path goal)
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+  // potential field or distance values to the source (path goal)
+  lvr2::DenseVertexMap<float> potential;
 };
 
 }

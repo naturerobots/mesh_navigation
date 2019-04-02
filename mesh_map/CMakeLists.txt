@@ -34,6 +34,7 @@ include_directories(
 
 add_library(${PROJECT_NAME}
   src/mesh_map.cpp
+  src/util.cpp
 )
 
 add_dependencies(${PROJECT_NAME}

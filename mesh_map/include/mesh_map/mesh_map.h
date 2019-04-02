@@ -35,14 +35,13 @@
  *
  */
 
-#ifndef MESH_NAVIGATION__MESH_MAP_H
-#define MESH_NAVIGATION__MESH_MAP_H
+#ifndef MESH_MAP__MESH_MAP_H
+#define MESH_MAP__MESH_MAP_H
 
 #include <lvr2/io/HDF5IO.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <tf/transform_listener.h>
 #include <mesh_msgs/MeshVertexCosts.h>
-#include <nav_msgs/Path.h>
 #include <mesh_map/MeshMapConfig.h>
 #include <dynamic_reconfigure/server.h>
 #include <mesh_map/abstract_layer.h>
@@ -52,12 +51,11 @@
 
 namespace mesh_map{
 
+
 class MeshMap
 {
  public:
 
-  typedef lvr2::Normal<float> NormalType;
-  typedef lvr2::BaseVector<float> Vector;
 
   typedef boost::shared_ptr<MeshMap> Ptr;
 
@@ -71,42 +69,6 @@ class MeshMap
 
   bool initLayerPlugins();
 
-  inline Vector toVector(const geometry_msgs::Point& point);
-
-  void cancelPlanning(){cancel_planning = false;}
-
-  bool pathPlanning(
-      const geometry_msgs::PoseStamped& start,
-      const geometry_msgs::PoseStamped& goal,
-      std::vector<geometry_msgs::PoseStamped>& plan,
-      bool fmm = true);
-
-  bool dijkstra(
-      const Vector& start,
-      const Vector& goal,
-      std::list<lvr2::VertexHandle>& path);
-
-  bool waveFrontPropagation(
-      const Vector& start,
-      const Vector& goal,
-      std::list<std::pair<Vector, lvr2::FaceHandle>>& path);
-
-  inline bool waveFrontPropagation(
-      const Vector& start,
-      const Vector& goal,
-      const lvr2::DenseEdgeMap<float>& edge_weights,
-      const lvr2::DenseVertexMap<float>& costs,
-      std::list<std::pair<Vector, lvr2::FaceHandle>>& path,
-      lvr2::DenseVertexMap<float>& distances,
-      lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
-
-  inline bool waveFrontUpdate(
-      lvr2::DenseVertexMap<float>& distances,
-      const lvr2::DenseEdgeMap<float>& edge_weights,
-      const lvr2::VertexHandle& v1,
-      const lvr2::VertexHandle& v2,
-      const lvr2::VertexHandle& v3);
-
   lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector &pos);
 
   lvr2::OptionalFaceHandle getContainingFaceHandle(const Vector &pos);
@@ -115,45 +77,23 @@ class MeshMap
 
   void combineVertexCosts();
 
-  inline Vector projectVectorOntoPlane(const Vector &vec, const Vector &ref, const NormalType &normal);
-
-  void getMinMax(const lvr2::VertexMap<float>& map, float& min, float& max);
 
   void findLethalAreas(
       const int min_contour_size,
       const float height_diff_threshold,
       const float roughness_threshold);
 
-  geometry_msgs::Pose calculatePoseFromDirection(
-      const Vector& position,
-      const Vector& direction,
-      const NormalType& normal);
-
-  geometry_msgs::Pose calculatePoseFromPosition(
-      const Vector& current,
-      const Vector& next,
-      const NormalType& normal);
-
   void findContours(
       std::vector<std::vector<lvr2::VertexHandle> >& contours,
       int min_contour_size);
 
-  void publishCostLayers();
+  void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name);
 
-  void publishVectorField();
+  void publishCostLayers();
 
   bool barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v);
 
-  bool barycentricCoords(const Vector &p, const Vector &v0, const Vector &v1, const Vector &v2, float &u, float &v);
-
-  void findLethalInLayer(
-      const lvr2::DenseVertexMap<float>& layer,
-      const float& threshold,
-      std::set<lvr2::VertexHandle>& lethals);
-
   void layerChanged(const std::string &layer_name);
-
-  void computeVectorMap();
 
   void findLethalByContours(
       const int& min_contour_size,
@@ -171,6 +111,20 @@ class MeshMap
       float &t, float &u, float &v, Vector &p);
 
   bool resetLayers();
+
+  const lvr2::HalfEdgeMesh<Vector>& mesh(){return *mesh_ptr;}
+
+  const lvr2::DenseVertexMap<float>& vertexCosts(){return vertex_costs;}
+
+  const lvr2::DenseVertexMap<float>& getPotential(){return potential;}
+
+  const std::string& mapFrame(){return global_frame;}
+
+  const lvr2::DenseFaceMap<Normal>& faceNormals(){return face_normals;}
+
+  const lvr2::DenseVertexMap<Normal>& vertexNormals(){return vertex_normals;}
+
+  const lvr2::DenseEdgeMap<float>& edgeWeights(){return edge_weights;}
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
@@ -197,25 +151,18 @@ class MeshMap
 
   // path surface potential
   lvr2::DenseVertexMap<float> potential;
-  lvr2::DenseVertexMap<float> direction;
-  // predecessors while wave propagation
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
 
-  lvr2::DenseVertexMap<Vector> vector_map;
 
   // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;
   lvr2::DenseEdgeMap<float> edge_weights;
 
 
-  lvr2::DenseFaceMap<NormalType> face_normals;
-  lvr2::DenseVertexMap<NormalType> vertex_normals;
+  lvr2::DenseFaceMap<Normal> face_normals;
+  lvr2::DenseVertexMap<Normal> vertex_normals;
 
   ros::Publisher vertex_costs_pub;
   ros::Publisher mesh_geometry_pub;
-  ros::Publisher path_pub;
-  ros::Publisher vector_pub;
 
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > reconfigure_server_ptr;
@@ -232,7 +179,6 @@ class MeshMap
 
   std::mutex layer_mtx;
 
-  std::atomic_bool cancel_planning;
 };
 
 } /* namespace mesh_map */

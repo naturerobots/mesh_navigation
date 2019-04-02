@@ -8,13 +8,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(catkin REQUIRED COMPONENTS
   mbf_mesh_core
   mesh_map
+  lvr_ros
 )
 
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/WaveFrontPlanner.cfg
+)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -31,7 +30,11 @@ add_library(${PROJECT_NAME}
   src/mesh_planner.cpp
 )
 
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_gencfg
+)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
