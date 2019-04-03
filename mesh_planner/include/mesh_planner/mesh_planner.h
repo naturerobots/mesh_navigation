@@ -39,6 +39,7 @@
 #define MESH_NAVIGATION__MESH_PLANNER_H
 
 #include <mbf_mesh_core/mesh_planner.h>
+#include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -100,12 +101,12 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
 
  protected:
 
-  bool waveFrontPropagation(
+  uint32_t waveFrontPropagation(
       const mesh_map::Vector& start,
       const mesh_map::Vector& goal,
       std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path);
 
-  bool waveFrontPropagation(
+  uint32_t waveFrontPropagation(
       const mesh_map::Vector& start,
       const mesh_map::Vector& goal,
       const lvr2::DenseEdgeMap<float>& edge_weights,

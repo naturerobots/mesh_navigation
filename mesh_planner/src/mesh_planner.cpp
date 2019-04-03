@@ -75,10 +75,13 @@ uint32_t MeshPlanner::makePlan(
   mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
   mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
 
-  if(!waveFrontPropagation(goal_vec, start_vec, path)){
+  uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path);
+
+  if(outcome != mbf_msgs::GetPathResult::SUCCESS) {
     mesh_map->publishVertexCosts(potential, "Potential Debug");
-    return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+    return outcome;
   }
+
   t_end = ros::WallTime::now();
 
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
@@ -194,7 +197,7 @@ void MeshPlanner::computeVectorMap()
   }
 }
 
-bool MeshPlanner::waveFrontPropagation(
+uint32_t MeshPlanner::waveFrontPropagation(
     const mesh_map::Vector& start,
     const mesh_map::Vector& goal,
     std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path)
@@ -329,7 +332,7 @@ inline bool MeshPlanner::waveFrontUpdate(
   return false;
 }
 
-bool MeshPlanner::waveFrontPropagation(
+uint32_t MeshPlanner::waveFrontPropagation(
     const mesh_map::Vector& start,
     const mesh_map::Vector& goal,
     const lvr2::DenseEdgeMap<float>& edge_weights,
@@ -350,10 +353,8 @@ bool MeshPlanner::waveFrontPropagation(
   // reset cancel planning
   cancel_planning = false;
 
-  if(!start_opt || !goal_opt)
-  {
-    return false;
-  }
+  if(!start_opt) return mbf_msgs::GetPathResult::INVALID_START;
+  if(!goal_opt) return mbf_msgs::GetPathResult::INVALID_GOAL;
 
   const auto& start_face = start_opt.unwrap();
   const auto& goal_face = goal_opt.unwrap();
@@ -461,7 +462,7 @@ bool MeshPlanner::waveFrontPropagation(
 
   if(cancel_planning){
     ROS_WARN_STREAM("Wave front propagation has been canceled!");
-    return false;
+    return mbf_msgs::GetPathResult::CANCELED;
   }
 
   ROS_INFO_STREAM("Finished wave front propagation.");
@@ -485,7 +486,7 @@ bool MeshPlanner::waveFrontPropagation(
   if(!path_exists)
   {
     ROS_WARN("Predecessor of the goal is not set! No path found!");
-    return false;
+    return mbf_msgs::GetPathResult::NO_PATH_FOUND;
   }
 
   ROS_INFO_STREAM("Start vector field back tracking!");
@@ -550,7 +551,7 @@ bool MeshPlanner::waveFrontPropagation(
       }
       if(!foundConnectedFace){
         ROS_ERROR_STREAM("Sample path failed! Could not find a connected face in vector direction!");
-        return true; // TODO
+        return mbf_msgs::GetPathResult::FAILURE;
       }
     }
     path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));
@@ -561,7 +562,7 @@ bool MeshPlanner::waveFrontPropagation(
 
   if(cancel_planning){
     ROS_WARN_STREAM("Wave front propagation has been canceled!");
-    return false;
+    return mbf_msgs::GetPathResult::CANCELED;
   }
 
   /*
@@ -585,7 +586,7 @@ bool MeshPlanner::waveFrontPropagation(
   path.push_front(start_vertex);
 */
 
-  return true;
+  return mbf_msgs::GetPathResult::SUCCESS;
 
 }
 
