@@ -54,8 +54,8 @@
 
 namespace mesh_map{
 
-MeshMap::MeshMap(tf::TransformListener& tf_listener)
-    : tf_listener(tf_listener),
+MeshMap::MeshMap(tf2_ros::Buffer& tf_listener)
+    : tf_buffer(tf_buffer),
       private_nh("~/mesh_map/"),
       first_config(true),
       map_loaded(false),

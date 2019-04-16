@@ -40,9 +40,10 @@
 
 #include <lvr2/io/HDF5IO.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
 #include <mesh_msgs/MeshVertexCosts.h>
 #include <mesh_map/MeshMapConfig.h>
+#include <geometry_msgs/Point.h>
 #include <dynamic_reconfigure/server.h>
 #include <mesh_map/abstract_layer.h>
 #include <pluginlib/class_loader.h>
@@ -59,7 +60,7 @@ class MeshMap
 
   typedef boost::shared_ptr<MeshMap> Ptr;
 
-  MeshMap(tf::TransformListener& tf);
+  MeshMap(tf2_ros::Buffer& tf);
 
   bool readMap();
 
@@ -173,7 +174,7 @@ class MeshMap
 
   ros::NodeHandle private_nh;
 
-  tf::TransformListener& tf_listener;
+  tf2_ros::Buffer& tf_buffer;
 
   std::string uuid_str;
 
