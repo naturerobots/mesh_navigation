@@ -42,6 +42,7 @@
 #include <lvr_ros/colors.h>
 #include <lvr2/util/Meap.hpp>
 
+
 PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
 
 namespace mesh_planner{
