@@ -62,28 +62,82 @@ namespace mesh_controller{
         std::string &message
         )
     {
-        ROS_INFO("start movement");
-        float new_velocity = 0.3;
+        // start an iterator to go through plan vector
+        int iter = 0;
 
-        /*
+        // repeatedly check if goal is reached
 
-        geometry_msg::Vector3 linear;
-        linear x = velocity;
-        velocity_pub.publish(velocity);
+        while(!isGoalReached(0.1, 0.1)){
+            // set current_position as first pose from plan vector
+            current_position = current_plan[iter];
 
-        */
+            ROS_INFO("start movement");
+
+            // get yaw from quaternion
+            float current_angle = quaternionToYaw(pose);
+            float goal_angle = quaternionToYaw(current_position);
+
+            // align robot angle with paths angle until certain tolerance is reached
+            if (!align(current_angle, goal_angle, 0.1)) {
+                // TODO check if angular momentum is correct
+                if(current_angle < goal_angle){
+                    cmd_vel.twist.angular.z = 0.1;
+                } else {
+                    cmd_vel.twist.angular.z = -0.1;
+                }
+            }
+            else{
+                // move forward
+                // TODO use look ahead function to determine new velocity
+                cmd_vel.twist.linear.x = 0.2;
+                iter += 1;
+            }
+        }
+        stopRobot(cmd_vel);
 
         return mbf_msgs::GetPathResult::SUCCESS;
     }
 
     bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
     {
-        return false;
+        goal = current_plan.back();
+        geometry_msgs::PoseStamped pose = current_position;
+
+        // get yaw from quaternion
+        float current_angle = quaternionToYaw(pose);
+        float goal_angle = quaternionToYaw(goal);
+
+        // robot point in 3D space
+        float current_x = pose.pose.position.x;
+        float current_y = pose.pose.position.y;
+        float current_z = pose.pose.position.z;
+
+        // goal point in 3D space
+        float goal_x = goal.pose.position.x;
+        float goal_y = goal.pose.position.y;
+        float goal_z = goal.pose.position.z;
+
+
+        // test if robot is within tolerable distance to goal
+        if (current_angle <= goal_angle + angle_tolerance && current_angle >= goal_angle - angle_tolerance ||
+            current_x <= goal_x + dist_tolerance && current_x >= goal_x - dist_tolerance ||
+            current_y <= goal_y + dist_tolerance && current_y >= goal_y - dist_tolerance ||
+            current_z <= goal_z + dist_tolerance && current_z >= goal_z - dist_tolerance){
+            return true;
+        } else {
+            return false;
+        }
     }
 
     bool  MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped> &plan)
     {
-        return false;
+        if (!plan.empty()) {
+            current_plan = plan;
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     bool  MeshController::cancel()
@@ -91,6 +145,39 @@ namespace mesh_controller{
         return false;
     }
 
+
+
+    float MeshController::quaternionToYaw(const geometry_msgs::PoseStamped& pose){
+        // https://stackoverflow.com/questions/5782658/extracting-yaw-from-a-quaternion
+        float a = pose.pose.orientation.x;
+        float b = pose.pose.orientation.z;
+        float mag = sqrtf(a*a + b*b);
+        a /= mag;
+        return 2*acosf(a);
+
+    }
+
+    bool MeshController::stopRobot(geometry_msgs::TwistStamped &cmd_vel){
+        cmd_vel.twist.angular.z = 0.0;
+        cmd_vel.twist.linear.x = 0.0;
+        return true;
+    }
+
+    float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position){
+        // https://en.wikipedia.org/wiki/Euclidean_distance
+
+        float px = pose.pose.position.x;
+        float py = pose.pose.position.y;
+        float pz = pose.pose.position.z;
+
+        float cx = plan_position.pose.position.x;
+        float cy = plan_position.pose.position.y;
+        float cz = plan_position.pose.position.z;
+
+        float power = 2.0;
+        float dist = sqrtf((pow((px-cx),power) + pow((py-cy),power) + pow((pz-cz),power)));
+        return dist;
+    }
 
     /**
      * Checks if the next vertex is the goal.
@@ -107,55 +194,75 @@ namespace mesh_controller{
    */
 
     /**
-     * Checks the difficulty of the next vertex to set the speed accordingly
+     * Checks the difficulty of the next vertex / vertices (depending on velocity) to set the speed accordingly
      * @param name
      * @param tf_ptr
      * @param mesh_map_ptr
      * @return indentifier how speed shall be handled
+     *          0 - same speed
+     *          1 - increase speed
+     *          2 - reduce speed
+     *          3 - goal within reach
+     *          4 - calculation failed
      */
      /*
-     int MeshController::lookAhead(current_vertex, next_vertex)
-    {
-         // depends what type the next_vertex will be:
-         // - If its numbers an easy difference can be looked at (here for purple to red increasing numbers)
-         //     a) negative => reduce speed
-         //     b) positive => increase speed
-         //     c) equal => keep speed
-         // - If its colors the colors will be assigned numbers first
+     int MeshController::lookAhead(current_cost, index, speed)
+     {
+        int amount = 0;
+        if (speed <= 0.1){
+            amount = 3;
+        } else if (speed <= 0.2){
+            amount = 6;
+        } else if (speed <= 0.3) {
+            amount = 9;
+        } else {
+            amount = 12
+        }
+
+        // checks if goal is within reach
+        if ( (index + amount) > current_plan.size()) {
+            return 3;
+        }
+
+        int all_vertices = 0;
+
+        for(int i = 0; i < amount; i++){
+            // sum up all vertex costs
+            all_vertices += current_plan[index + i];
+        }
+
+        // get average vertex costs
+        int av_cost = all_vertices / amount;
+
+        // TODO think about making more phased (gestaffelte) decisions
+        if (current_cost == av_cost){
+            return 0;
+        } else if (current_cost > av_cost) {
+            return 1;
+        } else if (current_cost < av_cost) {
+            return 2;
+        } else {
+            return 4;
+        }
     }
     */
 
-    /**
-     * Turns the robot to align its direction with the path
-     * @param name
-     * @param tf_ptr
-     * @param mesh_map_ptr
-     * @return true if robot is aligned; false otherwise
-     */
-     /*
-     bool MeshController::align(robot_angle, path_angle)
-    {
 
-         if (robot_angle < path_angle + 0.01 && robot_angle > path_angle - 0.01){
-             // robot is aligned to path
-             return true
-         }
-         else if (robot_angle >= path_angle + 0.01){
-             // turn robot by 1rad / sec
-             return false
-         }
-         else if (robot_angle <= path_angle - 0.01){
-             // turn robot by 1rad / sec
-             return false
-         }
+    bool MeshController::align(float current_angle, float goal_angle, float angle_tolerance)
+    {
+        // test if robot is within tolerable distance to goal
+        if (current_angle <= goal_angle + angle_tolerance && current_angle >= goal_angle - angle_tolerance){
+            return true;
+        } else {
+            return false;
+        }
     }
-      */
 
     bool  MeshController::initialize(
         const std::string& name,
         const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
         const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
-    {
-        return false;
+     {
+        return true;
     }
 }

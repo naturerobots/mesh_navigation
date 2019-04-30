@@ -90,39 +90,73 @@ namespace mesh_controller{
             virtual uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
                                                      const geometry_msgs::TwistStamped& velocity,
                                                      geometry_msgs::TwistStamped &cmd_vel,
-                                                     std::string &message) = 0;
+                                                     std::string &message);
 
             /**
              * @brief Check if the goal pose has been achieved by the local planner
+             * @param pose The current pose of the robot.
              * @param angle_tolerance The angle tolerance in which the current pose will be partly accepted as reached goal
              * @param dist_tolerance The distance tolerance in which the current pose will be partly accepted as reached goal
              * @return True if achieved, false otherwise
              */
-            virtual bool isGoalReached(double dist_tolerance, double angle_tolerance) = 0;
+            virtual bool isGoalReached(double dist_tolerance, double angle_tolerance);
 
             /**
              * @brief Set the plan that the local planner is following
              * @param plan The plan to pass to the local planner
              * @return True if the plan was updated successfully, false otherwise
              */
-            virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped> &plan) = 0;
+            virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped> &plan);
 
             /**
              * @brief Requests the planner to cancel, e.g. if it takes too much time.
              * @return True if a cancel has been successfully requested, false if not implemented.
              */
-            virtual bool cancel() = 0;
+            virtual bool cancel();
+
+            /**
+             * @brief Converts a quaternion to a Yaw in radiant.
+             * @param pose The pose including the quaternion that will be converted
+             * @return yaw in radiant.
+             */
+            float quaternionToYaw(const geometry_msgs::PoseStamped& pose);
+
+            /**
+             * @brief Stops angular and linear motion of the robot.
+             * @param cmd_vel Will be filled with the velocity command to be passed to the robot base.
+             * @return true, if robot is stopped; false if not implemented
+             */
+            bool stopRobot(geometry_msgs::TwistStamped &cmd_vel);
+
+            /**
+             * @brief Calculates the distance between robot and a path position points in 3D space
+             * @param pose The current pose of the robot.
+             * @param current_position The current position on the plan.
+             * @return Euclidean Distance as float
+             */
+            float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
+
+            /**
+             * @brief Checks if the robots' direction is aligned with the path
+             * @param current_angle     Current orientation of the robot.
+             * @param goal_angle        Orientation of  path.
+             * @param angle_tolerance   The angle tolerance in which the current pose will be partly accepted as aligned with path
+             * @return true if robot is aligned; false otherwise
+            */
+            bool align(float current_angle, float goal_angle, float angle_tolerance);
 
             virtual bool initialize(
                     const std::string& name,
                     const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                    const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
+                    const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
         protected:
-            //MeshController();
 
-        //private:
-            //ros::Publisher velocity_pub;
+        private:
+            vector<geometry_msgs::PoseStamped> current_plan;
+            geometry_msgs::PoseStamped goal;
+            geometry_msgs::PoseStamped current_position;
+
     };
 
 } /* namespace mesh_controller */
