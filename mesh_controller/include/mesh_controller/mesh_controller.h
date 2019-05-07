@@ -121,13 +121,7 @@ namespace mesh_controller{
              */
             float quaternionToYaw(const geometry_msgs::PoseStamped& pose);
 
-            /**
-             * @brief Stops angular and linear motion of the robot.
-             * @param cmd_vel Will be filled with the velocity command to be passed to the robot base.
-             * @return true, if robot is stopped; false if not implemented
-             */
-            bool stopRobot(geometry_msgs::TwistStamped &cmd_vel);
-
+            float toEulerAngle(const geometry_msgs::PoseStamped& pose);
             /**
              * @brief Calculates the distance between robot and a path position points in 3D space
              * @param pose The current pose of the robot.
@@ -137,6 +131,14 @@ namespace mesh_controller{
             float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
 
             /**
+             * @brief Calculates the Euclidean Distance between the current robot pose and the next [20] samples of the
+             *          plan to find the closest part of the plan.
+             * @param pose The current pose of the robot.
+             */
+            void
+            updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
+
+            /**
              * @brief Checks if the robots' direction is aligned with the path
              * @param current_angle     Current orientation of the robot.
              * @param goal_angle        Orientation of  path.
@@ -144,6 +146,15 @@ namespace mesh_controller{
              * @return true if robot is aligned; false otherwise
             */
             bool align(float current_angle, float goal_angle, float angle_tolerance);
+
+            /**
+             * @brief           PID controller: compares the actual robot pose with the desired one and calculates a
+             *                  calculating term
+             * @param setpoint  pose of the desired position of the robot
+             * @param pv        pose of the actual robot position
+             * @return          correcting term
+             */
+            float pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv);
 
             virtual bool initialize(
                     const std::string& name,
@@ -156,6 +167,15 @@ namespace mesh_controller{
             vector<geometry_msgs::PoseStamped> current_plan;
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
+            int iter;
+            float int_error;
+            // loop interval time in sec
+            float int_time;
+            float prev_error;
+            const float prop_gain = 1.0;
+            const float int_gain = 1.0;
+            const float deriv_gain = 1.0;
+            const float PI = 3.141592;
 
     };
 
