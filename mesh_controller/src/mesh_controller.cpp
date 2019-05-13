@@ -60,12 +60,7 @@ namespace mesh_controller{
         const geometry_msgs::TwistStamped& velocity,
         geometry_msgs::TwistStamped &cmd_vel,
         std::string &message
-        )
-    {
-
-
-
-
+        ){
 
         // ANGULAR movement
 
@@ -73,10 +68,10 @@ namespace mesh_controller{
         float yaw_plan = toEulerAngle(current_plan[iter]);
         float yaw_robot = toEulerAngle(pose);
 
-        float direction_value = 0.0;
+        float direction_value;
         // calculate direction_value depending on the values of yaw_plan and yaw_robot as they can have values
         // between 0 and 2*PI but are ordered in circle
-        if (!align(yaw_robot, yaw_plan, 0.1)){
+        if (!align(yaw_robot, yaw_plan, 0.15)){
             if(yaw_robot > yaw_plan) {
                 direction_value = abs(yaw_robot - yaw_plan);
             } else {        // (yaw_robot < yaw_plan)
@@ -84,10 +79,10 @@ namespace mesh_controller{
             }
             // define turn direction given calculations
             if (direction_value > PI){
-                cmd_vel.twist.angular.z = -0.5;        // turn right
+                cmd_vel.twist.angular.z = 0.5;        // turn right
                 ROS_INFO_STREAM("Turn right");
             } else {
-                //cmd_vel.twist.angular.z = 0.25;     // turn left
+                cmd_vel.twist.angular.z = -0.5;     // turn left
                 ROS_INFO_STREAM("Turn left");
             }
         } else {
@@ -98,7 +93,7 @@ namespace mesh_controller{
         // LINEAR movement
         // TODO look ahead to determine velocity depending on future vertex cost(s)
         // TODO PID controller
-        float new_velocity = 0.2;
+        float new_velocity = (0.01 * pidControl(current_position, pose));
         cmd_vel.twist.linear.x = new_velocity;
 
 
@@ -136,10 +131,9 @@ namespace mesh_controller{
         // test if robot is within tolerable distance to goal
         // TODO figure out how to simplify this (as clion suggests)
         // TODO how to stop velocity without cmd_vel reference
-        if (current_x <= goal_x + dist && current_x >= goal_x - dist ||
-            current_y <= goal_y + dist && current_y >= goal_y - dist ||
+        if (current_x <= goal_x + dist && current_x >= goal_x - dist &&
+            current_y <= goal_y + dist && current_y >= goal_y - dist &&
             current_z <= goal_z + dist && current_z >= goal_z - dist){
-            // set velocity to zero
             return true;
         } else {
             return false;
@@ -221,7 +215,7 @@ namespace mesh_controller{
 
     void MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity){
         // the faster the robot, the further the look ahead
-        int v = static_cast<int>(velocity * 1000.0);
+        int v = static_cast<int>(velocity * 1000.0 + 1);
         // smallest[0] is iteration, smallest[1] is euclidean distance
         float smallest[2] = {static_cast<float>(iter), -1};
         for(int j = 0; j < v; j++){
@@ -349,12 +343,14 @@ namespace mesh_controller{
             const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr){
 
         // iterator to go through plan vector
+        mesh_ptr = mesh_map_ptr;
         iter = 0;
 
         int_error = 0.0;
         // int_time has to be higher than 0 -> else division by zero
         int_time = 0.1;
         prev_error = 0.0;
+        footprint = false;
         return true;
     }
 }

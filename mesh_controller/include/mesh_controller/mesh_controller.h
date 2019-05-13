@@ -164,6 +164,7 @@ namespace mesh_controller{
         protected:
 
         private:
+            boost::shared_ptr<mesh_map::MeshMap> mesh_ptr;
             vector<geometry_msgs::PoseStamped> current_plan;
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
@@ -172,6 +173,8 @@ namespace mesh_controller{
             // loop interval time in sec
             float int_time;
             float prev_error;
+            // set true, footprint will be considered in planner
+            bool footprint;
             const float prop_gain = 1.0;
             const float int_gain = 1.0;
             const float deriv_gain = 1.0;
