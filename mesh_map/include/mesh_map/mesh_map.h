@@ -106,6 +106,10 @@ class MeshMap
 
   inline const geometry_msgs::Point toPoint(const Vector& vec);
 
+  Vector directionAtPosition(lvr2::FaceHandle current_face, Vector pos);
+
+  float costAtPosition(lvr2::FaceHandle current_face, Vector pos);
+
   bool rayTriangleIntersect(
       const Vector &orig, const Vector &dir,
       const Vector &v0, const Vector &v1, const Vector &v2,
@@ -126,6 +130,8 @@ class MeshMap
   const lvr2::DenseVertexMap<Normal>& vertexNormals(){return vertex_normals;}
 
   const lvr2::DenseEdgeMap<float>& edgeWeights(){return edge_weights;}
+
+  void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
 
  private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
@@ -153,8 +159,9 @@ class MeshMap
   // path surface potential
   lvr2::DenseVertexMap<float> potential;
 
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-  // edge vertex distances
+    // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;
   lvr2::DenseEdgeMap<float> edge_weights;
 

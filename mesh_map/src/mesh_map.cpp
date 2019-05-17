@@ -546,10 +546,45 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
+void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
+{
+    this->vector_map = vector_map;
+}
+
+Vector MeshMap::directionAtPosition(lvr2::FaceHandle current_face, Vector pos)
+{
+    auto vertices = mesh_ptr->getVerticesOfFace(current_face);
+    const Vector v0 = vector_map[vertices[0]];
+    const Vector v1 = vector_map[vertices[1]];
+    const Vector v2 = vector_map[vertices[2]];
+
+    float u, v, w;
+    if(barycentricCoords(pos, current_face, u, v))
+    {
+        w = 1 - u - v;
+        return v0 * u + v1 * v + v2 * w;
+    }
+    return Vector();
+}
+
+float  MeshMap::costAtPosition(lvr2::FaceHandle current_face, Vector pos)
+{
+    auto vertices = mesh_ptr->getVerticesOfFace(current_face);
+    const float c0 = vertex_costs[vertices[0]];
+    const float c1 = vertex_costs[vertices[1]];
+    const float c2 = vertex_costs[vertices[2]];
+
+    float u, v, w;
+    if(barycentricCoords(pos, current_face, u, v))
+    {
+        w = 1 - u - v;
+        return u * c0 + v * c1 + w * c2;
+    }
+    return 0;
+}
 
 
-
-lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
+    lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
 {
   lvr2::OptionalFaceHandle fH;
   lvr2::OptionalVertexHandle vH_opt = getNearestVertexHandle(pos);

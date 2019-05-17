@@ -115,19 +115,51 @@ namespace mesh_controller{
             virtual bool cancel();
 
             /**
-             * @brief Converts a quaternion to a Yaw in radiant.
-             * @param pose The pose including the quaternion that will be converted
-             * @return yaw in radiant.
+             * Results in a slow increase of velocity in the beginning. Can be modulated via fading variable.
+             * @return factor by which to multiply the velocity for smooth start
              */
-            float quaternionToYaw(const geometry_msgs::PoseStamped& pose);
+            float startVelocityFactor();
 
-            float toEulerAngle(const geometry_msgs::PoseStamped& pose);
             /**
-             * @brief Calculates the distance between robot and a path position points in 3D space
-             * @param pose The current pose of the robot.
-             * @param current_position The current position on the plan.
-             * @return Euclidean Distance as float
+             * Results in a slow decrease of velocity towards the goal. Can be modulated via fading varibale.
+             * @return factor by which to multiply the velocity for smooth stop
              */
+            float endVelocityFactor(;
+
+            /**
+             * Transforms a PoseStamped into a mesh_map Vector
+             * @param pose      any geometry_msgs PoseStamped
+             * @return          mesh_map Vector
+             */
+            mesh_map::Vector poseToVector(const geometry_msgs::PoseStamped& pose);
+
+            /**
+             * Calculates the (smaller) angle between two vectors
+             * @param pos       mesh_map Vector of the current robot heading
+             * @param plan      mesh_map Vector of the supposed (planned) heading
+             * @param leftRight is set to -1 if a left turn has to be made, or +1 for right turn
+             * @return          (smaller) angle between the vectors
+             */
+            float angleBetweenVectors(mesh_map::Vector pos, mesh_map::Vector plan);
+
+            /**
+             * A *tangens* function to return a phased response value given a value
+             * @param max_hight     maximum value that will be returned
+             * @param max_width     range that the given value can take before the maximum is returned
+             * @param value         value on x axis
+             * @return              value on y axis that corresponds to input value
+             */
+            float tanValue(float max_hight, float max_width, float value);
+
+            /**
+             * A *normal distribution / gaussian* function to return a phased response value given a value
+             * @param max_hight     maximum value that will be returned
+             * @param max_width     range that the given value can take before the maximum is returned
+             * @param value         value on x axis
+             * @return              value on y axis that corresponds to input value
+             */
+            float gaussValue(float max_hight, float max_width, float value);
+
             float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
 
             /**
@@ -135,8 +167,30 @@ namespace mesh_controller{
              *          plan to find the closest part of the plan.
              * @param pose The current pose of the robot.
              */
-            void
-            updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
+            void updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
+
+            /**
+             * Checks the difficulty of the next vertex / vertices (depending on velocity) to calculate a factor by which to change the velocity
+             * @param pose          current position of the robot
+             * @param velocity      speed of the robot
+             * @return              factor to increase/decrease/keep the robot linear velocity between -1 and 1
+             */
+            float lookAhead(const geometry_msgs::PoseStamped& pose, float velocity);
+
+            /**
+             * Calculates the cost of the vertex of the current pose
+             * @param pose  Current position of the robot
+             * @return      Cost of the vertex
+             */
+            float cost(const geometry_msgs::PoseStamped& pose);
+
+            /**
+             * Calculates the cost of the vertex of the current pose.
+             * @param pose_vec  Pointer to the vector of the current pose
+             * @param face      pointer to the face handle of the vector
+             * @return      Cost of the vertex
+             */
+            float cost(mesh_map::Vector &pose_vec, const lvr2::FaceHandle &face);
 
             /**
              * @brief Checks if the robots' direction is aligned with the path
@@ -156,6 +210,8 @@ namespace mesh_controller{
              */
             float pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv);
 
+            void recordData(const geometry_msgs::PoseStamped& robot_pose);
+
             virtual bool initialize(
                     const std::string& name,
                     const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
@@ -164,7 +220,7 @@ namespace mesh_controller{
         protected:
 
         private:
-            boost::shared_ptr<mesh_map::MeshMap> mesh_ptr;
+            boost::shared_ptr<mesh_map::MeshMap> mesh;
             vector<geometry_msgs::PoseStamped> current_plan;
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
@@ -175,10 +231,19 @@ namespace mesh_controller{
             float prev_error;
             // set true, footprint will be considered in planner
             bool footprint;
+            bool haveStartFace;
+            lvr2::FaceHandle current_face;
+            bool record;
+            // angle between pose vector and planned / supposed vector
+            float angle;
+            // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
+            float fading;
             const float prop_gain = 1.0;
             const float int_gain = 1.0;
             const float deriv_gain = 1.0;
             const float PI = 3.141592;
+            const float E = 3.718281;
+            const float maximum_velocity = 0.5;
 
     };
 

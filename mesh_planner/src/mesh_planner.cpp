@@ -137,7 +137,7 @@ bool MeshPlanner::cancel(){
 
 bool MeshPlanner::initialize(
     const std::string& plugin_name,
-    const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+    const boost::shared_ptr<mesh_map::MeshMap>& )
 {
   mesh_map = mesh_map_ptr;
   name = plugin_name;
@@ -196,6 +196,7 @@ void MeshPlanner::computeVectorMap()
     const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
     vector_map.insert(v3, dirVec);
   }
+  mesh_map->setVectorMap(vector_map);
 }
 
 uint32_t MeshPlanner::waveFrontPropagation(
@@ -523,7 +524,81 @@ uint32_t MeshPlanner::waveFrontPropagation(
 
       while(possible_faces.end() != current && max != cnt++)
       {
-        lvr2::FaceHandle fH = *current;
+        lvr2::FaceHandle fH = *constexpr float step_width = 0.03;
+
+          lvr2::FaceHandle current_face = goal_face;
+          auto face = mesh.getVerticesOfFace(current_face);
+          auto vertices = mesh.getVertexPositionsOfFace(current_face);
+          mesh_map::Vector vec = mesh_map::projectVectorOntoPlane(goal, vertices[0], face_normals[current_face]);
+          path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));
+
+          mesh_map::Vector dir;
+          while(vec.distance2(start) > step_width && !cancel_planning)
+          {
+              float u, v;
+              if(mesh_map::barycentricCoords(vec, vertices[0], vertices[1], vertices[2], u, v))
+              {
+                  float w = 1 - u - v;
+                  dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width ;
+              }
+              else
+              {
+                  bool foundConnectedFace = false;
+                  std::list<lvr2::FaceHandle> possible_faces;
+                  std::vector<lvr2::FaceHandle> neighbour_faces;
+                  mesh.getNeighboursOfFace(current_face, neighbour_faces);
+                  possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+                  std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
+
+                  int cnt = 0;
+                  int max = 40; // TODO to config
+
+                  while(possible_faces.end() != current && max != cnt++)
+                  {
+                      lvr2::FaceHandle fH = *current;
+                      vertices = mesh.getVertexPositionsOfFace(fH);
+                      face = mesh.getVerticesOfFace(fH);
+
+                      // Projection onto the triangle plane
+                      mesh_map::Vector tmp_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
+
+                      // Check if the projected point lies in the current testing face
+                      if(vector_map.containsKey(face[0]) && vector_map.containsKey(face[1]) && vector_map.containsKey(face[2])
+                         && mesh_map::barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
+                      {
+                          foundConnectedFace = true;
+                          current_face = fH;
+                          vec = tmp_vec;
+                          float w = 1 - u - v;
+                          dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width ;
+                          break;
+                      }
+                      else
+              bool foundConnectedFace = false;
+      std::list<lvr2::FaceHandle> possible_faces;
+      std::vector<lvr2::FaceHandle> neighbour_faces;
+      mesh.getNeighboursOfFace(current_face, neighbour_faces);
+      possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+      std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
+
+      int cnt = 0;
+      int max = 40; // TODO to config
+
+      while(possible_faces.end() != current && max != cnt++)
+      {
+        lvr2::FaceHandle fH = *constexpr float step_width = 0.03;
+
+          lvr2::FaceHandle current_face = goal_face;
+          auto face = mesh.getVerticesOfFace(current_face);
+          auto vertices = mesh.getVertexPositionsOfFace(current_face);
+          me        {
+                          // add neighbour of neighbour, if we overstep a small face or the peak of it
+                          std::vector<lvr2::FaceHandle> nn_faces;
+                          mesh.getNeighboursOfFace(fH, nn_faces);
+                          possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
+                      }
+                      current++;
+                  };
         vertices = mesh.getVertexPositionsOfFace(fH);
         face = mesh.getVerticesOfFace(fH);
 
