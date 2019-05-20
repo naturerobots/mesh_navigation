@@ -580,7 +580,7 @@ float  MeshMap::costAtPosition(lvr2::FaceHandle current_face, Vector pos)
         w = 1 - u - v;
         return u * c0 + v * c1 + w * c2;
     }
-    return 0;
+    return -1;
 }
 
 

@@ -122,6 +122,10 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
       const lvr2::VertexHandle& v2,
       const lvr2::VertexHandle& v3);
 
+  lvr2::BaseVector<float> step_update(float step_width, lvr2::FaceHandle current_face, lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>& mesh,
+          lvr2::BaseVector<float> vec, lvr2::DenseFaceMap<lvr2::Normal<float>>& face_normals,
+          std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, mesh_map::Vector dir);
+
   void publishVectorField();
 
   void computeVectorMap();

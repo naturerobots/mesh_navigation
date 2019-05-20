@@ -133,9 +133,10 @@ class MeshMap
 
   void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
 
- private:
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
+
+ private:
 
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 

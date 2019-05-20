@@ -35,16 +35,18 @@
  *
  */
 
+//TODO sort out unnecessary headers
+
 #include <pluginlib/class_list_macros.h>
 #include <mesh_controller/mesh_controller.h>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
 #include <lvr2/util/Meap.hpp>
-
+#include <lvr2/geometry/HalfEdgeMesh.hpp>
+#include <tf/transform_listener.h>
 
 #include <fstream>
 #include <iostream>
-using namespace std;
 
 PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController, mbf_mesh_core::MeshController);
 
@@ -67,59 +69,37 @@ namespace mesh_controller{
         std::string &message
         ){
 
-        // ANGULAR movement
+        std::vector<float> values;
 
-        // TODO is directionAtPosition necessary?
-        // transform poses to orientation vectors
-        const mesh_map::Vector pose_vec = poseToVector(pose);
-        const mesh_map::Vector plan_vec = poseToVector(current_position);
+        // TODO make usable for directionAtPosition
+        mesh_map::Vector plan_vec = poseToVector(current_position);
+        if(useMeshGradient){
+            // use supposed orientation from mesh gradient
+            if(current_face){
+                plan_vec = map_ptr->directionAtPosition(current_face.unwrap(), plan_vec);
+            }
+        } else {
 
-        // calculate angle between orientation vectors
-        // angle will never be negative and smaller or equal to pi
-        angle = angleBetweenVectors(pose_vec, plan_vec);
+            values = naiveControl(pose, velocity, plan_vec);
 
-        // to determine in which direction to turn (neg for left)
-        // per default it will turn right
-        float leftRight = 1.0;
-        if (angle > PI){
-            leftRight = -1.0;
-            // if the turn has to be left, the angle has to be adjusted
-            angle -= PI;
+            // set velocities
+
+            cmd_vel.twist.angular.z = values[0];
+            cmd_vel.twist.linear.x = values[1];
+
+
+            // RECORDING
+            if (record) {
+                recordData(pose);
+            }
         }
 
-        cmd_vel.twist.angular.z = leftRight * tanValue(0.5, PI, angle);
-
-
-
-        // LINEAR movement
-
-        // basic linear velocity depending on angle difference between robot pose and plan
-        // the here set 1.0 is also the maximum velocity the robot can be assigned
-        float vel_given_angle = gaussValue(1.0, PI, angle);
-
-        // look ahead
-        float ahead_factor = lookAhead(pose, velocity.twist.linear.x);
-
-        // dynamic obstacle avoidance
-
-        // start
-        float start = startVelocityFactor();
-        // end
-        float end = endVelocityFactor();
-
-        float new_vel = start * end * ahead_factor * vel_given_angle;
-
-        cmd_vel.twist.linear.x = new_vel;
-
-
-        // RECORDING
-        if (record){
-            recordData(pose);
+        if(!useMeshGradient){
+            // UPDATE ITERATOR to where on the plan the robot is / should be currently
+            updatePlanPos(pose, values[1]);
         }
 
 
-        // UPDATE ITERATOR to where on the plan the robot is / should be currently
-        goal_close = updatePlanPos(pose, new_vel);
 
 
         return mbf_msgs::GetPathResult::SUCCESS;
@@ -127,9 +107,8 @@ namespace mesh_controller{
 
     bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
     {
-        float dist_tol = float(dist_tolerance);
-        float angle_tol = float(angle_tolerance);
-        geometry_msgs::PoseStamped pose = current_position;
+        float dist_tol = dist_tolerance;
+        float angle_tol = angle_tolerance;
         float current_angle = angle;
 
         float current_distance = euclideanDistance(current_position, goal);
@@ -184,13 +163,12 @@ namespace mesh_controller{
 
     mesh_map::Vector MeshController::poseToVector(const geometry_msgs::PoseStamped& pose){
         // define tf Pose for later assignment
-        // TODO correct type definition
-        tf2::Stamped<tf2::Pose> tfPose;
+        tf::Stamped<tf::Pose> tfPose;
         // transform pose to tf:Pose
         poseStampedMsgToTF(pose, tfPose);
 
         // get x as tf:Vector of transformed pose
-        tf2::Vector3 v = tfPose.getBasic[0];
+        tf::Vector3 v = tfPose.getBasis()[0];
         // transform tf:Vector in mesh_map Vector and return
         return mesh_map::Vector(v.x(), v.y(), v.z());
     }
@@ -231,6 +209,7 @@ namespace mesh_controller{
         return result;
     }
 
+    /*
     float MeshController::linearValue(float ref_x_value, float ref_y_value, float y_axis, float value){
         float slope;
         if(ref_x_value == 0){
@@ -240,6 +219,7 @@ namespace mesh_controller{
         }
         return slope*value + y_axis;
     }
+     */
 
     float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position){
         // https://en.wikipedia.org/wiki/Euclidean_distance
@@ -276,11 +256,16 @@ namespace mesh_controller{
         current_position = current_plan[iter];
     }
 
-    float MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
+    std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
     {
          // select how far to look ahead depending on velocity
          int steps = (int)tanValue(1000.0, 1.0, velocity);
+         // iterator value in case drastic speed reduction has to be made
+         int speed_iter = 0;
          float accum_cost = 0.0;
+         bool red_obstacle = false;
+         float accum_turn = 0.0;
+         bool more_than_45_turn = false;
 
          // adds up cost of all steps ahead
          for (int i = 0; i < steps; i++){
@@ -289,52 +274,64 @@ namespace mesh_controller{
                  steps = i;
                  break;
              }
-             accum_cost += cost(current_plan[iter + i]);
+             float new_cost = cost(current_plan[iter + i]);
+
+             float future_turn = angleBetweenVectors(poseToVector(pose), poseToVector(current_plan[iter + i]));
+
+             accum_cost += new_cost;
+             accum_turn += future_turn;
          }
 
          // average costs
          float av_cost = accum_cost / steps;
          float current_cost = cost(pose);
-         float difference =  current_cost - av_cost;
+         float cost_difference =  current_cost - av_cost;
+
+         // average turn CAUTION turn directions can equalize each other
+         // TODO define direction (Vorzeichen) of turn
+         float av_turn = accum_turn / steps;
+         float turn_difference = angle - av_turn;
+         float turn_result = tanValue(1.0, PI, turn_difference);
 
          //TODO find out what the value range of vector costs is
-         return tanValue(1.0, 2.0*av_cost, difference);
+         return {turn_result , abs(tanValue(1.0, 2.0*av_cost, cost_difference))};
     }
 
     float MeshController::cost(const geometry_msgs::PoseStamped& pose){
         mesh_map::Vector pose_vec = poseToVector(pose);
+
         if(!haveStartFace){
-            // TODO how to solve error?
-            current_face = mesh_map::MeshMap::getContainingFaceHandle(pose_vec);
+            current_face = map_ptr->getContainingFaceHandle(pose_vec);
             haveStartFace = true;
         }
-        float u, v, w;
-        if(mesh_map::MeshMap::barycentricCoords(pose_vec, &current_face, u, v)){
-            return cost(pose_vec, current_face);
-        } else {
-            float cost = searchNeighbourFaces(pose);
-            if(cost < 0){
-                __throw_length_error("Took to long to search for neighbours");
+        float u, v;
+
+        float ret_cost = map_ptr->costAtPosition(current_face.unwrap(), pose_vec);
+        if(ret_cost == -1)
+        {
+            lvr2::OptionalFaceHandle new_face = searchNeighbourFaces(pose_vec, current_face.unwrap());
+            if(new_face){
+                current_face = new_face;
+                ret_cost = map_ptr->costAtPosition(current_face.unwrap(), pose_vec);
             }
-            return cost;
         }
+        return ret_cost;
     }
 
     float MeshController::cost(mesh_map::Vector &pose_vec, const lvr2::FaceHandle &face){
 
-        return mesh_map::MeshMap::costAtPosition(face, pose_vec);
+        return
+        map_ptr->costAtPosition(face, pose_vec);
     }
 
 
 
 
-    float MeshController::searchNeighbourFaces(const geometry_msgs::PoseStamped& pose){
-        mesh_map::Vector pose_vec = poseToVector(pose);
-
+    lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector pose_vec, const lvr2::FaceHandle face){
 
         std::list<lvr2::FaceHandle> possible_faces;
         std::vector<lvr2::FaceHandle> neighbour_faces;
-        mesh.getNeighboursOfFace(current_face, neighbour_faces);
+        map_ptr->mesh_ptr->getNeighboursOfFace(face, neighbour_faces);
         possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
         std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
 
@@ -346,51 +343,64 @@ namespace mesh_controller{
         while(possible_faces.end() != current && max != cnt++) {
             lvr2::FaceHandle work_face = *current;
 
-            // lvr2::FaceHandle fH = *constexpr float step_width = 0.03;
-
-            auto face = mesh.getVerticesOfFace(work_face);
-            // check if robot position is on one of the vertices
-            for (int i = 0; i < 3; i++) {
-                if (pose_vec == face[i]) {
-                    return face[i].vertexCost();
-                }
-            }
-
             float u,v;
             // check if robot position is in the current face
-            if (barycentricCoords(pose_vec, work_face, u, v)) {
-                return cost(pose_vec, work_face);
+            if (map_ptr->barycentricCoords(pose_vec, work_face, u, v)) {
+                return work_face;
             } else {
                 // add neighbour of neighbour, if we overstep a small face or the peak of it
                 std::vector<lvr2::FaceHandle> nn_faces;
-                mesh.getNeighboursOfFace(work_face, nn_faces);
+                half_edge_mesh.getNeighboursOfFace(work_face, nn_faces);
                 possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
             }
         }
         // in case no face / vertex that contains robot pose is found
-        return -1.0;
+        return lvr2::OptionalFaceHandle;
     }
 
+    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, const mesh_map::Vector plan_vec){
+        // transform poses to orientation vectors
+        const mesh_map::Vector pose_vec = poseToVector(pose);
 
-    bool MeshController::align(float current_angle, float goal_angle, float angle_tolerance)
-    {
-        // test if robot is within tolerable distance to goal
-        float pos_goal_tolerance = goal_angle + angle_tolerance;
-        float neg_goal_tolerance = goal_angle - angle_tolerance;
-        if(pos_goal_tolerance >= 2*PI){
-            // in case the addition of angle_tolerance overshoots 2*PI - as value range is 0 to 2PI
-            pos_goal_tolerance = pos_goal_tolerance - 2*PI;
-        }
-        if (neg_goal_tolerance <= 0){
-            // in chase the subtraction of angle_tolerance is under 0 - as value range is 0 to 2PI
-            neg_goal_tolerance = neg_goal_tolerance + 2*PI;
+
+        // calculate angle between orientation vectors
+        // angle will never be negative and smaller or equal to pi
+        angle = angleBetweenVectors(pose_vec, plan_vec);
+
+        // to determine in which direction to turn (neg for left)
+        // per default it will turn right
+        float leftRight = 1.0;
+        if (angle > PI) {
+            leftRight = -1.0;
+            // if the turn has to be left, the angle has to be adjusted
+            angle -= PI;
         }
 
-        if (current_angle <= pos_goal_tolerance && current_angle >= neg_goal_tolerance){
-            return true;
-        } else {
-            return false;
-        }
+        float turn_angle_diff = leftRight * tanValue(0.5, PI, angle);
+
+
+
+        // LINEAR movement
+
+        // basic linear velocity depending on angle difference between robot pose and plan
+        float vel_given_angle = gaussValue(maximum_velocity, PI, angle);
+
+        // look ahead
+        std::vector<float> ahead_factor = lookAhead(pose, velocity.twist.linear.x);
+
+        // dynamic obstacle avoidance
+
+        // slow start
+        float start = startVelocityFactor();
+        // slower towards end
+        float end = endVelocityFactor();
+
+
+        float new_turn = turn_angle_diff * ahead_factor[0];
+        float new_vel = start * end * ahead_factor[1] * vel_given_angle;
+
+        return {new_turn, new_vel};
+
     }
 
     float MeshController::pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv){
@@ -460,8 +470,9 @@ namespace mesh_controller{
             const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr){
 
         // all for mesh plan
-        mesh = mesh_map_ptr;
+        map_ptr = mesh_map_ptr;
         goal = current_plan.back();
+
 
         // iterator to go through plan vector
         iter = 0;
@@ -470,13 +481,13 @@ namespace mesh_controller{
         // int_time has to be higher than 0 -> else division by zero
         int_time = 0.1;
         prev_error = 0.0;
-        footprint = false;
         haveStartFace = false;
-        goal_close = false;
         fading = 5;
+
+
 
         // for recording - true = record, false = no record
         record = false;
         return true;
     }
-}
+} /* namespace mesh_controller */

@@ -43,7 +43,6 @@
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
-// #include <mesh_controller/MeshControllerConfig.h>
 
 namespace mesh_controller{
 
@@ -124,7 +123,7 @@ namespace mesh_controller{
              * Results in a slow decrease of velocity towards the goal. Can be modulated via fading varibale.
              * @return factor by which to multiply the velocity for smooth stop
              */
-            float endVelocityFactor(;
+            float endVelocityFactor();
 
             /**
              * Transforms a PoseStamped into a mesh_map Vector
@@ -173,14 +172,14 @@ namespace mesh_controller{
              * Checks the difficulty of the next vertex / vertices (depending on velocity) to calculate a factor by which to change the velocity
              * @param pose          current position of the robot
              * @param velocity      speed of the robot
-             * @return              factor to increase/decrease/keep the robot linear velocity between -1 and 1
+             * @return              factor to increase/decrease/keep the robots {angular and linear} velocity between 0 and 1
              */
-            float lookAhead(const geometry_msgs::PoseStamped& pose, float velocity);
+            std::vector<float> lookAhead(const geometry_msgs::PoseStamped& pose, float velocity);
 
             /**
-             * Calculates the cost of the vertex of the current pose
-             * @param pose  Current position of the robot
-             * @return      Cost of the vertex
+             * Calculates the cost of the vertex of a desired pose
+             * @param pose          Desired Position
+             * @return              Cost of the position
              */
             float cost(const geometry_msgs::PoseStamped& pose);
 
@@ -193,13 +192,13 @@ namespace mesh_controller{
             float cost(mesh_map::Vector &pose_vec, const lvr2::FaceHandle &face);
 
             /**
-             * @brief Checks if the robots' direction is aligned with the path
-             * @param current_angle     Current orientation of the robot.
-             * @param goal_angle        Orientation of  path.
-             * @param angle_tolerance   The angle tolerance in which the current pose will be partly accepted as aligned with path
-             * @return true if robot is aligned; false otherwise
-            */
-            bool align(float current_angle, float goal_angle, float angle_tolerance);
+             * Searches where on the mesh map a pose lays (faces or vertices)
+             * @param pose_vec  Vector of the pose whose position is searched for
+             * @return          Cost at that position, returns -1.0 in case the position is not found (in reasonable time)
+             */
+            float searchNeighbourFaces(mesh_map::Vector pose_vec);
+
+            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, const mesh_map::Vector plan_vec);
 
             /**
              * @brief           PID controller: compares the actual robot pose with the desired one and calculates a
@@ -220,30 +219,32 @@ namespace mesh_controller{
         protected:
 
         private:
-            boost::shared_ptr<mesh_map::MeshMap> mesh;
+            // TODO sort out unnecessary variables
+            boost::shared_ptr<mesh_map::MeshMap> map_ptr;
             vector<geometry_msgs::PoseStamped> current_plan;
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
+            lvr2::HalfEdgeMesh<lvr2::BaseVec> half_edge_mesh;
             int iter;
             float int_error;
             // loop interval time in sec
             float int_time;
             float prev_error;
-            // set true, footprint will be considered in planner
-            bool footprint;
             bool haveStartFace;
-            lvr2::FaceHandle current_face;
+            lvr2::OptionalFaceHandle current_face;
             bool record;
             // angle between pose vector and planned / supposed vector
             float angle;
             // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
             float fading;
+            //
+            const bool useMeshGradient = false;
             const float prop_gain = 1.0;
             const float int_gain = 1.0;
             const float deriv_gain = 1.0;
             const float PI = 3.141592;
             const float E = 3.718281;
-            const float maximum_velocity = 0.5;
+            const float maximum_velocity = 1;
 
     };
 
