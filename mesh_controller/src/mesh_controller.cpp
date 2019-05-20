@@ -318,16 +318,7 @@ namespace mesh_controller{
         return ret_cost;
     }
 
-    float MeshController::cost(mesh_map::Vector &pose_vec, const lvr2::FaceHandle &face){
-
-        return
-        map_ptr->costAtPosition(face, pose_vec);
-    }
-
-
-
-
-    lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector pose_vec, const lvr2::FaceHandle face){
+    lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face){
 
         std::list<lvr2::FaceHandle> possible_faces;
         std::vector<lvr2::FaceHandle> neighbour_faces;
@@ -355,7 +346,7 @@ namespace mesh_controller{
             }
         }
         // in case no face / vertex that contains robot pose is found
-        return lvr2::OptionalFaceHandle;
+        return lvr2::OptionalFaceHandle();
     }
 
     std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, const mesh_map::Vector plan_vec){

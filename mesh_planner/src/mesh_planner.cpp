@@ -510,7 +510,7 @@ namespace mesh_planner{
             }
             else
             {
-                lvr2::BaseVector<float> step_ret = step_update(step_width, current_face, mesh, vec, face_normals, path, dir);
+                lvr2::BaseVector<float> step_ret = step_update(step_width, current_face, mesh, vec, path, dir);
                 if ( lvr2::BaseVector<float>() == step_ret){
                     ROS_ERROR_STREAM("Sample path failed! Could not find a connected face in vector direction!");
                     return mbf_msgs::GetPathResult::FAILURE;
@@ -552,9 +552,10 @@ namespace mesh_planner{
 
     }
 
-    lvr2::BaseVector<float> MeshPlanner::step_update(float step_width, lvr2::FaceHandle current_face, lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>& mesh,
-            lvr2::BaseVector<float> vec, lvr2::DenseFaceMap<lvr2::Normal<float>>& face_normals,
-            std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, mesh_map::Vector dir){
+    lvr2::BaseVector<float> MeshPlanner::step_update(float step_width, lvr2::FaceHandle current_face, const lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>& mesh,
+            lvr2::BaseVector<float> vec, std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, mesh_map::Vector dir){
+
+        const auto& face_normals = mesh_map->faceNormals();
         bool foundConnectedFace = false;
         std::list<lvr2::FaceHandle> possible_faces;
         std::vector<lvr2::FaceHandle> neighbour_faces;
@@ -598,7 +599,7 @@ namespace mesh_planner{
         }
 
         if(!foundConnectedFace){
-            return lvr2::BaseVector<float>;
+            return lvr2::BaseVector<float>();
         }
 
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));

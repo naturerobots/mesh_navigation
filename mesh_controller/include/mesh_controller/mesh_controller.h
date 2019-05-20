@@ -183,20 +183,14 @@ namespace mesh_controller{
              */
             float cost(const geometry_msgs::PoseStamped& pose);
 
-            /**
-             * Calculates the cost of the vertex of the current pose.
-             * @param pose_vec  Pointer to the vector of the current pose
-             * @param face      pointer to the face handle of the vector
-             * @return      Cost of the vertex
-             */
-            float cost(mesh_map::Vector &pose_vec, const lvr2::FaceHandle &face);
 
             /**
-             * Searches where on the mesh map a pose lays (faces or vertices)
+             * Searches the face on the mesh map where a pose lays
              * @param pose_vec  Vector of the pose whose position is searched for
-             * @return          Cost at that position, returns -1.0 in case the position is not found (in reasonable time)
+             * @param face      Face handle from which search begins
+             * @return          Face handle of the position - empty face handle if position could not be found
              */
-            float searchNeighbourFaces(mesh_map::Vector pose_vec);
+            lvr2::OptionalFaceHandle searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face);
 
             std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, const mesh_map::Vector plan_vec);
 
