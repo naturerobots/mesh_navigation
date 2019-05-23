@@ -99,6 +99,8 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
       const std::string& name,
       const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
+  lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
+
  protected:
 
   uint32_t waveFrontPropagation(
@@ -121,9 +123,6 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
       const lvr2::VertexHandle& v1,
       const lvr2::VertexHandle& v2,
       const lvr2::VertexHandle& v3);
-
-  lvr2::BaseVector<float> step_update(float step_width, lvr2::FaceHandle current_face, const lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>& mesh,
-                                      lvr2::BaseVector<float> vec, std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, mesh_map::Vector dir);
 
   void publishVectorField();
 

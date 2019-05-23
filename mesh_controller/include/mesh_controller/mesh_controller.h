@@ -126,11 +126,11 @@ namespace mesh_controller{
             float endVelocityFactor();
 
             /**
-             * Transforms a PoseStamped into a mesh_map Vector
+             * Transforms a PoseStamped into a direction mesh_map Vector
              * @param pose      any geometry_msgs PoseStamped
-             * @return          mesh_map Vector
+             * @return          direction mesh_map Vector
              */
-            mesh_map::Vector poseToVector(const geometry_msgs::PoseStamped& pose);
+            mesh_map::Vector poseToDirectionVector(const geometry_msgs::PoseStamped& pose);
 
             /**
              * Calculates the (smaller) angle between two vectors
@@ -159,12 +159,19 @@ namespace mesh_controller{
              */
             float gaussValue(float max_hight, float max_width, float value);
 
+            /**
+             * returns the euclidean distance between two poses
+             * @param pose              first pose
+             * @param plan_position     second pose
+             * @return                  distance as float
+             */
             float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
 
             /**
-             * @brief Calculates the Euclidean Distance between the current robot pose and the next [20] samples of the
-             *          plan to find the closest part of the plan.
-             * @param pose The current pose of the robot.
+             * Calculates the Euclidean Distance between the current robot pose and the next x poses towards the goal
+             * to find the closest part of the plan.
+             * @param pose      current position of the robot
+             * @param velocity  current velocity of the robot
              */
             void updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
 
@@ -179,9 +186,9 @@ namespace mesh_controller{
             /**
              * Calculates the cost of the vertex of a desired pose
              * @param pose          Desired Position
-             * @return              Cost of the position
+             * @return              Cost of the position, -1 if position could not be found
              */
-            float cost(const geometry_msgs::PoseStamped& pose);
+            float cost(mesh_map::Vector& pose_vec);
 
 
             /**
@@ -190,20 +197,57 @@ namespace mesh_controller{
              * @param face      Face handle from which search begins
              * @return          Face handle of the position - empty face handle if position could not be found
              */
-            lvr2::OptionalFaceHandle searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face);
-
-            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, const mesh_map::Vector plan_vec);
+            lvr2::OptionalFaceHandle searchNeighbourFaces(const mesh_map::Vector& pose_vec, lvr2::FaceHandle face);
 
             /**
-             * @brief           PID controller: compares the actual robot pose with the desired one and calculates a
-             *                  calculating term
-             * @param setpoint  pose of the desired position of the robot
-             * @param pv        pose of the actual robot position
-             * @return          correcting term
+             * Combines angle difference, look ahead etc. to determine angular and linear velocities
+             * @param pose          Current robot pose.
+             * @param velocity      Current velocity of the robot.
+             * @param plan_vec      vector of supposed position (necessary if using the mesh Gradient and not the plan)
+             * @return              vector with new angular velocity and new linear velocity
              */
-            float pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv);
+            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, mesh_map::Vector plan_vec);
 
+            /**
+             * Calls the pid controllers for the distance to the desired position and desired direction control and combines those
+             * Includes look ahead
+             * @param setpoint  The desired position of the robot
+             * @param pv        the actual position of the robot
+             * @param velocity  current velocity of the robot
+             * @return          vector containing the new angular and linear velocities
+             */
+            std::vector<float> pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv, const geometry_msgs::TwistStamped& velocity  );
+
+            /**
+             * PID control for the distance between the desired position and the actual position of the robot
+             * @param setpoint  desired position of the robot
+             * @param pv        actual position of the robot
+             * @return          new linear velocity
+             */
+            float pidControlDistance(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv);
+
+            /**
+             * PID control for the angle between the desired position and the actual position of the robot
+             * @param setpoint  desired angle/heading of the robot
+             * @param pv        actual angle / heading of the robot
+             * @return          new angular velocity
+             */
+            float pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv);
+
+            /**
+             *
+             * @param robot_pose
+             */
             void recordData(const geometry_msgs::PoseStamped& robot_pose);
+
+            /**
+             * Finds the next position given a direction vector and its corresponding face handle by following the direction
+             * For: look ahead when using mesh gradient
+             * @param vec   direction vector from which the next step vector is calculated
+             * @param face  face of the direction vector
+             * @return      new vector (also updates the ahead_face handle to correspond to the new vector)
+             */
+            lvr2::BaseVector<float> step_update(mesh_map::Vector& vec, lvr2::FaceHandle face);
 
             virtual bool initialize(
                     const std::string& name,
@@ -213,6 +257,8 @@ namespace mesh_controller{
         protected:
 
         private:
+
+
             // TODO sort out unnecessary variables
             boost::shared_ptr<mesh_map::MeshMap> map_ptr;
             vector<geometry_msgs::PoseStamped> current_plan;
@@ -223,14 +269,20 @@ namespace mesh_controller{
             float int_error;
             // loop interval time in sec
             float int_time;
-            float prev_error;
+            // for pid control
+            float prev_distance_error;
+            float prev_dir_error;
             bool haveStartFace;
             lvr2::OptionalFaceHandle current_face;
+            lvr2::OptionalFaceHandle ahead_face;
             bool record;
             // angle between pose vector and planned / supposed vector
             float angle;
             // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
             float fading;
+            // stores the current vector map containing vectors pointing to the source (path goal)
+            lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+
             //
             const bool useMeshGradient = false;
             const float prop_gain = 1.0;
@@ -238,7 +290,10 @@ namespace mesh_controller{
             const float deriv_gain = 1.0;
             const float PI = 3.141592;
             const float E = 3.718281;
-            const float maximum_velocity = 1;
+            const float maximum_lin_velocity = 1.0;
+            const float maximum_ang_velocity = 1.0;
+
+            const int control_type = 1; // 1: naive control, 2: pidControl,
 
     };
 

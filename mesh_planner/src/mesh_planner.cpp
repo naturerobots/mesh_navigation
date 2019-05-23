@@ -157,6 +157,10 @@ namespace mesh_planner{
         return true;
     }
 
+    lvr2::DenseVertexMap<mesh_map::Vector> MeshPlanner::getVectorMap(){
+        return vector_map;
+    }
+
     void MeshPlanner::reconfigureCallback(mesh_planner::MeshPlannerConfig& cfg, uint32_t level)
     {
         ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
@@ -510,14 +514,52 @@ namespace mesh_planner{
             }
             else
             {
-                lvr2::BaseVector<float> step_ret = step_update(step_width, current_face, mesh, vec, path, dir);
-                if ( lvr2::BaseVector<float>() == step_ret){
+                bool foundConnectedFace = false;
+                std::list<lvr2::FaceHandle> possible_faces;
+                std::vector<lvr2::FaceHandle> neighbour_faces;
+                mesh.getNeighboursOfFace(current_face, neighbour_faces);
+                possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+                std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
+
+                int cnt = 0;
+                int max = 40; // TODO to config
+
+                while(possible_faces.end() != current && max != cnt++)
+                {
+                    lvr2::FaceHandle fH = *current;
+                    vertices = mesh.getVertexPositionsOfFace(fH);
+                    face = mesh.getVerticesOfFace(fH);
+
+                    // Projection onto the triangle plane
+                    mesh_map::Vector tmp_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
+
+                    // Check if the projected point lies in the current testing face
+                    if(vector_map.containsKey(face[0]) && vector_map.containsKey(face[1]) && vector_map.containsKey(face[2])
+                       && mesh_map::barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
+                    {
+                        foundConnectedFace = true;
+                        current_face = fH;
+                        vec = tmp_vec;
+                        float w = 1 - u - v;
+                        dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width ;
+                        break;
+                    }
+                    else
+                    {
+                        // add neighbour of neighbour, if we overstep a small face or the peak of it
+                        std::vector<lvr2::FaceHandle> nn_faces;
+                        mesh.getNeighboursOfFace(fH, nn_faces);
+                        possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
+                    }
+                    current++;
+                }
+                if(!foundConnectedFace){
                     ROS_ERROR_STREAM("Sample path failed! Could not find a connected face in vector direction!");
                     return mbf_msgs::GetPathResult::FAILURE;
                 }
-
-                vec = step_ret;
             }
+            path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));
+            vec += dir;
         }
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(start, current_face));
@@ -550,60 +592,6 @@ namespace mesh_planner{
 
         return mbf_msgs::GetPathResult::SUCCESS;
 
-    }
-
-    lvr2::BaseVector<float> MeshPlanner::step_update(float step_width, lvr2::FaceHandle current_face, const lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>& mesh,
-            lvr2::BaseVector<float> vec, std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, mesh_map::Vector dir){
-
-        const auto& face_normals = mesh_map->faceNormals();
-        bool foundConnectedFace = false;
-        std::list<lvr2::FaceHandle> possible_faces;
-        std::vector<lvr2::FaceHandle> neighbour_faces;
-        mesh.getNeighboursOfFace(current_face, neighbour_faces);
-        possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
-        std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
-
-        int cnt = 0;
-        int max = 40; // TODO to config
-
-        while(possible_faces.end() != current && max != cnt++)
-        {
-            lvr2::FaceHandle fH = *current;
-            auto vertices = mesh.getVertexPositionsOfFace(fH);
-            auto face = mesh.getVerticesOfFace(fH);
-
-            // Projection onto the triangle plane
-            mesh_map::Vector tmp_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
-            float u, v;
-
-
-            // Check if the projected point lies in the current testing face
-            if(vector_map.containsKey(face[0]) && vector_map.containsKey(face[1]) && vector_map.containsKey(face[2])
-               && mesh_map::barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
-            {
-                foundConnectedFace = true;
-                current_face = fH;
-                vec = tmp_vec;
-                float w = 1 - u - v;
-                dir = ( vector_map[face[0]]*u + vector_map[face[1]]*v + vector_map[face[2]]*w ).normalized() * step_width;
-                break;
-            }
-            else
-            {
-                // add neighbour of neighbour, if we overstep a small face or the peak of it
-                std::vector<lvr2::FaceHandle> nn_faces;
-                mesh.getNeighboursOfFace(fH, nn_faces);
-                possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
-            }
-            current++;
-        }
-
-        if(!foundConnectedFace){
-            return lvr2::BaseVector<float>();
-        }
-
-        path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(vec, current_face));
-        return vec + dir;
     }
 
     void MeshPlanner::publishVectorField()
