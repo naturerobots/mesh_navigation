@@ -214,6 +214,22 @@ namespace mesh_controller{
         return result;
     }
 
+    float MeshController::direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed){
+        // cross product
+        const mesh_map::Vector& cross_product = {current.y*supposed.z - current.z*supposed.y, current.z*supposed.x - current.x*supposed.z,
+                                                 current.x*supposed.y - current.y*supposed.x};
+        const mesh_map::Vector& up = {0, 0, 1};
+        // dot product of result with up vector (0,0,1)
+        float dot_product = cross_product.x*up.x + cross_product.y*up.y + cross_product.z*up.z;
+
+        // TODO check return values for turns
+        if(dot_product < 0){
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+
     /*
     float MeshController::linearValue(float ref_x_value, float ref_y_value, float y_axis, float value){
         float slope;
@@ -403,12 +419,8 @@ namespace mesh_controller{
         angle = angleBetweenVectors(pose_vec, plan_vec);
 
         // to determine in which direction to turn (neg for left, pos for right)
-        float leftRight = 1.0;
-        if (angle > PI) {
-            leftRight = -1.0;
-            // if the turn has to be left, the angle has to be adjusted
-            angle -= PI;
-        }
+        float leftRight = direction(pose_vec, plan_vec);
+
 
         float turn_angle_diff = leftRight * tanValue(0.5, PI, angle);
 
@@ -462,14 +474,14 @@ namespace mesh_controller{
         float error = euclideanDistance(setpoint, pv);
 
         // proportional part
-        float proportional = prop_gain * error;
+        float proportional = prop_dis_gain * error;
 
         // integral part
         int_error += (error * int_time);
-        float integral = int_gain * int_error;
+        float integral = int_dis_gain * int_error;
 
         // derivative part
-        float derivative = deriv_gain * ((error - prev_distance_error) / int_time);
+        float derivative = deriv_dis_gain * ((error - prev_distance_error) / int_time);
 
         float linear = proportional + integral + derivative;
 
@@ -490,14 +502,14 @@ namespace mesh_controller{
         float dir_error = angleBetweenVectors(setpoint, pv);
 
         // proportional part
-        float proportional = prop_gain * dir_error;
+        float proportional = prop_dir_gain * dir_error;
 
         // integral part
         int_error += (dir_error * int_time);
-        float integral = int_gain * int_error;
+        float integral = int_dir_gain * int_error;
 
         // derivative part
-        float derivative = deriv_gain * ((dir_error - prev_dir_error) / int_time);
+        float derivative = deriv_dir_gain * ((dir_error - prev_dir_error) / int_time);
 
         float angular = proportional + integral + derivative;
 
@@ -509,12 +521,10 @@ namespace mesh_controller{
 
         prev_dir_error = dir_error;
 
-        if (angular > PI) {
-            // if the turn has to be left, the angle has to be adjusted
-            angular = (angular - PI) * -1.0;
-        }
+        // to determine in which direction to turn (neg for left, pos for right)
+        float leftRight = direction(pv, setpoint);
 
-        return angular;
+        return angular*leftRight;
     }
 
     void MeshController::recordData(const geometry_msgs::PoseStamped& robot_pose){
@@ -646,6 +656,28 @@ namespace mesh_controller{
 
         // for recording - true = record, false = no record
         record = false;
+
+        prop_dis_gain = 1.0;
+        int_dis_gain = 1.0;
+        deriv_dis_gain = 1.0;
+        prop_dir_gain = 1.0;
+        int_dir_gain = 1.0;
+        deriv_dir_gain = 1.0;
+        /*
+        // pid controller tuning parameters
+        float k_u = ; float t_u = ;
+        float tau = ; g_p = ; t_d = ;
+        switch(tuning_type){
+            case 1: prop_gain = 0.6*k_u; int_gain =0.5*t_u ; deriv_gain = 0.125*t_u; //ZN https://dewesoft.pro/online/course/pid-control/page/pid-tuning-methods
+            case 2: prop_gain = k_u/2.2; int_gain = 2.2*t_u; deriv_gain = t_u/6.3; // T-L  http://pages.mtu.edu/~tbco/cm416/zn.html
+            case 3: prop_gain = (1.35/g_t)*(tau/t_d + 0.185); int_gain = 2.5 * t_d * ((tau+0.185*t_d)/tau + 0.611*t_d); deriv_gain = 0.37 * t_d * tau / (tau + 0.185*t_d); // C-C https://dewesoft.pro/online/course/pid-control/page/pid-tuning-methods
+            case 4: prop_gain = ; int_gain = ; deriv_gain = ;
+                prop_gain = ; int_gain = ; deriv_gain =
+
+        }
+        */
+
         return true;
+
     }
 } /* namespace mesh_controller */

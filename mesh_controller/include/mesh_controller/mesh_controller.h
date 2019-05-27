@@ -160,6 +160,14 @@ namespace mesh_controller{
             float gaussValue(float max_hight, float max_width, float value);
 
             /**
+             * Calculates in which direction the robot has to turn
+             * @param current       current heading of the robot
+             * @param supposed      supposed heading of the robot
+             * @return              -1 for left turn, 1 else
+             */
+            float direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed);
+
+            /**
              * returns the euclidean distance between two poses
              * @param pose              first pose
              * @param plan_position     second pose
@@ -210,7 +218,7 @@ namespace mesh_controller{
 
             /**
              * Calls the pid controllers for the distance to the desired position and desired direction control and combines those
-             * Includes look ahead
+             * Includes look ahe
              * @param setpoint  The desired position of the robot
              * @param pv        the actual position of the robot
              * @param velocity  current velocity of the robot
@@ -283,11 +291,19 @@ namespace mesh_controller{
             // stores the current vector map containing vectors pointing to the source (path goal)
             lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-            //
+            //pid tuning parameters
+            const int tuning_type = 1; //1: ZieglerNichols 2: Tyreus-Luyben 3: KappaTau 4: PolePlacement
+            float prop_dis_gain;
+            float int_dis_gain;
+            float deriv_dis_gain;
+            float prop_dir_gain;
+            float int_dir_gain;
+            float deriv_dir_gain;
+            float k_u;
+            float t_u;
+
+
             const bool useMeshGradient = false;
-            const float prop_gain = 1.0;
-            const float int_gain = 1.0;
-            const float deriv_gain = 1.0;
             const float PI = 3.141592;
             const float E = 3.718281;
             const float maximum_lin_velocity = 1.0;
