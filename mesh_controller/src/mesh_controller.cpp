@@ -70,10 +70,15 @@ namespace mesh_controller{
         std::string &message
         ){
 
+        if(!current_plan.empty()){
+            goal = current_plan.back();
+        }
+
+
         std::vector<float> values;
 
         // TODO make usable for directionAtPosition
-        mesh_map::Vector plan_vec = poseToDirectionVector(current_position);
+        mesh_map::Vector plan_vec = poseToDirectionVesctor(current_position);
         if(useMeshGradient){
             // use supposed orientation from mesh gradient
             if(current_face){
@@ -642,7 +647,6 @@ namespace mesh_controller{
 
         // all for mesh plan
         map_ptr = mesh_map_ptr;
-        goal = current_plan.back();
 
 
         // iterator to go through plan vector
