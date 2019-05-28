@@ -175,6 +175,8 @@ namespace mesh_controller{
              */
             float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
 
+            float euclideanDistance(lvr2::BaseVector<float> current, lvr2::BaseVector<float> planned);
+
             /**
              * Calculates the Euclidean Distance between the current robot pose and the next x poses towards the goal
              * to find the closest part of the plan.

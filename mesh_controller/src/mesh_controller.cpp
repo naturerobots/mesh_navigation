@@ -78,7 +78,7 @@ namespace mesh_controller{
         std::vector<float> values;
 
         // TODO make usable for directionAtPosition
-        mesh_map::Vector plan_vec = poseToDirectionVesctor(current_position);
+        mesh_map::Vector plan_vec = poseToDirectionVector(current_position);
         if(useMeshGradient){
             // use supposed orientation from mesh gradient
             if(current_face){
@@ -247,6 +247,7 @@ namespace mesh_controller{
     }
      */
 
+
     float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position){
         // https://en.wikipedia.org/wiki/Euclidean_distance
 
@@ -258,8 +259,12 @@ namespace mesh_controller{
         float cy = plan_position.pose.position.y;
         float cz = plan_position.pose.position.z;
 
+        return euclideanDistance({px, py, pz}, {cx, cy, cz});
+    }
+
+    float MeshController::euclideanDistance(lvr2::BaseVector<float> current, lvr2::BaseVector<float> planned){
         float power = 2.0;
-        float dist = sqrtf((pow((px-cx),power) + pow((py-cy),power) + pow((pz-cz),power)));
+        float dist = sqrtf((pow((planned.x-current.x),power) + pow((planned.y-current.y),power) + pow((planned.z-current.z),power)));
         return dist;
     }
 
@@ -291,14 +296,13 @@ namespace mesh_controller{
          float accum_turn = 0.0;
          bool vital_turn = false;
          bool vital_cost = false;
-         auto goal_vec = poseToDirectionVector(goal);
 
          if (useMeshGradient){
              // TODO find out what excactly return vector gives (direction or position)
              lvr2::BaseVector<float> position_ahead = poseToDirectionVector(pose);
              ahead_face = current_face;
              for (int j = 0; j < steps/3; j++){
-                 if(angleBetweenVectors(position_ahead, goal_vec) < 0.04){
+                 if(euclideanDistance(position_ahead, {goal.pose.position.x, goal.pose.position.y, goal.pose.position.z}) < 0.04){
                      steps = j;
                      break;
                  }
