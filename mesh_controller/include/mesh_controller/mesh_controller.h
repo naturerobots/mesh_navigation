@@ -245,7 +245,8 @@ namespace mesh_controller{
             float pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv);
 
             /**
-             *
+             * Records the distance between the current robot position and the supposed robot position to be able
+             * to evaluate the "goodness" of the driven path.
              * @param robot_pose
              */
             void recordData(const geometry_msgs::PoseStamped& robot_pose);
@@ -276,42 +277,54 @@ namespace mesh_controller{
             geometry_msgs::PoseStamped current_position;
             lvr2::HalfEdgeMesh<lvr2::BaseVec> half_edge_mesh;
             int iter;
-            float int_error;
-            // loop interval time in sec
-            float int_time;
+
             // for pid control
-            float prev_distance_error;
+            float int_dis_error;
+            float int_dir_error;
+            float prev_dis_error;
             float prev_dir_error;
+
+            // for mesh use
             bool haveStartFace;
             lvr2::OptionalFaceHandle current_face;
             lvr2::OptionalFaceHandle ahead_face;
-            bool record;
             // angle between pose vector and planned / supposed vector
             float angle;
-            // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
-            float fading;
             // stores the current vector map containing vectors pointing to the source (path goal)
             lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-            //pid tuning parameters
-            const int tuning_type = 1; //1: ZieglerNichols 2: Tyreus-Luyben 3: KappaTau 4: PolePlacement
-            float prop_dis_gain;
-            float int_dis_gain;
-            float deriv_dis_gain;
-            float prop_dir_gain;
-            float int_dir_gain;
-            float deriv_dir_gain;
-            float k_u;
-            float t_u;
 
+            bool record;
+
+
+            /* TODO find out what to do with dynamic reconfigure variables
+            //pid tuning parameters
+            const float prop_dis_gain = 1.0;
+            const float int_dis_gain = 1.0;
+            const float deriv_dis_gain = 1.0;
+            const float prop_dir_gain = 1.0;
+            const float int_dir_gain = 1.0;
+            const float deriv_dir_gain = 1.0;
+            // pid loop interval time in sec
+            // int_time has to be higher than 0 -> else division by zero
+            const float int_time = 0.1;
 
             const bool useMeshGradient = false;
+            const float max_lin_velocity = 1.0;
+            const float max_ang_velocity = 1.0;
+             // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
+            float fading = 5;
+
+
+            */
+
             const float PI = 3.141592;
             const float E = 3.718281;
-            const float maximum_lin_velocity = 1.0;
-            const float maximum_ang_velocity = 1.0;
-
-            const int control_type = 1; // 1: naive control, 2: pidControl,
+            // TODO check if enum works - especially with dynamic reconfigure
+            enum Control {naive, pid};
+            /*TODO find out what to do with dynamic reconfigure variables
+            const Control control_type = naive;
+             */
 
     };
 

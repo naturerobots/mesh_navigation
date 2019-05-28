@@ -70,11 +70,6 @@ namespace mesh_controller{
         std::string &message
         ){
 
-        if(!current_plan.empty()){
-            goal = current_plan.back();
-        }
-
-
         std::vector<float> values;
 
         // TODO make usable for directionAtPosition
@@ -88,9 +83,8 @@ namespace mesh_controller{
         }
 
         switch(control_type){
-            case 1: values = naiveControl(pose, velocity, plan_vec);
-            // TODO pid control
-            case 2: values = pidControl(pose, pose, velocity);
+            case naive: values = naiveControl(pose, velocity, plan_vec);
+            case pid: values = pidControl(pose, pose, velocity);
 
         }
 
@@ -438,7 +432,7 @@ namespace mesh_controller{
         // LINEAR movement
 
         // basic linear velocity depending on angle difference between robot pose and plan
-        float vel_given_angle = gaussValue(maximum_lin_velocity, PI, angle);
+        float vel_given_angle = gaussValue(max_lin_velocity, PI, angle);
 
         // look ahead
         std::vector<float> ahead_factor = lookAhead(pose, velocity.twist.linear.x);
@@ -466,7 +460,7 @@ namespace mesh_controller{
         float angular_vel = pidControlDir(angular_sp, angular_pv);
 
         // to regulate linear velocity depending on angular velocity (higher angular vel => lower linear vel)
-        float linear_factor = gaussValue(maximum_lin_velocity, 2*maximum_ang_velocity, angular_vel);
+        float linear_factor = gaussValue(max_lin_velocity, 2*max_ang_velocity, angular_vel);
 
         std::vector<float> ahead = lookAhead(pv, velocity.twist.linear.x);
 
@@ -486,11 +480,11 @@ namespace mesh_controller{
         float proportional = prop_dis_gain * error;
 
         // integral part
-        int_error += (error * int_time);
+        int_dis_error += (error * int_time);
         float integral = int_dis_gain * int_error;
 
         // derivative part
-        float derivative = deriv_dis_gain * ((error - prev_distance_error) / int_time);
+        float derivative = deriv_dis_gain * ((error - prev_dis_error) / int_time);
 
         float linear = proportional + integral + derivative;
 
@@ -500,7 +494,7 @@ namespace mesh_controller{
         //else if( output < _min )
         //    output = _min;
 
-        prev_distance_error = error;
+        prev_dis_error = error;
         return linear;
     }
 
@@ -514,7 +508,7 @@ namespace mesh_controller{
         float proportional = prop_dir_gain * dir_error;
 
         // integral part
-        int_error += (dir_error * int_time);
+        int_dir_error += (dir_error * int_time);
         float integral = int_dir_gain * int_error;
 
         // derivative part
@@ -639,6 +633,7 @@ namespace mesh_controller{
         // make new measurement + make mesh layer of it
         // compare new measurement to old one - find new lethal faces
         // check if new lethal faces are on path
+        // check if new lethal faces are on path
             // if on path: reduce velocity + make new plan
 
     }
@@ -652,38 +647,26 @@ namespace mesh_controller{
         // all for mesh plan
         map_ptr = mesh_map_ptr;
 
+        if(!current_plan.empty()){
+            goal = current_plan.back();
+        } else {
+            return false;
+        }
 
         // iterator to go through plan vector
         iter = 0;
 
-        int_error = 0.0;
-        // int_time has to be higher than 0 -> else division by zero
-        int_time = 0.1;
+        // for PID
+        // initialize integral error for PID
+        int_dis_error = 0.0;
+        int_dir_error = 0.0;
+
+
+
         haveStartFace = false;
-        fading = 5;
 
         // for recording - true = record, false = no record
         record = false;
-
-        prop_dis_gain = 1.0;
-        int_dis_gain = 1.0;
-        deriv_dis_gain = 1.0;
-        prop_dir_gain = 1.0;
-        int_dir_gain = 1.0;
-        deriv_dir_gain = 1.0;
-        /*
-        // pid controller tuning parameters
-        float k_u = ; float t_u = ;
-        float tau = ; g_p = ; t_d = ;
-        switch(tuning_type){
-            case 1: prop_gain = 0.6*k_u; int_gain =0.5*t_u ; deriv_gain = 0.125*t_u; //ZN https://dewesoft.pro/online/course/pid-control/page/pid-tuning-methods
-            case 2: prop_gain = k_u/2.2; int_gain = 2.2*t_u; deriv_gain = t_u/6.3; // T-L  http://pages.mtu.edu/~tbco/cm416/zn.html
-            case 3: prop_gain = (1.35/g_t)*(tau/t_d + 0.185); int_gain = 2.5 * t_d * ((tau+0.185*t_d)/tau + 0.611*t_d); deriv_gain = 0.37 * t_d * tau / (tau + 0.185*t_d); // C-C https://dewesoft.pro/online/course/pid-control/page/pid-tuning-methods
-            case 4: prop_gain = ; int_gain = ; deriv_gain = ;
-                prop_gain = ; int_gain = ; deriv_gain =
-
-        }
-        */
 
         return true;
 
