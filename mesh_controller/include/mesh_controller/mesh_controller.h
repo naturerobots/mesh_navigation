@@ -118,13 +118,13 @@ namespace mesh_controller{
              * Results in a slow increase of velocity in the beginning. Can be modulated via fading variable.
              * @return factor by which to multiply the velocity for smooth start
              */
-            float startVelocityFactor();
+            float startVelocityFactor(const geometry_msgs::PoseStamped& pose);
 
             /**
              * Results in a slow decrease of velocity towards the goal. Can be modulated via fading varibale.
              * @return factor by which to multiply the velocity for smooth stop
              */
-            float endVelocityFactor();
+            float endVelocityFactor(const geometry_msgs::PoseStamped& pose);
 
             /**
              * Transforms a PoseStamped into a direction mesh_map Vector
@@ -176,7 +176,7 @@ namespace mesh_controller{
              */
             float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
 
-            float euclideanDistance(lvr2::BaseVector<float> current, lvr2::BaseVector<float> planned);
+            float euclideanDistance(lvr2::BaseVector<float>& current, lvr2::BaseVector<float>& planned);
 
             /**
              * Calculates the Euclidean Distance between the current robot pose and the next x poses towards the goal
@@ -280,6 +280,7 @@ namespace mesh_controller{
             geometry_msgs::PoseStamped current_position;
             lvr2::HalfEdgeMesh<lvr2::BaseVec> half_edge_mesh;
             int iter;
+            float init_distance;
 
             // for pid control
             float int_dis_error;
@@ -300,8 +301,6 @@ namespace mesh_controller{
             bool record;
 
 
-            // TODO find out what to do with dynamic reconfigure variables
-
             // Server for Reconfiguration
             std::string name;
             ros::NodeHandle private_nh;
@@ -310,32 +309,10 @@ namespace mesh_controller{
             bool first_config;
             MeshControllerConfig config;
 
-            /*
-            //pid tuning parameters
-            const float prop_dis_gain = 1.0;
-            const float int_dis_gain = 1.0;
-            const float deriv_dis_gain = 1.0;
-            const float prop_dir_gain = 1.0;
-            const float int_dir_gain = 1.0;
-            const float deriv_dir_gain = 1.0;
-            // pid loop interval time in sec
-            // int_time has to be higher than 0 -> else division by zero
-            const float int_time = 0.1;
 
-            const bool useMeshGradient = false;
-            const float max_lin_velocity = 1.0;
-            const float max_ang_velocity = 1.0;
-             // determines how long it takes at the start/end to reach full/zero velocity (btw 0 and 100)
-            float fading = 5;
-
-
-            */
 
             const float PI = 3.141592;
             const float E = 3.718281;
-            /*TODO find out what to do with dynamic reconfigure variables
-            const Control control_type = naive;
-             */
 
     };
 
