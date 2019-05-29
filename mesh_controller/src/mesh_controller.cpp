@@ -71,6 +71,7 @@ namespace mesh_controller{
         std::string &message
         ){
 
+
         // variable that contains the planned / supposed orientation of the robot
         mesh_map::Vector plan_vec;
         if(config.useMeshGradient){
@@ -84,19 +85,26 @@ namespace mesh_controller{
             plan_vec = poseToDirectionVector(current_position);
         }
 
-        // variable to save the new angular and linear velocities
-        std::vector<float> values;
+        // variable to store the new angular and linear velocities
+        std::vector<float> values(2);
+
 
         // used to change type of controller
         switch(config.control_type){
-            case 0: values = naiveControl(pose, velocity, plan_vec);
-            case 1: values = pidControl(pose, pose, velocity);
+            case 0:
+                values = naiveControl(pose, velocity, plan_vec);
+                break;
+            case 1:
+                values = pidControl(pose, pose, velocity);
+                break;
+            default:
+                return mbf_msgs::GetPathResult::FAILURE;
         }
 
         // set velocities
-        cmd_vel.twist.angular.z = values[0];
-        cmd_vel.twist.linear.x = values[1];
-
+        cmd_vel.twist.angular.z = values.at(0);
+        cmd_vel.twist.linear.x = values.at(1);
+/*
 
         // RECORDING to measure "goodness" of travelled path
         if (record) {
@@ -107,7 +115,7 @@ namespace mesh_controller{
             // UPDATE ITERATOR to where on the plan the robot is / should be currently
             updatePlanPos(pose, values[1]);
         }
-
+*/
         return mbf_msgs::GetPathResult::SUCCESS;
     }
 
@@ -379,18 +387,18 @@ namespace mesh_controller{
          float cost_result;
          // check if a lethal vertex is ahead
          if (cost_difference != std::numeric_limits<float>::infinity()){
-             cost_result = abs(tanValue(1.0, 2.0 * av_cost, cost_difference));
+             cost_result = tanValue(1.0, 2.0, cost_difference);
          } else {
              // if yes, set the linear velocity factor small depending on distance to the lethal vertex
              cost_result = gaussValue(1.0, 2*max_steps, steps);
          }
 
-
+         // TODO dirction of turn for angular vel
          // calculate the difference between the current angle and the average angle
          float turn_difference = angle - av_turn;
          float turn_result = tanValue(1.0, PI, turn_difference);
 
-         //TODO find out what the value range of vector costs is
+
          return {turn_result, cost_result};
     }
 
@@ -453,7 +461,8 @@ namespace mesh_controller{
 
     std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,const mesh_map::Vector plan_vec){
         mesh_map::Vector pose_vec = poseToDirectionVector(pose);
-
+        return {-1.0, 1.0};
+/*
         // ANGULAR MOVEMENT
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
@@ -469,6 +478,7 @@ namespace mesh_controller{
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
         float vel_given_angle = gaussValue(config.max_lin_velocity, PI, angle);
+        return {turn_angle_diff, vel_given_angle};
 
         // ADDITIONAL factors
         // look ahead
@@ -481,12 +491,32 @@ namespace mesh_controller{
         // slower towards end
         float end = endVelocityFactor(pose);
 
-        // combine the basic velocity calculations with the look ahead, start and end factors for final velocity
-        float new_turn = turn_angle_diff * ahead_factor[0];
-        float new_vel = start * end * ahead_factor[1] * vel_given_angle;
+        // adding or subtracting percentage of previously set angular velocity (turn_angle diff) depending on angular ahead factor
+        // combine the basic velocity calculations with the look ahead
+        float ahead_ang;
+        if(ahead_factor[0] < 0){
+            ahead_ang = turn_angle_diff - (1-(ahead_factor[0] / turn_angle_diff));
+        } else if (ahead_factor[0] > 0){
+            ahead_ang = turn_angle_diff + (1-(ahead_factor[0] / turn_angle_diff));
+        } else {
+            ahead_ang = turn_angle_diff;
+        }
 
-        return {new_turn, new_vel};
+        // adding or subtracting percentage of previously set linear velocity (vel_given_angle) depending on linear ahead factor
+        float ahead_lin;
+        if (ahead_factor[1] < 0){
+            ahead_lin = vel_given_angle - (1-(ahead_factor[1] / vel_given_angle));
+        } else if (ahead_factor[1] > 0){
+            ahead_lin = vel_given_angle + (1-(ahead_factor[1] / vel_given_angle));
+        } else{
+            ahead_lin = vel_given_angle;
+        }
 
+        // setting linear velocity depending on robot position in relation to start / goal
+        float new_vel = start * end * ahead_lin;
+
+        return {ahead_ang, new_vel};
+        */
     }
 
     std::vector<float> MeshController::pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv, const geometry_msgs::TwistStamped& velocity){
@@ -499,14 +529,33 @@ namespace mesh_controller{
 
         // ADDITIONAL factors
         // to regulate linear velocity depending on angular velocity (higher angular vel => lower linear vel)
-        float linear_factor = gaussValue(config.max_lin_velocity, 2*config.max_ang_velocity, angular_vel);
+        float vel_given_angle = linear_vel - ((angular_vel/config.max_ang_velocity) * linear_vel);
 
         std::vector<float> ahead = lookAhead(pv, velocity.twist.linear.x);
-        // combination of linear, ahead factor for final velocity
-        float new_angular = angular_vel * ahead[0];
-        float new_linear = linear_vel * linear_factor * ahead[1];
 
-        return {new_angular, new_linear};
+
+        // adding or subtracting percentage of previously set angular velocity (turn_angle diff) depending on angular ahead factor
+        // combine the basic velocity calculations with the look ahead
+        float ahead_ang;
+        if(ahead[0] < 0){
+            ahead_ang = angular_vel - (1-(ahead[0] / angular_vel));
+        } else if (ahead[0] > 0){
+            ahead_ang = angular_vel + (1-(ahead[0] / angular_vel));
+        } else {
+            ahead_ang = angular_vel;
+        }
+
+        // adding or subtracting percentage of previously set linear velocity (vel_given_angle) depending on linear ahead factor
+        float ahead_lin;
+        if (ahead[1] < 0){
+            ahead_lin = vel_given_angle - (1-(ahead[1] / vel_given_angle));
+        } else if (ahead[1] > 0){
+            ahead_lin = vel_given_angle + (1-(ahead[1] / vel_given_angle));
+        } else{
+            ahead_lin = vel_given_angle;
+        }
+
+        return {ahead_ang, ahead_lin};
     }
 
     float MeshController::pidControlDistance(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv){
@@ -571,7 +620,7 @@ namespace mesh_controller{
 
     void MeshController::recordData(const geometry_msgs::PoseStamped& robot_pose){
         float distance = euclideanDistance(robot_pose, current_position);
-        string output = std::to_string(distance);
+        string output = std::to_string(distance) + "\n";
 
         string info_msg = string("distance: ");
 
@@ -676,7 +725,7 @@ namespace mesh_controller{
 
     void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
     {
-        ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
+        ROS_INFO_STREAM("Controller variable config through dynamic reconfigure.");
         if (first_config)
         {
             config = cfg;
@@ -687,7 +736,7 @@ namespace mesh_controller{
     }
 
     bool  MeshController::initialize(
-            const std::string& name,
+            const std::string& plugin_name,
             const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
             const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr){
 
@@ -719,7 +768,7 @@ namespace mesh_controller{
         record = false;
 
 
-
+        name = plugin_name;
         private_nh = ros::NodeHandle("~/"+name);
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > (
                 new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));

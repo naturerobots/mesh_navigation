@@ -261,14 +261,16 @@ namespace mesh_controller{
              */
             lvr2::BaseVector<float> step_update(mesh_map::Vector& vec, lvr2::FaceHandle face);
 
+            void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
+
             virtual bool initialize(
-                    const std::string& name,
+                    const std::string& plugin_name,
                     const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
                     const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
         protected:
 
-            void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
+
 
         private:
 
@@ -296,10 +298,6 @@ namespace mesh_controller{
             float angle;
             // stores the current vector map containing vectors pointing to the source (path goal)
             lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
-
-
-            bool record;
-
 
             // Server for Reconfiguration
             std::string name;
