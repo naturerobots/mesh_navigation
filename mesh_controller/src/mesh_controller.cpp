@@ -46,6 +46,7 @@
 #include <tf/transform_listener.h>
 
 
+
 #include <fstream>
 #include <iostream>
 
@@ -74,7 +75,7 @@ namespace mesh_controller{
 
         // TODO make usable for directionAtPosition
         mesh_map::Vector plan_vec = poseToDirectionVector(current_position);
-        if(useMeshGradient){
+        if(config.useMeshGradient){
             // use supposed orientation from mesh gradient
             if(current_face){
                 plan_vec = map_ptr->directionAtPosition(current_face.unwrap(), plan_vec);
@@ -82,9 +83,9 @@ namespace mesh_controller{
             }
         }
 
-        switch(control_type){
-            case naive: values = naiveControl(pose, velocity, plan_vec);
-            case pid: values = pidControl(pose, pose, velocity);
+        switch(config.control_type){
+            case 0: values = naiveControl(pose, velocity, plan_vec);
+            case 1: values = pidControl(pose, pose, velocity);
 
         }
 
@@ -98,7 +99,7 @@ namespace mesh_controller{
             recordData(pose);
         }
 
-        if(!useMeshGradient){
+        if(!config.useMeshGradient){
             // UPDATE ITERATOR to where on the plan the robot is / should be currently
             updatePlanPos(pose, values[1]);
         }
@@ -145,8 +146,8 @@ namespace mesh_controller{
         int size = current_plan.size();
         float percentage = (float)iter*100/size;
 
-        if (percentage <= fading){
-            return percentage/fading;
+        if (percentage <= config.fading){
+            return percentage/config.fading;
         } else {
             return 1.0;
         }
@@ -156,9 +157,9 @@ namespace mesh_controller{
         int size = current_plan.size();
         float percentage = (float)iter*100/size;
 
-        if (percentage >= (100-fading)){
+        if (percentage >= (100-config.fading)){
             percentage = 100 - percentage;
-            return 1 - (percentage / fading);
+            return 1 - (percentage / config.fading);
         } else {
             return 1.0;
         }
@@ -203,14 +204,16 @@ namespace mesh_controller{
         if(value > max_width){
             return 0;
         }
-        // calculates y value of gaussian distribution for difference, given mean = (center = ) 0 and std. dev = 1
-        // it will always have a width of [-3,3] (before being zero) and hight of 0.4
-        // transformed value 6 as normal width
-        float tr_value = 6.0 * value / max_width;
-        float y_value = 1/sqrtf(2*PI) * pow(E, (-0.5 * pow(tr_value, 2)));
-        // transform y_value in regards to max_hight
-        float result = max_hight * y_value / 0.4;
-        return result;
+
+        //  calculating the standard deviation given the max_width
+        // based on the fact that 99.7% of area lies between mü-3*sigma and mü+3*sigma
+        float std_dev = pow(-max_width/6, 2);
+
+        // calculating y value of given normal distribution
+        // stretched to max_hight and desired width
+        float y_value = max_hight * 1/(sqrtf(2*PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2)));
+
+        return y_value;
     }
 
     float MeshController::direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed){
@@ -291,12 +294,13 @@ namespace mesh_controller{
          bool vital_turn = false;
          bool vital_cost = false;
 
-         if (useMeshGradient){
+         if (config.useMeshGradient){
              // TODO find out what excactly return vector gives (direction or position)
              lvr2::BaseVector<float> position_ahead = poseToDirectionVector(pose);
              ahead_face = current_face;
              for (int j = 0; j < steps/3; j++){
-                 if(euclideanDistance(position_ahead, {goal.pose.position.x, goal.pose.position.y, goal.pose.position.z}) < 0.04){
+                 lvr2::BaseVector<float> goal_vec = {(float)goal.pose.position.x, (float)goal.pose.position.y, (float)goal.pose.position.z};
+                 if(euclideanDistance(position_ahead, goal_vec) < 0.04){
                      steps = j;
                      break;
                  }
@@ -432,7 +436,7 @@ namespace mesh_controller{
         // LINEAR movement
 
         // basic linear velocity depending on angle difference between robot pose and plan
-        float vel_given_angle = gaussValue(max_lin_velocity, PI, angle);
+        float vel_given_angle = gaussValue(config.max_lin_velocity, PI, angle);
 
         // look ahead
         std::vector<float> ahead_factor = lookAhead(pose, velocity.twist.linear.x);
@@ -460,7 +464,7 @@ namespace mesh_controller{
         float angular_vel = pidControlDir(angular_sp, angular_pv);
 
         // to regulate linear velocity depending on angular velocity (higher angular vel => lower linear vel)
-        float linear_factor = gaussValue(max_lin_velocity, 2*max_ang_velocity, angular_vel);
+        float linear_factor = gaussValue(config.max_lin_velocity, 2*config.max_ang_velocity, angular_vel);
 
         std::vector<float> ahead = lookAhead(pv, velocity.twist.linear.x);
 
@@ -477,14 +481,14 @@ namespace mesh_controller{
         float error = euclideanDistance(setpoint, pv);
 
         // proportional part
-        float proportional = prop_dis_gain * error;
+        float proportional = config.prop_dis_gain * error;
 
         // integral part
-        int_dis_error += (error * int_time);
-        float integral = int_dis_gain * int_error;
+        int_dis_error += (error * config.int_time);
+        float integral = config.int_dis_gain * int_dis_error;
 
         // derivative part
-        float derivative = deriv_dis_gain * ((error - prev_dis_error) / int_time);
+        float derivative = config.deriv_dis_gain * ((error - prev_dis_error) / config.int_time);
 
         float linear = proportional + integral + derivative;
 
@@ -505,14 +509,14 @@ namespace mesh_controller{
         float dir_error = angleBetweenVectors(setpoint, pv);
 
         // proportional part
-        float proportional = prop_dir_gain * dir_error;
+        float proportional = config.prop_dir_gain * dir_error;
 
         // integral part
-        int_dir_error += (dir_error * int_time);
-        float integral = int_dir_gain * int_error;
+        int_dir_error += (dir_error * config.int_time);
+        float integral = config.int_dir_gain * int_dir_error;
 
         // derivative part
-        float derivative = deriv_dir_gain * ((dir_error - prev_dir_error) / int_time);
+        float derivative = config.deriv_dir_gain * ((dir_error - prev_dir_error) / config.int_time);
 
         float angular = proportional + integral + derivative;
 
@@ -639,6 +643,18 @@ namespace mesh_controller{
     }
     */
 
+    void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
+    {
+        ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
+        if (first_config)
+        {
+            config = cfg;
+            first_config = false;
+        }
+
+        config = cfg;
+    }
+
     bool  MeshController::initialize(
             const std::string& name,
             const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
@@ -667,6 +683,15 @@ namespace mesh_controller{
 
         // for recording - true = record, false = no record
         record = false;
+
+
+
+        private_nh = ros::NodeHandle("~/"+name);
+        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > (
+                new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));
+
+        config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
+        reconfigure_server_ptr->setCallback(config_callback);
 
         return true;
 

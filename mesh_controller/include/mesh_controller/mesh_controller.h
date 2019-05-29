@@ -43,6 +43,7 @@
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <mesh_controller/MeshControllerConfig.h>
 
 namespace mesh_controller{
 
@@ -267,6 +268,8 @@ namespace mesh_controller{
 
         protected:
 
+            void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
+
         private:
 
 
@@ -297,7 +300,17 @@ namespace mesh_controller{
             bool record;
 
 
-            /* TODO find out what to do with dynamic reconfigure variables
+            // TODO find out what to do with dynamic reconfigure variables
+
+            // Server for Reconfiguration
+            std::string name;
+            ros::NodeHandle private_nh;
+            boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > reconfigure_server_ptr;
+            dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>::CallbackType config_callback;
+            bool first_config;
+            MeshControllerConfig config;
+
+            /*
             //pid tuning parameters
             const float prop_dis_gain = 1.0;
             const float int_dis_gain = 1.0;
@@ -320,8 +333,6 @@ namespace mesh_controller{
 
             const float PI = 3.141592;
             const float E = 3.718281;
-            // TODO check if enum works - especially with dynamic reconfigure
-            enum Control {naive, pid};
             /*TODO find out what to do with dynamic reconfigure variables
             const Control control_type = naive;
              */

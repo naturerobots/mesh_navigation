@@ -11,9 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
         lvr_ros
         )
 
-#generate_dynamic_reconfigure_options(
-#        cfg/MeshController.cfg
-#)
+generate_dynamic_reconfigure_options(
+        cfg/MeshController.cfg
+)
 
 catkin_package(
         INCLUDE_DIRS include
@@ -49,3 +49,4 @@ install(TARGETS ${PROJECT_NAME}
 install(FILES mesh_controller.xml
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
         )
+
