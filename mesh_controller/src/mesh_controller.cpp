@@ -725,7 +725,20 @@ namespace mesh_controller{
 
     void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
     {
-        ROS_INFO_STREAM("Controller variable config through dynamic reconfigure.");
+        ROS_INFO("Reconfigure Request: %f %f %f %f %f %f %s %f %f %f %f %i ",
+                config.prop_dis_gain,
+                config.int_dis_gain,
+                config.deriv_dis_gain,
+                config.prop_dir_gain,
+                config.int_dir_gain,
+                config.deriv_dir_gain,
+                config.useMeshGradient?"True":"False",
+                config.max_lin_velocity,
+                config.max_ang_velocity,
+                config.fading,
+                config.int_time,
+                config.control_type);
+
         if (first_config)
         {
             config = cfg;
