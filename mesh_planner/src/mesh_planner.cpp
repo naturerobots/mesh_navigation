@@ -77,11 +77,6 @@ uint32_t MeshPlanner::makePlan(
 
   uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path);
 
-  if(outcome != mbf_msgs::GetPathResult::SUCCESS) {
-    mesh_map->publishVertexCosts(potential, "Potential Debug");
-    return outcome;
-  }
-
   t_end = ros::WallTime::now();
 
   double execution_time = (t_end - t_start).toNSec() * 1e-6;
@@ -125,8 +120,7 @@ uint32_t MeshPlanner::makePlan(
   //computeVectorMap();
   publishVectorField();
 
-  return mbf_msgs::GetPathResult::SUCCESS;
-
+  return outcome;
 }
 
 bool MeshPlanner::cancel(){
