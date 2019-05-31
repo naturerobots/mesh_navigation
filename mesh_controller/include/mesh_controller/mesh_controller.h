@@ -307,6 +307,8 @@ namespace mesh_controller{
             bool first_config;
             MeshControllerConfig config;
 
+            bool record;
+
 
 
             const float PI = 3.141592;
