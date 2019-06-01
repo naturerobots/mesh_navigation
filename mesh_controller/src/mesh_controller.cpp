@@ -248,6 +248,7 @@ namespace mesh_controller{
 
     float MeshController::direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed){
         // https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
+        // TODO maybe the 3d vectors have to be projected to plane
         // cross product
         const mesh_map::Vector& cross_product = {current.y*supposed.z - current.z*supposed.y, current.z*supposed.x - current.x*supposed.z,
                                                  current.x*supposed.y - current.y*supposed.x};
@@ -260,9 +261,9 @@ namespace mesh_controller{
 
         // TODO check return values for turns
         if(dot_product < 0){
-            return -1;
+            return 1.0;
         } else {
-            return 1;
+            return -1.0;
         }
     }
 
