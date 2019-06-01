@@ -726,6 +726,7 @@ namespace mesh_controller{
 
     void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
     {
+
         ROS_INFO("Reconfigure Request: %f %f %f %f %f %f %s %f %f %f %f %i ",
                 config.prop_dis_gain,
                 config.int_dis_gain,
@@ -754,41 +755,43 @@ namespace mesh_controller{
             const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
             const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr){
 
+        name = plugin_name;
+        private_nh = ros::NodeHandle("~/"+name);
+
+        ROS_INFO_STREAM("Namespace of the controller: " << private_nh.getNamespace());
         // all for mesh plan
         map_ptr = mesh_map_ptr;
 
-        if(!current_plan.empty()){
-            goal = current_plan.back();
-        } else {
-            return false;
-        }
-
         // iterator to go through plan vector
         iter = 0;
-
-        // initial distance between goal and robot position
-        init_distance = euclideanDistance(current_plan.front(), goal);
 
         // for PID
         // initialize integral error for PID
         int_dis_error = 0.0;
         int_dir_error = 0.0;
 
-
-
         haveStartFace = false;
 
         // for recording - true = record, false = no record
         record = false;
 
-
-        name = plugin_name;
-        private_nh = ros::NodeHandle("~/"+name);
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > (
                 new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));
 
         config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
+
+        // TODO That does not make any sense here in the init
+        if(!current_plan.empty()){
+            goal = current_plan.back();
+
+            // TODO ist immer 0?!
+            // initial distance between goal and robot position
+            init_distance = euclideanDistance(current_plan.front(), goal);
+
+        } else {
+            return false;
+        }
 
         return true;
 
