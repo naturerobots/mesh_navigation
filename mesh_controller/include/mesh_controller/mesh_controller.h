@@ -290,6 +290,8 @@ namespace mesh_controller{
             float prev_dis_error;
             float prev_dir_error;
 
+            bool goalSet;
+
             // for mesh use
             bool haveStartFace;
             lvr2::OptionalFaceHandle current_face;

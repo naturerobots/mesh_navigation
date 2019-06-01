@@ -71,12 +71,23 @@ namespace mesh_controller{
         std::string &message
         ){
 
+        if(current_plan.empty()){
+            return mbf_msgs::GetPathResult::FAILURE;
+        } else if (!goalSet){
+            goal = current_plan.back();
+
+            // TODO ist immer 0?!
+            // distance between goal and start point
+            init_distance = euclideanDistance(current_plan.front(), goal);
+            goalSet= true;
+        }
+
 
         // variable that contains the planned / supposed orientation of the robot
         mesh_map::Vector plan_vec;
-        if(config.useMeshGradient){
+        if (config.useMeshGradient) {
             // use supposed orientation from mesh gradient
-            if(current_face){
+            if (current_face) {
                 plan_vec = map_ptr->directionAtPosition(current_face.unwrap(), plan_vec);
 
             }
@@ -90,7 +101,7 @@ namespace mesh_controller{
 
 
         // used to change type of controller
-        switch(config.control_type){
+        switch (config.control_type) {
             case 0:
                 values = naiveControl(pose, velocity, plan_vec);
                 break;
@@ -102,9 +113,9 @@ namespace mesh_controller{
         }
 
         // set velocities
-        cmd_vel.twist.angular.z = values.at(0);
-        cmd_vel.twist.linear.x = values.at(1);
-/*
+        cmd_vel.twist.angular.z = values[0];
+        cmd_vel.twist.linear.x = values[1];
+
 
         // RECORDING to measure "goodness" of travelled path
         if (record) {
@@ -115,7 +126,7 @@ namespace mesh_controller{
             // UPDATE ITERATOR to where on the plan the robot is / should be currently
             updatePlanPos(pose, values[1]);
         }
-*/
+
         return mbf_msgs::GetPathResult::SUCCESS;
     }
 
@@ -206,13 +217,17 @@ namespace mesh_controller{
     }
 
     float MeshController::angleBetweenVectors(mesh_map::Vector pos, mesh_map::Vector plan){
-        // calculate point product between 2 vectors to get the (smaller) angle between them
-        float dot_prod = pos[0]*plan[0] + pos[1]*plan[1] + pos[2]*plan[2];
-        // calculate the length of the vectors
-        float length_pos = sqrt(pow(pos[0], 2) + pow(pos[1], 2) + pow(pos[2], 2));
-        float length_plan = sqrt(pow(plan[0], 2) + pow(plan[1], 2) + pow(plan[2], 2));
-        // return the arccos which is the smaller angle in rad (< PI)
-        return acos(dot_prod / (length_pos * length_plan));
+        if(pos == plan){
+            return 0.0;
+        } else {
+            // calculate point product between 2 vectors to get the (smaller) angle between them
+            float dot_prod = pos[0] * plan[0] + pos[1] * plan[1] + pos[2] * plan[2];
+            // calculate the length of the vectors
+            float length_pos = sqrt(pow(pos[0], 2) + pow(pos[1], 2) + pow(pos[2], 2));
+            float length_plan = sqrt(pow(plan[0], 2) + pow(plan[1], 2) + pow(plan[2], 2));
+            // return the arccos which is the smaller angle in rad (< PI)
+            return acos(dot_prod / (length_pos * length_plan));
+        }
     }
 
     float MeshController::tanValue(float max_hight, float max_width, float value){
@@ -247,23 +262,33 @@ namespace mesh_controller{
     }
 
     float MeshController::direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed){
-        // https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
-        // TODO maybe the 3d vectors have to be projected to plane
-        // cross product
-        const mesh_map::Vector& cross_product = {current.y*supposed.z - current.z*supposed.y, current.z*supposed.x - current.x*supposed.z,
-                                                 current.x*supposed.y - current.y*supposed.x};
-        const mesh_map::Vector& up = {0, 0, 1};
-        // dot product of result with up vector (0,0,1) will return a positive or negative result
-        // positive means current is "left" of supposed and a right turn is required
-        // negative means current is "right" of supposed and a left turn is required
-        // zero can mean no turn or 180° turn - as we only consider the direction it will be set to right per default
-        float dot_product = cross_product.x*up.x + cross_product.y*up.y + cross_product.z*up.z;
-
-        // TODO check return values for turns
-        if(dot_product < 0){
+        if (current == supposed){
             return 1.0;
         } else {
-            return -1.0;
+            https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
+            const auto &face_normals = map_ptr->faceNormals();
+            auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap());
+            mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current, vertices[0],
+                                                                            face_normals[current_face.unwrap()]);
+            mesh_map::Vector vec_supposed = mesh_map::projectVectorOntoPlane(supposed, vertices[0],
+                                                                             face_normals[current_face.unwrap()]);
+
+            mesh_map::Vector vec_normal = face_normals[current_face.unwrap()];
+
+            mesh_map::Vector vec_cross_prod = {vec_current.y * vec_supposed.z - vec_current.z * vec_supposed.y,
+                                               vec_current.z * vec_supposed.x - vec_current.x * vec_supposed.z,
+                                               vec_current.x * vec_supposed.y - vec_current.y * vec_supposed.x};
+
+            // use normal vector of face for dot product as "up" vector
+            // => positive result = left, negative result = right,
+            float vec_dot_prod = {vec_cross_prod.x * vec_normal.x + vec_cross_prod.y * vec_normal.y +
+                                  vec_cross_prod.z * vec_normal.z};
+
+            if (vec_dot_prod < 0.0) {
+                return -1.0;        // turn right
+            } else {
+                return 1.0;     // turn left
+            }
         }
     }
 
@@ -462,25 +487,25 @@ namespace mesh_controller{
 
     std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,const mesh_map::Vector plan_vec){
         mesh_map::Vector pose_vec = poseToDirectionVector(pose);
-        return {-1.0, 1.0};
-/*
+
         // ANGULAR MOVEMENT
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
         angle = angleBetweenVectors(pose_vec, plan_vec);
 
         // to determine in which direction to turn (neg for left, pos for right)
+
         float leftRight = direction(pose_vec, plan_vec);
+
         // calculate a direction velocity depending on the turn direction and difference angle
-        float turn_angle_diff = leftRight * tanValue(0.5, PI, angle);
-
-
+        float turn_angle_diff = leftRight * tanValue(config.max_ang_velocity, PI, angle);
 
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
         float vel_given_angle = gaussValue(config.max_lin_velocity, PI, angle);
         return {turn_angle_diff, vel_given_angle};
 
+/*
         // ADDITIONAL factors
         // look ahead
         std::vector<float> ahead_factor = lookAhead(pose, velocity.twist.linear.x);
@@ -517,7 +542,7 @@ namespace mesh_controller{
         float new_vel = start * end * ahead_lin;
 
         return {ahead_ang, new_vel};
-        */
+*/
     }
 
     std::vector<float> MeshController::pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv, const geometry_msgs::TwistStamped& velocity){
@@ -755,6 +780,7 @@ namespace mesh_controller{
             const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
             const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr){
 
+        goalSet = false;
         name = plugin_name;
         private_nh = ros::NodeHandle("~/"+name);
 
@@ -781,17 +807,7 @@ namespace mesh_controller{
         config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
 
-        // TODO That does not make any sense here in the init
-        if(!current_plan.empty()){
-            goal = current_plan.back();
 
-            // TODO ist immer 0?!
-            // initial distance between goal and robot position
-            init_distance = euclideanDistance(current_plan.front(), goal);
-
-        } else {
-            return false;
-        }
 
         return true;
 
