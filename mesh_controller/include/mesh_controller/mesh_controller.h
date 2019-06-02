@@ -134,6 +134,13 @@ namespace mesh_controller{
             mesh_map::Vector poseToDirectionVector(const geometry_msgs::PoseStamped& pose);
 
             /**
+             * Transforms a PoseStamped into a position vector
+             * @param pose      any geometry_msgs PoseStamped
+             * @return          position mesh_map Vector
+             */
+            mesh_map::Vector poseToPositionVector(const geometry_msgs::PoseStamped &pose);
+
+            /**
              * Calculates the (smaller) angle between two vectors
              * @param pos       mesh_map Vector of the current robot heading
              * @param plan      mesh_map Vector of the supposed (planned) heading
@@ -166,7 +173,7 @@ namespace mesh_controller{
              * @param supposed      supposed heading of the robot
              * @return              -1 for left turn, 1 else
              */
-            float direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed);
+            float direction(const geometry_msgs::PoseStamped& current, const mesh_map::Vector& supposed);
 
             /**
              * returns the euclidean distance between two poses
@@ -201,6 +208,11 @@ namespace mesh_controller{
              */
             float cost(mesh_map::Vector& pose_vec);
 
+            /**
+             * sets the variable current face to the face of the current position
+             * @param position_vec
+             */
+            void setCurrentFace(mesh_map::Vector& position_vec);
 
             /**
              * Searches the face on the mesh map where a pose lays
@@ -243,7 +255,7 @@ namespace mesh_controller{
              * @param pv        actual angle / heading of the robot
              * @return          new angular velocity
              */
-            float pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv);
+            float pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv, const geometry_msgs::PoseStamped& pv_pose);
 
             /**
              * Records the distance between the current robot position and the supposed robot position to be able

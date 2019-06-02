@@ -70,6 +70,9 @@ namespace mesh_controller{
         geometry_msgs::TwistStamped &cmd_vel,
         std::string &message
         ){
+        // set current face
+        mesh_map::Vector pos_vec = poseToPositionVector(pose);
+        setCurrentFace(pos_vec);
 
         if(current_plan.empty()){
             return mbf_msgs::GetPathResult::FAILURE;
@@ -89,7 +92,6 @@ namespace mesh_controller{
             // use supposed orientation from mesh gradient
             if (current_face) {
                 plan_vec = map_ptr->directionAtPosition(current_face.unwrap(), plan_vec);
-
             }
         } else {
             // use supposed orientation from calculated path
@@ -216,6 +218,10 @@ namespace mesh_controller{
         return mesh_map::Vector(v.x(), v.y(), v.z());
     }
 
+    mesh_map::Vector MeshController::poseToPositionVector(const geometry_msgs::PoseStamped &pose){
+        return {(float)pose.pose.position.x, (float)pose.pose.position.y, (float)pose.pose.position.z};
+    }
+
     float MeshController::angleBetweenVectors(mesh_map::Vector pos, mesh_map::Vector plan){
         if(pos == plan){
             return 0.0;
@@ -261,17 +267,27 @@ namespace mesh_controller{
         return y_value;
     }
 
-    float MeshController::direction(const mesh_map::Vector& current, const mesh_map::Vector& supposed){
-        if (current == supposed){
+    float MeshController::direction(const geometry_msgs::PoseStamped& current, const mesh_map::Vector& supposed){
+        mesh_map::Vector current_dir = poseToDirectionVector(current);
+        mesh_map::Vector current_pos = poseToPositionVector(current);
+
+
+        if (current_dir == supposed){
             return 1.0;
         } else {
             https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
             const auto &face_normals = map_ptr->faceNormals();
             auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap());
-            mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current, vertices[0],
+            mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current_pos, vertices[0],
                                                                             face_normals[current_face.unwrap()]);
-            mesh_map::Vector vec_supposed = mesh_map::projectVectorOntoPlane(supposed, vertices[0],
-                                                                             face_normals[current_face.unwrap()]);
+            mesh_map::Vector vec_supposed;
+            if(config.useMeshGradient){
+                vec_supposed = supposed;
+            } else {
+                mesh_map::Vector supposed_pos = poseToPositionVector(current_position);
+                vec_supposed = mesh_map::projectVectorOntoPlane(supposed_pos, vertices[0],
+                                                                                 face_normals[current_face.unwrap()]);
+            }
 
             mesh_map::Vector vec_normal = face_normals[current_face.unwrap()];
 
@@ -382,7 +398,7 @@ namespace mesh_controller{
                      break;
                  }
                  geometry_msgs::PoseStamped& pose_ahead = current_plan[iter+i];
-                 mesh_map::Vector pose_ahead_vec =  {(float)pose_ahead.pose.position.x, (float)pose_ahead.pose.position.y, (float)pose_ahead.pose.position.z};
+                 mesh_map::Vector pose_ahead_vec =  poseToPositionVector(pose_ahead);
                  // find cost of the future position
                  float new_cost = cost(pose_ahead_vec);
                  if (new_cost == std::numeric_limits<float>::infinity()){
@@ -429,29 +445,22 @@ namespace mesh_controller{
     }
 
     float MeshController::cost(mesh_map::Vector& pose_vec){
-        // find a face to access cost later in case none has been found yet
-        if(!haveStartFace){
-            current_face = map_ptr->getContainingFaceHandle(pose_vec);
-            haveStartFace = true;
-        }
-
         // call function to get cost at position through corresponding face
         float ret_cost = map_ptr->costAtPosition(current_face.unwrap(), pose_vec);
-        // if ret_cost is -1 the pose is not in the current face
-        if(ret_cost == -1)
-        {
-            // search for a neighbour face that contains the pose
-            lvr2::OptionalFaceHandle new_face = searchNeighbourFaces(pose_vec, current_face.unwrap());
-            if(new_face){
-                // call function to get cost at position through corresponding face
-                current_face = new_face;
-                ret_cost = map_ptr->costAtPosition(current_face.unwrap(), pose_vec);
-            } else {
-                // in case no neighbour face contained the pose
-                return -1.0;
+        return ret_cost;
+    }
+
+    void MeshController::setCurrentFace(mesh_map::Vector& position_vec){
+        // find a face to access cost later in case none has been found yet
+        if(!haveStartFace){
+            current_face = map_ptr->getContainingFaceHandle(position_vec);
+            haveStartFace = true;
+        } else {
+            current_face = searchNeighbourFaces(position_vec, current_face.unwrap());
+            if(!haveStartFace){
+                setCurrentFace(position_vec);
             }
         }
-        return ret_cost;
     }
 
     lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face){
@@ -482,6 +491,7 @@ namespace mesh_controller{
             }
         }
         // in case no face that contains robot pose is found
+        haveStartFace = false;
         return lvr2::OptionalFaceHandle();
     }
 
@@ -495,7 +505,7 @@ namespace mesh_controller{
 
         // to determine in which direction to turn (neg for left, pos for right)
 
-        float leftRight = direction(pose_vec, plan_vec);
+        float leftRight = direction(pose, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle
         float turn_angle_diff = leftRight * tanValue(config.max_ang_velocity, PI, angle);
@@ -551,7 +561,7 @@ namespace mesh_controller{
         // ANGULAR movement
         const mesh_map::Vector& angular_sp = poseToDirectionVector(setpoint);
         const mesh_map::Vector& angular_pv = poseToDirectionVector(pv);
-        float angular_vel = pidControlDir(angular_sp, angular_pv);
+        float angular_vel = pidControlDir(angular_sp, angular_pv, pv);
 
         // ADDITIONAL factors
         // to regulate linear velocity depending on angular velocity (higher angular vel => lower linear vel)
@@ -612,7 +622,7 @@ namespace mesh_controller{
         return linear;
     }
 
-    float MeshController::pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv){
+    float MeshController::pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv, const geometry_msgs::PoseStamped& pv_pose){
         // setpoint is desired direction, pv is actual direction
         // https://gist.github.com/bradley219/5373998
 
@@ -639,7 +649,7 @@ namespace mesh_controller{
         prev_dir_error = dir_error;
 
         // to determine in which direction to turn (neg for left, pos for right)
-        float leftRight = direction(pv, setpoint);
+        float leftRight = direction(pv_pose, setpoint);
 
         return angular*leftRight;
     }
