@@ -290,9 +290,13 @@ namespace mesh_controller{
             // TODO sort out unnecessary variables
             boost::shared_ptr<mesh_map::MeshMap> map_ptr;
             vector<geometry_msgs::PoseStamped> current_plan;
+
+            int plan_iter;
+
+            ros::Time last_call;
+
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
-            int iter;
             float init_distance;
 
             // for pid control
@@ -320,12 +324,13 @@ namespace mesh_controller{
             bool first_config;
             MeshControllerConfig config;
 
+            ros::Publisher angle_pub;
+
             bool record;
 
 
 
-            const float PI = 3.141592;
-            const float E = 3.718281;
+            const float E = 2.718281;
 
     };
 

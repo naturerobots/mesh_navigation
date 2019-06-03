@@ -584,27 +584,17 @@ float  MeshMap::costAtPosition(lvr2::FaceHandle current_face, Vector pos)
 }
 
 
-    lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
+lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
 {
-  lvr2::OptionalFaceHandle fH;
-  lvr2::OptionalVertexHandle vH_opt = getNearestVertexHandle(pos);
-  if(vH_opt)
+  for(auto face : mesh_ptr->faces())
   {
-    lvr2::VertexHandle vH = vH_opt.unwrap();
-    std::vector<lvr2::FaceHandle> faces;
-    mesh_ptr->getFacesOfVertex(vH, faces);
-
-    for(auto face : faces)
-    {
       float u, v;
       if(barycentricCoords(pos, face, u, v))
       {
-        fH = face;
-        break;
+        return face;
       }
-    }
   }
-  return fH;
+  return lvr2::OptionalFaceHandle();
 }
 
 lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos)

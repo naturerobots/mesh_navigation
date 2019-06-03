@@ -44,6 +44,7 @@
 #include <lvr2/util/Meap.hpp>
 #include <lvr2/geometry/HalfEdgeMesh.hpp>
 #include <tf/transform_listener.h>
+#include <std_msgs/Float32.h>
 
 
 
@@ -151,6 +152,8 @@ namespace mesh_controller{
         if (!plan.empty()) {
             // assign given plan to current_plan variable to make it usable for navigation
             current_plan = plan;
+            current_plan.erase(current_plan.begin());
+            goal = current_plan.back();
             return true;
         }
         else {
@@ -165,14 +168,10 @@ namespace mesh_controller{
 
     float MeshController::startVelocityFactor(const geometry_msgs::PoseStamped& pose){
         float percentage;
-        if(!config.useMeshGradient) {
-            // calculates how far along the current plan the robot is
-            percentage = (float) iter * 100 / current_plan.size();
-        } else {
+
             // calculates how far the robot is from the goal given the distance to the goal compared to the initial distance
             // note: may not be 100% accurate due to possible curves
             percentage = euclideanDistance(pose, goal) * 100 / init_distance;
-        }
 
         // checks if the travelled distance is within the first x percent of the total distance
         if (percentage <= config.fading){
@@ -186,16 +185,11 @@ namespace mesh_controller{
 
     float MeshController::endVelocityFactor(const geometry_msgs::PoseStamped& pose){
         float percentage;
-        if(!config.useMeshGradient) {
-            // calculates how far along the current plan the robot is
-            percentage = (float) iter * 100 / current_plan.size();
-        } else {
+
             // calculates how far the robot is from the goal given the distance to the goal compared to the initial distance
             // note: may not be 100% accurate due to possible curves
             percentage = euclideanDistance(pose, goal) * 100 / init_distance;
-        }
-
-        // checks if the travelled distance is within the last x percent of the total distance
+                // checks if the travelled distance is within the last x percent of the total distance
         if (percentage >= (100-config.fading)){
             percentage = 100 - percentage;
             // calculates an decreasing factor depending on how much of the x percent are travelled
@@ -207,13 +201,14 @@ namespace mesh_controller{
     }
 
     mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose){
+        ROS_INFO_STREAM("pose frame id "<<pose.header.frame_id);
         // define tf Pose for later assignment
         tf::Stamped<tf::Pose> tfPose;
         // transform pose to tf:Pose
         poseStampedMsgToTF(pose, tfPose);
 
         // get x as tf:Vector of transformed pose
-        tf::Vector3 v = tfPose.getBasis()[0];
+        tf::Vector3 v = tfPose.getBasis()*tf::Vector3(1, 0, 0);
         // transform tf:Vector in mesh_map Vector and return
         return mesh_map::Vector(v.x(), v.y(), v.z());
     }
@@ -226,13 +221,9 @@ namespace mesh_controller{
         if(pos == plan){
             return 0.0;
         } else {
-            // calculate point product between 2 vectors to get the (smaller) angle between them
-            float dot_prod = pos[0] * plan[0] + pos[1] * plan[1] + pos[2] * plan[2];
-            // calculate the length of the vectors
-            float length_pos = sqrt(pow(pos[0], 2) + pow(pos[1], 2) + pow(pos[2], 2));
-            float length_plan = sqrt(pow(plan[0], 2) + pow(plan[1], 2) + pow(plan[2], 2));
-            // return the arccos which is the smaller angle in rad (< PI)
-            return acos(dot_prod / (length_pos * length_plan));
+            tf::Vector3 tf_pos(pos.x, pos.y, pos.z);
+            tf::Vector3 tf_plan(plan.x, plan.y, plan.z);
+            return tf_pos.angle(tf_plan);
         }
     }
 
@@ -244,9 +235,10 @@ namespace mesh_controller{
             return -max_hight;
         }
         // to widen or narrow the curve
-        float width = PI/(max_width);
+
+        float width = (max_width)/M_PI;
         // calculating corresponding y-value
-        float result = max_hight * tan(width * value);
+        float result =tan(value * width);
         return result;
     }
 
@@ -262,7 +254,7 @@ namespace mesh_controller{
 
         // calculating y value of given normal distribution
         // stretched to max_hight and desired width
-        float y_value = max_hight * 1/(sqrtf(2*PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2)));
+        float y_value = max_hight * 1/(sqrtf(2*M_PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2)));
 
         return y_value;
     }
@@ -277,11 +269,6 @@ namespace mesh_controller{
         } else {
             https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
             const auto &face_normals = map_ptr->faceNormals();
-            if(!current_face){
-                ROS_ERROR("current face not set");
-                ROS_ERROR_STREAM("pos vector x"<<current_pos.x<<" y "<<current_pos.y<<" z "<<current_pos.z);
-                setCurrentFace(current_pos);
-            }
             auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap());
             mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current_pos, vertices[0],
                                                                             face_normals[current_face.unwrap()]);
@@ -331,29 +318,59 @@ namespace mesh_controller{
     }
 
     void MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity){
-        // the faster the robot, the further the robot might have travelled on the planned path
-        int v = static_cast<int>(velocity * 1000.0 + 1);
-        // smallest[0] is iterator, smallest[1] is euclidean distance
-        float smallest[2] = {static_cast<float>(iter), -1};
-
-        for(int j = 0; j < v; j++){
-            // check if end of path is reached when looking forward
-            if(j > current_plan.size()){
-                break;
-            }
-            // run over planned path from last "known"/"current" position on and calculate the distance to the current position
-            float dist = euclideanDistance(pose, current_plan[(j + iter)]);
-            // store the position and pose with the smallest distance
-            if (dist < smallest[1] || smallest[1] == -1.0) {
-                smallest[0] = j;
-                smallest[1] = dist;
-            }
+        if(last_call.isZero())
+        {
+            last_call = ros::Time::now();
+            plan_iter = 0;
+            return;
         }
+        ros::Time now = ros::Time::now();
+        ros::Duration time_delta = now - last_call;
 
-        // update iterator of path vector
-        iter += static_cast<int>(smallest[0]);
-        // update the current plan position to the one that has been determined as being closest to the robot now
-        current_position = current_plan[iter];
+        // the faster the robot, the further the robot might have travelled on the planned path
+        double max_dist = velocity * time_delta.toSec();
+        float min_dist = std::numeric_limits<float>::max();
+
+        tf::Pose robot_pose, iter_pose;
+        tf::poseMsgToTF(pose.pose, robot_pose);
+
+        int iter, ret_iter;
+        iter = plan_iter;
+
+        float dist = 0;
+        // look ahead
+        do{
+            geometry_msgs::Pose pose = current_plan[iter].pose;
+            tf::poseMsgToTF(pose, iter_pose);
+            dist = robot_pose.getOrigin().distance(iter_pose.getOrigin());
+            if(dist < min_dist){
+                ret_iter = iter;
+                min_dist = dist;
+            }
+
+            iter++;
+        }
+        while(dist < max_dist && iter < current_plan.size());
+
+        iter = plan_iter;
+        dist = 0;
+
+        do{
+            geometry_msgs::Pose pose = current_plan[iter].pose;
+            tf::poseMsgToTF(pose, iter_pose);
+            dist = robot_pose.getOrigin().distance(iter_pose.getOrigin());
+            if(dist < min_dist){
+                ret_iter = iter;
+                min_dist = dist;
+            }
+
+            iter--;
+        }
+        while(dist < max_dist && iter >= 0);
+        plan_iter = ret_iter;
+
+        current_position = current_plan[plan_iter];
+        last_call = now;
     }
 
     std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
@@ -398,11 +415,11 @@ namespace mesh_controller{
              // adds up cost of all steps ahead
              for (int i = 0; i < steps; i++) {
                  // in case look ahead extends planned path
-                 if ((iter + i) <= current_plan.size()) {
+                 if ((plan_iter + i) < current_plan.size()) {
                      steps = i;
                      break;
                  }
-                 geometry_msgs::PoseStamped& pose_ahead = current_plan[iter+i];
+                 geometry_msgs::PoseStamped& pose_ahead = current_plan[plan_iter+i];
                  mesh_map::Vector pose_ahead_vec =  poseToPositionVector(pose_ahead);
                  // find cost of the future position
                  float new_cost = cost(pose_ahead_vec);
@@ -415,7 +432,7 @@ namespace mesh_controller{
                      __throw_bad_function_call();
                  }
                  // get direction difference between current position and next position
-                 float future_turn = angleBetweenVectors(poseToDirectionVector(pose), poseToDirectionVector(current_plan[iter + i]));
+                 float future_turn = angleBetweenVectors(poseToDirectionVector(pose), poseToDirectionVector(current_plan[plan_iter + i]));
                  // accumulate cost and angle
                  accum_cost += new_cost;
                  accum_turn += future_turn;
@@ -443,7 +460,7 @@ namespace mesh_controller{
          // TODO dirction of turn for angular vel
          // calculate the difference between the current angle and the average angle
          float turn_difference = angle - av_turn;
-         float turn_result = tanValue(1.0, PI, turn_difference);
+         float turn_result = tanValue(1.0, M_PI, turn_difference);
 
 
          return {turn_result, cost_result};
@@ -460,6 +477,9 @@ namespace mesh_controller{
 
         if(!current_face){
             current_face = map_ptr->getContainingFaceHandle(position_vec);
+            if(!current_face){
+                ROS_ERROR("searched through mesh - no face");
+            }
         } else {
             current_face = searchNeighbourFaces(position_vec, current_face.unwrap());
             if(!current_face){
@@ -504,7 +524,9 @@ namespace mesh_controller{
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
         angle = angleBetweenVectors(pose_vec, plan_vec);
-
+        std_msgs::Float32 angle32;
+        angle32.data = angle*180/M_PI;
+        angle_pub.publish(angle32);
         // to determine in which direction to turn (neg for left, pos for right)
         if(!current_face){
             setCurrentFace(position_vec);
@@ -512,11 +534,11 @@ namespace mesh_controller{
         float leftRight = direction(pose, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle
-        float turn_angle_diff = leftRight * tanValue(config.max_ang_velocity, PI, angle);
+        float turn_angle_diff = leftRight * tanValue(config.max_ang_velocity, M_PI, angle);
 
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
-        float vel_given_angle = gaussValue(config.max_lin_velocity, PI, angle);
+        float vel_given_angle = gaussValue(config.max_lin_velocity, M_PI, angle);
         return {turn_angle_diff, vel_given_angle};
 
 /*
@@ -802,8 +824,6 @@ namespace mesh_controller{
         // all for mesh plan
         map_ptr = mesh_map_ptr;
 
-        // iterator to go through plan vector
-        iter = 0;
 
         // for PID
         // initialize integral error for PID
@@ -821,6 +841,7 @@ namespace mesh_controller{
         config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
 
+        angle_pub = private_nh.advertise<std_msgs::Float32>("current_angle", 1);
 
 
         return true;
