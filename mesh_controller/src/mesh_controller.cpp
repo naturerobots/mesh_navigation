@@ -277,6 +277,11 @@ namespace mesh_controller{
         } else {
             https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
             const auto &face_normals = map_ptr->faceNormals();
+            if(!current_face){
+                ROS_ERROR("current face not set");
+                ROS_ERROR_STREAM("pos vector x"<<current_pos.x<<" y "<<current_pos.y<<" z "<<current_pos.z);
+                setCurrentFace(current_pos);
+            }
             auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap());
             mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current_pos, vertices[0],
                                                                             face_normals[current_face.unwrap()]);
@@ -452,12 +457,12 @@ namespace mesh_controller{
 
     void MeshController::setCurrentFace(mesh_map::Vector& position_vec){
         // find a face to access cost later in case none has been found yet
-        if(!haveStartFace){
+
+        if(!current_face){
             current_face = map_ptr->getContainingFaceHandle(position_vec);
-            haveStartFace = true;
         } else {
             current_face = searchNeighbourFaces(position_vec, current_face.unwrap());
-            if(!haveStartFace){
+            if(!current_face){
                 setCurrentFace(position_vec);
             }
         }
@@ -466,9 +471,7 @@ namespace mesh_controller{
     lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face){
 
         std::list<lvr2::FaceHandle> possible_faces;
-        std::vector<lvr2::FaceHandle> neighbour_faces;
-        map_ptr->mesh_ptr->getNeighboursOfFace(face, neighbour_faces);
-        possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+        possible_faces.push_back(face);
         std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
 
         int cnt = 0;
@@ -486,25 +489,26 @@ namespace mesh_controller{
             } else {
                 // add neighbour of neighbour, if we overstep a small face or the peak of it
                 std::vector<lvr2::FaceHandle> nn_faces;
-                half_edge_mesh.getNeighboursOfFace(work_face, nn_faces);
+                map_ptr->mesh_ptr->getNeighboursOfFace(work_face, nn_faces);
                 possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
             }
         }
-        // in case no face that contains robot pose is found
-        haveStartFace = false;
+
         return lvr2::OptionalFaceHandle();
     }
 
     std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,const mesh_map::Vector plan_vec){
         mesh_map::Vector pose_vec = poseToDirectionVector(pose);
-
+        mesh_map::Vector position_vec = poseToPositionVector(pose);
         // ANGULAR MOVEMENT
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
         angle = angleBetweenVectors(pose_vec, plan_vec);
 
         // to determine in which direction to turn (neg for left, pos for right)
-
+        if(!current_face){
+            setCurrentFace(position_vec);
+        }
         float leftRight = direction(pose, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle

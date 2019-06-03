@@ -292,7 +292,6 @@ namespace mesh_controller{
             vector<geometry_msgs::PoseStamped> current_plan;
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped current_position;
-            lvr2::HalfEdgeMesh<lvr2::BaseVec> half_edge_mesh;
             int iter;
             float init_distance;
 
