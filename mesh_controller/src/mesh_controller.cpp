@@ -74,18 +74,14 @@ namespace mesh_controller{
         // set current face
         mesh_map::Vector pos_vec = poseToPositionVector(pose);
         setCurrentFace(pos_vec);
+        updatePlanPos(pose, velocity.twist.linear.x);
 
         if(current_plan.empty()){
             return mbf_msgs::GetPathResult::FAILURE;
         } else if (!goalSet){
             goal = current_plan.back();
-
-            // TODO ist immer 0?!
-            // distance between goal and start point
-            init_distance = euclideanDistance(current_plan.front(), goal);
             goalSet= true;
         }
-
 
         // variable that contains the planned / supposed orientation of the robot
         mesh_map::Vector plan_vec;
@@ -96,7 +92,7 @@ namespace mesh_controller{
             }
         } else {
             // use supposed orientation from calculated path
-            plan_vec = poseToDirectionVector(current_position);
+            plan_vec = poseToDirectionVector(plan_position);
         }
 
         // variable to store the new angular and linear velocities
@@ -125,10 +121,7 @@ namespace mesh_controller{
             recordData(pose);
         }
 
-        if(!config.useMeshGradient){
-            // UPDATE ITERATOR to where on the plan the robot is / should be currently
-            updatePlanPos(pose, values[1]);
-        }
+
 
         return mbf_msgs::GetPathResult::SUCCESS;
     }
@@ -136,7 +129,7 @@ namespace mesh_controller{
     bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
     {
         // calculates the distance that is currently between the robot and the goal
-        float current_distance = euclideanDistance(current_position, goal);
+        float current_distance = euclideanDistance(plan_position, goal);
 
         // test if robot is within tolerable distance to goal and if the heading has a tolerable distance to goal heading
         if (current_distance <= (float)dist_tolerance && angle <= (float)angle_tolerance){
@@ -166,42 +159,71 @@ namespace mesh_controller{
         return false;
     }
 
-    float MeshController::startVelocityFactor(const geometry_msgs::PoseStamped& pose){
-        float percentage;
+    float MeshController::fadingFactor(){
+        // calculate the distance between  the plan positions to get the plan length
+        if(initial_dist == std::numeric_limits<float>::max()){
 
-            // calculates how far the robot is from the goal given the distance to the goal compared to the initial distance
-            // note: may not be 100% accurate due to possible curves
-            percentage = euclideanDistance(pose, goal) * 100 / init_distance;
+            geometry_msgs::Pose start = current_plan.front().pose;
+            // start pose as tf pose
+            tf::Pose tf_start_pose;
+            tf::poseMsgToTF(start, tf_start_pose);
 
-        // checks if the travelled distance is within the first x percent of the total distance
-        if (percentage <= config.fading){
-            // calculates an increasing factor depending on how much of the x percent are travelled
-            // aka closer to start: factor to set velocity closer to zero
-            return percentage/config.fading;
+            // to store the next pose of plan
+            tf::Pose tf_next_pose;
+
+            // go through plan and add up each distance
+            for(int i = 1; i < current_plan.size(); i++){
+                geometry_msgs::Pose next_pose = current_plan.at(i).pose;
+                tf::poseMsgToTF(next_pose, tf_next_pose);
+                initial_dist += tf_start_pose.getOrigin().distance(tf_next_pose.getOrigin());
+                // overwrites start position with next position to calculate the difference
+                // between the next and next-next position in next step
+                tf_start_pose = tf_next_pose;
+            }
+        }
+
+        // calculate the distance between the current position on plan and the start position
+        geometry_msgs::Pose start = current_plan.front().pose;
+        // start pose as tf pose
+        tf::Pose tf_start_pose;
+        tf::poseMsgToTF(start, tf_start_pose);
+        // to store the next pose of plan
+        tf::Pose tf_next_pose;
+        float current_dist;
+
+        for(int j = 1; j <= plan_iter; j++){
+            geometry_msgs::Pose next_pose = current_plan.at(j).pose;
+            tf::poseMsgToTF(next_pose, tf_next_pose);
+            current_dist += tf_start_pose.getOrigin().distance(tf_next_pose.getOrigin());
+            // overwrites start position with next position to calculate the difference
+            // between the next and next-next position in next step
+            tf_start_pose = tf_next_pose;
+        }
+
+        // check if the current distance is within the set distances around start or end position to initiate
+        // velocity fading in / out
+        float changing_factor;
+        float end_increasing_vel = (initial_dist-(initial_dist-config.fading));
+        float start_reducing_vel = (initial_dist-config.fading);
+        if (current_dist <= end_increasing_vel){
+            if (current_dist == 0.0){
+                // return small factor in case of initial position to enable movement
+                // note: if max_velocity is zero, this factor will not matter
+                return 0.01;
+            }
+            // returns a factor slowly increasing to 1 while getting closer to the normal velocity point
+            return current_dist / end_increasing_vel;
+        } else if (current_dist >= start_reducing_vel){
+            // returns a factor slowly decreasing to 0 from fading out point to goal position
+            return 1 - (current_dist/start_reducing_vel);
         } else {
+            // velocity does not have to be influenced by changing factor
             return 1.0;
         }
-    }
 
-    float MeshController::endVelocityFactor(const geometry_msgs::PoseStamped& pose){
-        float percentage;
-
-            // calculates how far the robot is from the goal given the distance to the goal compared to the initial distance
-            // note: may not be 100% accurate due to possible curves
-            percentage = euclideanDistance(pose, goal) * 100 / init_distance;
-                // checks if the travelled distance is within the last x percent of the total distance
-        if (percentage >= (100-config.fading)){
-            percentage = 100 - percentage;
-            // calculates an decreasing factor depending on how much of the x percent are travelled
-            // aka closer to goal: factor to set velocity closer to zero
-            return 1 - (percentage / config.fading);
-        } else {
-            return 1.0;
-        }
     }
 
     mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose){
-        ROS_INFO_STREAM("pose frame id "<<pose.header.frame_id);
         // define tf Pose for later assignment
         tf::Stamped<tf::Pose> tfPose;
         // transform pose to tf:Pose
@@ -217,29 +239,44 @@ namespace mesh_controller{
         return {(float)pose.pose.position.x, (float)pose.pose.position.y, (float)pose.pose.position.z};
     }
 
-    float MeshController::angleBetweenVectors(mesh_map::Vector pos, mesh_map::Vector plan){
-        if(pos == plan){
-            return 0.0;
-        } else {
-            tf::Vector3 tf_pos(pos.x, pos.y, pos.z);
-            tf::Vector3 tf_plan(plan.x, plan.y, plan.z);
-            return tf_pos.angle(tf_plan);
-        }
+    float MeshController::angleBetweenVectors(mesh_map::Vector robot_heading, mesh_map::Vector planned_heading){
+        tf::Vector3 tf_robot(robot_heading.x, robot_heading.y, robot_heading.z);
+        tf::Vector3 tf_planned(planned_heading.x, planned_heading.y, planned_heading.z);
+        return tf_robot.angle(tf_planned);
     }
 
     float MeshController::tanValue(float max_hight, float max_width, float value){
-        // as tangens goes to pos infinity and never meets the width borders, they have to be checked individually
+        // as tangens goes to pos and neg infinity and never meets the width borders,
+        // they have to be checked individually
         if (value >= max_width/2){
             return max_hight;
-        } else if (value <= -max_width/2) {
+        } else if (value <= max_width/(-2)) {
             return -max_hight;
         }
-        // to widen or narrow the curve
 
-        float width = (max_width)/M_PI;
+
+        // to widen or narrow the curve
+        float width = max_width/M_PI;
+        // to compress tangens
+        float compress = max_hight/(tan(value*width));
+
         // calculating corresponding y-value
-        float result =tan(value * width);
+        float result = compress*tan(value * width);
+        // limit max and min return (just in case)
+        if (result > max_hight){
+            return max_hight;
+        } else if (result < -max_hight) {
+            return -max_hight;
+        }
         return result;
+    }
+
+    float MeshController::linValue(float max_hight, float max_width, float value){
+        if (value > max_width/2){
+            return max_hight;
+        }
+        float incline = max_hight / (max_width/2);
+        return incline*value;
     }
 
     float MeshController::gaussValue(float max_hight, float max_width, float value){
@@ -259,44 +296,24 @@ namespace mesh_controller{
         return y_value;
     }
 
-    float MeshController::direction(const geometry_msgs::PoseStamped& current, const mesh_map::Vector& supposed){
-        mesh_map::Vector current_dir = poseToDirectionVector(current);
-        mesh_map::Vector current_pos = poseToPositionVector(current);
+    float MeshController::direction(mesh_map::Vector& robot_heading, mesh_map::Vector& planned_heading){
 
+        tf::Vector3 tf_robot(robot_heading.x, robot_heading.y, robot_heading.z);
+        tf::Vector3 tf_planned(planned_heading.x, planned_heading.y, planned_heading.z);
 
-        if (current_dir == supposed){
+        https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
+        tf::Vector3 tf_cross_prod = tf_robot.cross(tf_planned);
+
+        tf::Vector3 tf_up = tf_cross_prod.normalize();
+
+        // use normal vector of face for dot product as "up" vector
+        // => positive result = left, negative result = right,
+        float tf_dot_prod = tf_cross_prod.dot(tf_up);
+
+        if (tf_dot_prod < 0.0) {
             return 1.0;
         } else {
-            https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
-            const auto &face_normals = map_ptr->faceNormals();
-            auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap());
-            mesh_map::Vector vec_current = mesh_map::projectVectorOntoPlane(current_pos, vertices[0],
-                                                                            face_normals[current_face.unwrap()]);
-            mesh_map::Vector vec_supposed;
-            if(config.useMeshGradient){
-                vec_supposed = supposed;
-            } else {
-                mesh_map::Vector supposed_pos = poseToPositionVector(current_position);
-                vec_supposed = mesh_map::projectVectorOntoPlane(supposed_pos, vertices[0],
-                                                                                 face_normals[current_face.unwrap()]);
-            }
-
-            mesh_map::Vector vec_normal = face_normals[current_face.unwrap()];
-
-            mesh_map::Vector vec_cross_prod = {vec_current.y * vec_supposed.z - vec_current.z * vec_supposed.y,
-                                               vec_current.z * vec_supposed.x - vec_current.x * vec_supposed.z,
-                                               vec_current.x * vec_supposed.y - vec_current.y * vec_supposed.x};
-
-            // use normal vector of face for dot product as "up" vector
-            // => positive result = left, negative result = right,
-            float vec_dot_prod = {vec_cross_prod.x * vec_normal.x + vec_cross_prod.y * vec_normal.y +
-                                  vec_cross_prod.z * vec_normal.z};
-
-            if (vec_dot_prod < 0.0) {
-                return -1.0;        // turn right
-            } else {
-                return 1.0;     // turn left
-            }
+            return -1.0;
         }
     }
 
@@ -367,9 +384,9 @@ namespace mesh_controller{
             iter--;
         }
         while(dist < max_dist && iter >= 0);
-        plan_iter = ret_iter;
 
-        current_position = current_plan[plan_iter];
+        plan_iter = ret_iter;
+        plan_position = current_plan[plan_iter];
         last_call = now;
     }
 
@@ -517,29 +534,27 @@ namespace mesh_controller{
         return lvr2::OptionalFaceHandle();
     }
 
-    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,const mesh_map::Vector plan_vec){
-        mesh_map::Vector pose_vec = poseToDirectionVector(pose);
+    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, mesh_map::Vector plan_vec){
+        mesh_map::Vector dir_vec = poseToDirectionVector(pose);
         mesh_map::Vector position_vec = poseToPositionVector(pose);
+
         // ANGULAR MOVEMENT
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
-        angle = angleBetweenVectors(pose_vec, plan_vec);
+        angle = angleBetweenVectors(dir_vec, plan_vec);
         std_msgs::Float32 angle32;
         angle32.data = angle*180/M_PI;
         angle_pub.publish(angle32);
         // to determine in which direction to turn (neg for left, pos for right)
-        if(!current_face){
-            setCurrentFace(position_vec);
-        }
-        float leftRight = direction(pose, plan_vec);
+        float leftRight = direction(dir_vec, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle
-        float turn_angle_diff = leftRight * tanValue(config.max_ang_velocity, M_PI, angle);
+        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 2*M_PI, angle);
 
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
-        float vel_given_angle = gaussValue(config.max_lin_velocity, M_PI, angle);
-        return {turn_angle_diff, vel_given_angle};
+        float final_lin_vel = fadingFactor() * gaussValue(config.max_lin_velocity, M_PI, angle);
+        return {final_ang_vel, 0.0};
 
 /*
         // ADDITIONAL factors
@@ -675,13 +690,13 @@ namespace mesh_controller{
         prev_dir_error = dir_error;
 
         // to determine in which direction to turn (neg for left, pos for right)
-        float leftRight = direction(pv_pose, setpoint);
+        //float leftRight = direction(pv_pose, setpoint);
 
-        return angular*leftRight;
+        return angular;//*leftRight;
     }
 
     void MeshController::recordData(const geometry_msgs::PoseStamped& robot_pose){
-        float distance = euclideanDistance(robot_pose, current_position);
+        float distance = euclideanDistance(robot_pose, plan_position);
         string output = std::to_string(distance) + "\n";
 
         string info_msg = string("distance: ");
@@ -834,6 +849,8 @@ namespace mesh_controller{
 
         // for recording - true = record, false = no record
         record = false;
+
+        initial_dist == std::numeric_limits<float>::max();
 
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > (
                 new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));

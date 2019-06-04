@@ -115,16 +115,11 @@ namespace mesh_controller{
             virtual bool cancel();
 
             /**
-             * Results in a slow increase of velocity in the beginning. Can be modulated via fading variable.
-             * @return factor by which to multiply the velocity for smooth start
+             * Results in a slow increase of velocity in the beginning and decrease towards end.
+             * Can be modulated via fading variable.
+             * @return factor by which to multiply the linear velocity for smooth start and end
              */
-            float startVelocityFactor(const geometry_msgs::PoseStamped& pose);
-
-            /**
-             * Results in a slow decrease of velocity towards the goal. Can be modulated via fading varibale.
-             * @return factor by which to multiply the velocity for smooth stop
-             */
-            float endVelocityFactor(const geometry_msgs::PoseStamped& pose);
+            float fadingFactor();
 
             /**
              * Transforms a PoseStamped into a direction mesh_map Vector
@@ -158,6 +153,8 @@ namespace mesh_controller{
              */
             float tanValue(float max_hight, float max_width, float value);
 
+            float linValue(float max_hight, float max_width, float value);
+
             /**
              * A *normal distribution / gaussian* function to return a phased response value given a value
              * @param max_hight     maximum value that will be returned
@@ -173,7 +170,7 @@ namespace mesh_controller{
              * @param supposed      supposed heading of the robot
              * @return              -1 for left turn, 1 else
              */
-            float direction(const geometry_msgs::PoseStamped& current, const mesh_map::Vector& supposed);
+            float direction(mesh_map::Vector& robot_heading, mesh_map::Vector& planned_heading);
 
             /**
              * returns the euclidean distance between two poses
@@ -296,7 +293,7 @@ namespace mesh_controller{
             ros::Time last_call;
 
             geometry_msgs::PoseStamped goal;
-            geometry_msgs::PoseStamped current_position;
+            geometry_msgs::PoseStamped plan_position;
             float init_distance;
 
             // for pid control
@@ -328,6 +325,7 @@ namespace mesh_controller{
 
             bool record;
 
+            float initial_dist;
 
 
             const float E = 2.718281;
