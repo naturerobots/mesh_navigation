@@ -281,8 +281,8 @@ namespace mesh_controller{
 
     float MeshController::gaussValue(float max_hight, float max_width, float value){
         // in case value lays outside width, the function goes to zero
-        if(value > max_width){
-            return 0;
+        if(value > max_width/2){
+            return 0.0;
         }
 
         //  calculating the standard deviation given the max_width
@@ -553,8 +553,8 @@ namespace mesh_controller{
 
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
-        float final_lin_vel = fadingFactor() * gaussValue(config.max_lin_velocity, M_PI, angle);
-        return {final_ang_vel, 0.0};
+        float final_lin_vel = gaussValue(config.max_lin_velocity, 2*M_PI, angle) ; //* fadingFactor();
+        return {final_ang_vel, final_lin_vel};
 
 /*
         // ADDITIONAL factors
