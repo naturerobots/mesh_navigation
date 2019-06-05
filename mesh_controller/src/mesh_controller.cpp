@@ -72,7 +72,7 @@ namespace mesh_controller{
         std::string &message
         ){
         if(current_plan.empty()){
-            return mbf_msgs::GetPathResult::FAILURE;
+            return mbf_msgs::GetPathResult::EMPTY_PATH;
         } else if (!goalSet){
             goal = current_plan.back();
             goalSet= true;
@@ -82,6 +82,12 @@ namespace mesh_controller{
         mesh_map::Vector pos_vec = poseToPositionVector(pose);
         setCurrentFace(pos_vec);
         updatePlanPos(pose, set_linear_velocity);
+
+        // check if the robot is too far off the plan
+        if (offPlan(pose)){
+            // TODO see if NOT_INITIALIZED = 112 can be used
+            return mbf_msgs::GetPathResult::FAILURE;
+        }
 
         // variable that contains the planned / supposed orientation of the robot
         mesh_map::Vector plan_vec;
@@ -108,7 +114,7 @@ namespace mesh_controller{
                 values = pidControl(pose, pose, velocity);
                 break;
             default:
-                return mbf_msgs::GetPathResult::FAILURE;
+                return mbf_msgs::GetPathResult::NOT_INITIALIZED;
         }
 
         // set velocities
@@ -134,9 +140,6 @@ namespace mesh_controller{
         tf::poseMsgToTF(goal.pose, goal_pose);
 
         float dist = plan_pose.getOrigin().distance(goal_pose.getOrigin());
-
-
-        float current_distance = euclideanDistance(plan_position, goal);
 
         // test if robot is within tolerable distance to goal and if the heading has a tolerable distance to goal heading
         if (dist <= (float)dist_tolerance && angle <= (float)angle_tolerance){
@@ -167,39 +170,35 @@ namespace mesh_controller{
     }
 
     float MeshController::fadingFactor(){
-        // calculate the distance between  the plan positions to get the plan length
-
-
+        // transform the first pose of plan to a tf position vector
+        tf::Vector3 tf_start_vec;
+        geometry_msgs::PoseStamped start_pose = current_plan.at(0);
+        mesh_map::Vector start_vec = poseToPositionVector(start_pose);
+        tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+        // calculate the distance between  the plan positions to get the plan length once
         if(initial_dist == std::numeric_limits<float>::max()){
-            ROS_INFO("init fading");
-            tf::Vector3 tf_start_vec, tf_next_vec;
-
-            geometry_msgs::PoseStamped start_pose = current_plan.at(0);
-            mesh_map::Vector start_vec = poseToPositionVector(start_pose);
-            tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+            tf::Vector3 tf_next_vec;
             float update_dist = 0.0;
             // go through plan and add up each distance
             // add up distance of travelled path
             for(int i = 1; i < current_plan.size(); i++){
+                // get the next pose of the plan and transform it to a tf position vector
                 geometry_msgs::PoseStamped next_pose = current_plan.at(i);
                 mesh_map::Vector next_vec = poseToPositionVector(next_pose);
                 tf_next_vec = {next_vec.x, next_vec.y, next_vec.z};
-
+                // calculate the distance between the two vectors
                 update_dist += tf_start_vec.distance(tf_next_vec);
-                // overwrites start position with next position to calculate the difference
+
+                // overwrite start position with next position to calculate the difference
                 // between the next and next-next position in next step
                 tf_start_vec = tf_next_vec;
             }
             initial_dist = update_dist;
-            ROS_INFO_STREAM("initial distance : "<<initial_dist);
         }
 
+        // calculate the length of the travelled path
         float dist = 0.0;
-        tf::Vector3 tf_start_vec, tf_next_vec;
-
-        geometry_msgs::PoseStamped start_pose = current_plan.at(0);
-        mesh_map::Vector start_vec = poseToPositionVector(start_pose);
-        tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+        tf::Vector3 tf_next_vec;
 
         // add up distance of travelled path
         for(int i = 1; i <= plan_iter && i < current_plan.size(); i++){
@@ -212,11 +211,10 @@ namespace mesh_controller{
             // between the next and next-next position in next step
             tf_start_vec = tf_next_vec;
         }
-        ROS_INFO_STREAM("distance "<<dist);
 
-        // check if the current distance is within the set distances around start or end position to initiate
-        // velocity fading in / out
+        // compare the now travelled distance with the path length
         if(dist <= initial_dist) {
+            // in case the travelled distance is close to start position
             if (dist < config.fading) {
                 ROS_INFO("start fading");
                 if (dist == 0.0) {
@@ -224,15 +222,18 @@ namespace mesh_controller{
                     // note: if max_velocity is zero, this factor will not matter
                     return config.max_lin_velocity / 10;
                 }
-                // returns a factor slowly increasing to 1 while getting closer to the normal velocity point
+                // returns a factor slowly increasing to 1 while getting closer to the
+                // distance from which the full velocity is driven
                 return dist / config.fading;
-            } else if ((initial_dist - dist) < config.fading) {
+            }
+            // in case the travelled distance is close to goal position
+            else if ((initial_dist - dist) < config.fading) {
                 ROS_INFO("end fading");
-                // returns a factor slowly decreasing to 0 from fading out point to goal position
+                // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
                 return (initial_dist - dist) / config.fading;
             }
         }
-        // velocity does not have to be influenced by changing factor
+        // for the part of the path when the velocity does not have to be influenced by a changing factor
         return 1.0;
     }
 
@@ -338,7 +339,21 @@ namespace mesh_controller{
         }
     }
 
-    float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position){
+    bool MeshController::offPlan(const geometry_msgs::PoseStamped& robot_pose){
+        // transform the first pose of plan to a tf position vector
+        mesh_map::Vector robot_vec = poseToPositionVector(robot_pose);
+        tf::Vector3 tf_robot_vec = {robot_vec.x, robot_vec.y, robot_vec.z};
+        mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
+        tf::Vector3 tf_plan_vec = {plan_vec.x, plan_vec.y, plan_vec.z};
+
+        if(tf_robot_vec.distance(tf_plan_vec) > 0.25){
+            ROS_INFO("true");
+            return true;
+        }
+        return false;
+    }
+
+    float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose){
         // https://en.wikipedia.org/wiki/Euclidean_distance
 
         // transform position of poses to position vectors
@@ -661,7 +676,7 @@ namespace mesh_controller{
         // setpoint is desired position, pv is actual position
         // https://gist.github.com/bradley219/5373998
 
-        float error = euclideanDistance(setpoint, pv);
+        float error = euclideanDistance(setpoint);
 
         // proportional part
         float proportional = config.prop_dis_gain * error;
@@ -718,7 +733,7 @@ namespace mesh_controller{
     }
 
     void MeshController::recordData(const geometry_msgs::PoseStamped& robot_pose){
-        float distance = euclideanDistance(robot_pose, plan_position);
+        float distance = euclideanDistance(robot_pose);
         string output = std::to_string(distance) + "\n";
 
         string info_msg = string("distance: ");

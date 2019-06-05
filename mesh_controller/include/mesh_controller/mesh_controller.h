@@ -189,12 +189,19 @@ namespace mesh_controller{
             float direction(mesh_map::Vector& robot_heading, mesh_map::Vector& planned_heading);
 
             /**
+             * Checks if the robot has driven too far of the plan
+             * @param robot_pose    current pose of the robot
+             * @return              true, if the robot is too far off, false otherwise
+             */
+            bool offPlan(const geometry_msgs::PoseStamped& robot_pose);
+
+            /**
              * returns the euclidean distance between two poses
              * @param pose              first pose
              * @param plan_position     second pose
              * @return                  distance as float
              */
-            float euclideanDistance(const geometry_msgs::PoseStamped& pose, const geometry_msgs::PoseStamped& plan_position);
+            float euclideanDistance(const geometry_msgs::PoseStamped& pose);
 
             float euclideanDistance(lvr2::BaseVector<float>& current, lvr2::BaseVector<float>& planned);
 
