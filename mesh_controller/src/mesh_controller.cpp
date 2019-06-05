@@ -71,17 +71,18 @@ namespace mesh_controller{
         geometry_msgs::TwistStamped &cmd_vel,
         std::string &message
         ){
-        // set current face
-        mesh_map::Vector pos_vec = poseToPositionVector(pose);
-        setCurrentFace(pos_vec);
-        updatePlanPos(pose, velocity.twist.linear.x);
-
         if(current_plan.empty()){
             return mbf_msgs::GetPathResult::FAILURE;
         } else if (!goalSet){
             goal = current_plan.back();
             goalSet= true;
         }
+
+        // set current face
+        mesh_map::Vector pos_vec = poseToPositionVector(pose);
+        setCurrentFace(pos_vec);
+        ROS_INFO_STREAM("velocity twist "<<velocity.twist);
+        updatePlanPos(pose, set_linear_velocity);
 
         // variable that contains the planned / supposed orientation of the robot
         mesh_map::Vector plan_vec;
@@ -128,11 +129,18 @@ namespace mesh_controller{
 
     bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
     {
-        // calculates the distance that is currently between the robot and the goal
+        // calculates the distance that is currently between the plan position and the goal
+        tf::Pose plan_pose, goal_pose;
+        tf::poseMsgToTF(plan_position.pose, plan_pose);
+        tf::poseMsgToTF(goal.pose, goal_pose);
+
+        float dist = plan_pose.getOrigin().distance(goal_pose.getOrigin());
+
+
         float current_distance = euclideanDistance(plan_position, goal);
 
         // test if robot is within tolerable distance to goal and if the heading has a tolerable distance to goal heading
-        if (current_distance <= (float)dist_tolerance && angle <= (float)angle_tolerance){
+        if (dist <= (float)dist_tolerance && angle <= (float)angle_tolerance){
             return true;
         } else {
             return false;
@@ -279,6 +287,14 @@ namespace mesh_controller{
         return incline*value;
     }
 
+    float MeshController::parValue(float max_hight, float max_width, float value){
+        if (value > max_width/2){
+            return max_hight;
+        }
+        float shape = max_hight / pow((max_width/2), 2);
+        return shape*pow(value, 2);
+    }
+
     float MeshController::gaussValue(float max_hight, float max_width, float value){
         // in case value lays outside width, the function goes to zero
         if(value > max_width/2){
@@ -304,7 +320,7 @@ namespace mesh_controller{
         https://www.gamedev.net/forums/topic/508445-left-or-right-direction/
         tf::Vector3 tf_cross_prod = tf_robot.cross(tf_planned);
 
-        tf::Vector3 tf_up = tf_cross_prod.normalize();
+        tf::Vector3 tf_up = {0,0,-1};
 
         // use normal vector of face for dot product as "up" vector
         // => positive result = left, negative result = right,
@@ -337,6 +353,7 @@ namespace mesh_controller{
     void MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity){
         if(last_call.isZero())
         {
+            ROS_INFO("set zero");
             last_call = ros::Time::now();
             plan_iter = 0;
             return;
@@ -348,8 +365,11 @@ namespace mesh_controller{
         double max_dist = velocity * time_delta.toSec();
         float min_dist = std::numeric_limits<float>::max();
 
-        tf::Pose robot_pose, iter_pose;
-        tf::poseMsgToTF(pose.pose, robot_pose);
+        tf::Vector3 tf_robot_vec, tf_iter_vec, tf_plan_vec;
+        mesh_map::Vector robot_vec = poseToPositionVector(pose);
+        mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
+        tf_robot_vec = {robot_vec.x, robot_vec.y, robot_vec.z};
+        tf_plan_vec = {plan_vec.x, plan_vec.y, plan_vec.z};
 
         int iter, ret_iter;
         iter = plan_iter;
@@ -357,33 +377,31 @@ namespace mesh_controller{
         float dist = 0;
         // look ahead
         do{
-            geometry_msgs::Pose pose = current_plan[iter].pose;
-            tf::poseMsgToTF(pose, iter_pose);
-            dist = robot_pose.getOrigin().distance(iter_pose.getOrigin());
+            geometry_msgs::PoseStamped iter_pose = current_plan[iter];
+            mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
+            tf_iter_vec = {iter_vec.x, iter_vec.y, iter_vec.z};
+            dist = tf_robot_vec.distance(tf_iter_vec);
             if(dist < min_dist){
                 ret_iter = iter;
                 min_dist = dist;
             }
-
             iter++;
-        }
-        while(dist < max_dist && iter < current_plan.size());
+        } while(iter < current_plan.size()); // TODO check if another case can be used eg dist > max_dist &&
 
         iter = plan_iter;
-        dist = 0;
+        dist = 0.0;
 
         do{
-            geometry_msgs::Pose pose = current_plan[iter].pose;
-            tf::poseMsgToTF(pose, iter_pose);
-            dist = robot_pose.getOrigin().distance(iter_pose.getOrigin());
+            geometry_msgs::PoseStamped iter_pose = current_plan[iter];
+            mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
+            tf_iter_vec = {iter_vec.x, iter_vec.y, iter_vec.z};
+            dist = tf_robot_vec.distance(tf_iter_vec);
             if(dist < min_dist){
                 ret_iter = iter;
                 min_dist = dist;
             }
-
             iter--;
-        }
-        while(dist < max_dist && iter >= 0);
+        } while(iter >= 0); // TODO check if another case can be used eg dist > max_dist &&
 
         plan_iter = ret_iter;
         plan_position = current_plan[plan_iter];
@@ -538,6 +556,8 @@ namespace mesh_controller{
         mesh_map::Vector dir_vec = poseToDirectionVector(pose);
         mesh_map::Vector position_vec = poseToPositionVector(pose);
 
+        ROS_INFO_STREAM("position on path "<<plan_iter);
+
         // ANGULAR MOVEMENT
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
@@ -553,7 +573,8 @@ namespace mesh_controller{
 
         // LINEAR movement
         // basic linear velocity depending on angle difference between robot pose and plan
-        float final_lin_vel = gaussValue(config.max_lin_velocity, 2*M_PI, angle) ; //* fadingFactor();
+        float final_lin_vel = gaussValue(config.max_lin_velocity, 2*M_PI, angle); // * fadingFactor();
+        set_linear_velocity = final_lin_vel;
         return {final_ang_vel, final_lin_vel};
 
 /*
@@ -846,6 +867,8 @@ namespace mesh_controller{
         int_dir_error = 0.0;
 
         haveStartFace = false;
+
+        set_linear_velocity = 0.0;
 
         // for recording - true = record, false = no record
         record = false;

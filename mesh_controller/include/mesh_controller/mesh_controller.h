@@ -153,7 +153,23 @@ namespace mesh_controller{
              */
             float tanValue(float max_hight, float max_width, float value);
 
+            /**
+             * A linear function to return a phased response value given a value
+             * @param max_hight     maximum value that will be returned
+             * @param max_width     range that the given value can take before the maximum is returned
+             * @param value         value on x axis
+             * @return              value on y axis that corresponds to input value
+             */
             float linValue(float max_hight, float max_width, float value);
+
+            /**
+             * A parabola function to return a phased response value given a value
+             * @param max_hight     maximum value that will be returned
+             * @param max_width     range that the given value can take before the maximum is returned
+             * @param value         value on x axis
+             * @return              value on y axis that corresponds to input value
+             */
+            float parValue(float max_hight, float max_width, float value);
 
             /**
              * A *normal distribution / gaussian* function to return a phased response value given a value
@@ -303,6 +319,7 @@ namespace mesh_controller{
             float prev_dir_error;
 
             bool goalSet;
+            float set_linear_velocity;
 
             // for mesh use
             bool haveStartFace;
