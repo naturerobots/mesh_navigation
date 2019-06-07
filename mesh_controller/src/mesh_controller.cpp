@@ -170,24 +170,26 @@ namespace mesh_controller{
     }
 
     float MeshController::fadingFactor(){
-        // transform the first pose of plan to a tf position vector
-        tf::Vector3 tf_start_vec;
-        geometry_msgs::PoseStamped start_pose = current_plan.at(0);
-        mesh_map::Vector start_vec = poseToPositionVector(start_pose);
-        tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
         // calculate the distance between  the plan positions to get the plan length once
         if(initial_dist == std::numeric_limits<float>::max()){
+            // transform the first pose of plan to a tf position vector
+            tf::Vector3 tf_start_vec;
+            geometry_msgs::PoseStamped start_pose = current_plan.at(0);
+            mesh_map::Vector start_vec = poseToPositionVector(start_pose);
+            tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+
             tf::Vector3 tf_next_vec;
             float update_dist = 0.0;
             // go through plan and add up each distance
             // add up distance of travelled path
+            // TODO figure out why initial distance is sometimes smaller than actual path length!
             for(int i = 1; i < current_plan.size(); i++){
                 // get the next pose of the plan and transform it to a tf position vector
                 geometry_msgs::PoseStamped next_pose = current_plan.at(i);
                 mesh_map::Vector next_vec = poseToPositionVector(next_pose);
                 tf_next_vec = {next_vec.x, next_vec.y, next_vec.z};
                 // calculate the distance between the two vectors
-                update_dist += tf_start_vec.distance(tf_next_vec);
+                update_dist = update_dist + tf_start_vec.distance(tf_next_vec);
 
                 // overwrite start position with next position to calculate the difference
                 // between the next and next-next position in next step
@@ -195,8 +197,14 @@ namespace mesh_controller{
             }
             initial_dist = update_dist;
         }
+        ROS_INFO_STREAM("initial dist : "<<initial_dist);
 
-        // calculate the length of the travelled path
+        // transform the first pose of plan to a tf position vector
+        tf::Vector3 tf_start_vec;
+        geometry_msgs::PoseStamped start_pose = current_plan.at(0);
+        mesh_map::Vector start_vec = poseToPositionVector(start_pose);
+        tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+
         float dist = 0.0;
         tf::Vector3 tf_next_vec;
 
@@ -210,7 +218,9 @@ namespace mesh_controller{
             // overwrites start position with next position to calculate the difference
             // between the next and next-next position in next step
             tf_start_vec = tf_next_vec;
+
         }
+        ROS_INFO_STREAM("dist :"<<dist);
 
         // compare the now travelled distance with the path length
         if(dist <= initial_dist) {
@@ -220,21 +230,24 @@ namespace mesh_controller{
                 if (dist == 0.0) {
                     // return small factor in case of initial position to enable movement
                     // note: if max_velocity is zero, this factor will not matter
-                    return config.max_lin_velocity / 10;
+                    last_fading = config.max_lin_velocity / 10;
+                    return last_fading;
                 }
                 // returns a factor slowly increasing to 1 while getting closer to the
                 // distance from which the full velocity is driven
                 return dist / config.fading;
             }
-            // in case the travelled distance is close to goal position
+                // in case the travelled distance is close to goal position
             else if ((initial_dist - dist) < config.fading) {
                 ROS_INFO("end fading");
                 // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
-                return (initial_dist - dist) / config.fading;
+                last_fading = (initial_dist - dist) / config.fading;
+                return last_fading;
             }
+            // for the part of the path when the velocity does not have to be influenced by a changing factor
+            last_fading = 1.0;
+            return last_fading;
         }
-        // for the part of the path when the velocity does not have to be influenced by a changing factor
-        return 1.0;
     }
 
     mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose){
@@ -285,12 +298,12 @@ namespace mesh_controller{
         return result;
     }
 
-    float MeshController::linValue(float max_hight, float max_width, float value){
+    float MeshController::linValue(float max_hight, float min_hight, float max_width, float value){
         if (value > max_width/2){
             return max_hight;
         }
         float incline = max_hight / (max_width/2);
-        return incline*value;
+        return incline*value + min_hight;
     }
 
     float MeshController::parValue(float max_hight, float max_width, float value){
@@ -301,7 +314,7 @@ namespace mesh_controller{
         return shape*pow(value, 2);
     }
 
-    float MeshController::gaussValue(float max_hight, float max_width, float value){
+    float MeshController::gaussValue(float max_hight, float min_hight, float max_width, float value){
         // in case value lays outside width, the function goes to zero
         if(value > max_width/2){
             return 0.0;
@@ -313,7 +326,7 @@ namespace mesh_controller{
 
         // calculating y value of given normal distribution
         // stretched to max_hight and desired width
-        float y_value = max_hight * 1/(sqrtf(2*M_PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2)));
+        float y_value = max_hight * 1/(sqrtf(2*M_PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2))) + min_hight;
 
         return y_value;
     }
@@ -346,7 +359,7 @@ namespace mesh_controller{
         mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
         tf::Vector3 tf_plan_vec = {plan_vec.x, plan_vec.y, plan_vec.z};
 
-        if(tf_robot_vec.distance(tf_plan_vec) > 0.25){
+        if(tf_robot_vec.distance(tf_plan_vec) > config.off_plan){
             ROS_INFO("true");
             return true;
         }
@@ -504,10 +517,10 @@ namespace mesh_controller{
          float cost_result;
          // check if a lethal vertex is ahead
          if (cost_difference != std::numeric_limits<float>::infinity()){
-             cost_result = tanValue(1.0, 2.0, cost_difference);
+             cost_result = tanValue(config.max_lin_velocity, 2.0, cost_difference);
          } else {
              // if yes, set the linear velocity factor small depending on distance to the lethal vertex
-             cost_result = gaussValue(1.0, 2*max_steps, steps);
+             cost_result = gaussValue(config.max_lin_velocity, config.min_lin_velocity, 2*max_steps, steps);
          }
 
          // TODO dirction of turn for angular vel
@@ -578,18 +591,22 @@ namespace mesh_controller{
         // calculate angle between orientation vectors
         // angle will never be negative and smaller or equal to pi
         angle = angleBetweenVectors(dir_vec, plan_vec);
+
+        // output: angle publishing
         std_msgs::Float32 angle32;
         angle32.data = angle*180/M_PI;
         angle_pub.publish(angle32);
+
         // to determine in which direction to turn (neg for left, pos for right)
         float leftRight = direction(dir_vec, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle
-        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 2*M_PI, angle);
+        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, config.min_ang_velocity, 2*M_PI, angle);
 
-        // LINEAR movement
-        // basic linear velocity depending on angle difference between robot pose and plan
-        float final_lin_vel = gaussValue(config.max_lin_velocity, 2*M_PI, angle) * fadingFactor();
+        // LINEAR movementq
+        // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
+        float final_lin_vel = gaussValue(config.max_lin_velocity, config.min_ang_velocity, 2*M_PI, angle) * fadingFactor();
+
         set_linear_velocity = final_lin_vel;
         return {final_ang_vel, final_lin_vel};
 

@@ -160,7 +160,7 @@ namespace mesh_controller{
              * @param value         value on x axis
              * @return              value on y axis that corresponds to input value
              */
-            float linValue(float max_hight, float max_width, float value);
+            float linValue(float max_hight, float min_hight, float max_width, float value);
 
             /**
              * A parabola function to return a phased response value given a value
@@ -178,7 +178,7 @@ namespace mesh_controller{
              * @param value         value on x axis
              * @return              value on y axis that corresponds to input value
              */
-            float gaussValue(float max_hight, float max_width, float value);
+            float gaussValue(float max_hight, float min_hight, float max_width, float value);
 
             /**
              * Calculates in which direction the robot has to turn
@@ -350,6 +350,7 @@ namespace mesh_controller{
             bool record;
 
             float initial_dist;
+            float last_fading;
 
 
             const float E = 2.718281;
