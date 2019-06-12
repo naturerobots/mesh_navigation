@@ -156,11 +156,12 @@ namespace mesh_controller{
             /**
              * A linear function to return a phased response value given a value
              * @param max_hight     maximum value that will be returned
+             * @param x_axis        determines the intersection point with the x-axis
              * @param max_width     range that the given value can take before the maximum is returned
              * @param value         value on x axis
              * @return              value on y axis that corresponds to input value
              */
-            float linValue(float max_hight, float min_hight, float max_width, float value);
+            float linValue(float max_hight, float x_axis, float max_width, float value);
 
             /**
              * A parabola function to return a phased response value given a value
@@ -178,7 +179,7 @@ namespace mesh_controller{
              * @param value         value on x axis
              * @return              value on y axis that corresponds to input value
              */
-            float gaussValue(float max_hight, float min_hight, float max_width, float value);
+            float gaussValue(float max_hight, float max_width, float value);
 
             /**
              * Calculates in which direction the robot has to turn

@@ -117,6 +117,9 @@ namespace mesh_controller{
                 return mbf_msgs::GetPathResult::NOT_INITIALIZED;
         }
 
+        if (values[1] == std::numeric_limits<float>::max()){
+            return mbf_msgs::GetPathResult::FAILURE;
+        }
         // set velocities
         cmd_vel.twist.angular.z = values[0];
         cmd_vel.twist.linear.x = values[1];
@@ -180,10 +183,11 @@ namespace mesh_controller{
 
             tf::Vector3 tf_next_vec;
             float update_dist = 0.0;
-            // go through plan and add up each distance
-            // add up distance of travelled path
+            // go through plan and add up each distance between the current and its following position
+            // to get the length of the whole path
             // TODO figure out why initial distance is sometimes smaller than actual path length!
             for(int i = 1; i < current_plan.size(); i++){
+                ROS_INFO_STREAM("vector size : "<< current_plan.size()<<" current position : "<<i);
                 // get the next pose of the plan and transform it to a tf position vector
                 geometry_msgs::PoseStamped next_pose = current_plan.at(i);
                 mesh_map::Vector next_vec = poseToPositionVector(next_pose);
@@ -298,12 +302,14 @@ namespace mesh_controller{
         return result;
     }
 
-    float MeshController::linValue(float max_hight, float min_hight, float max_width, float value){
+    float MeshController::linValue(float max_hight, float x_axis, float max_width, float value){
         if (value > max_width/2){
             return max_hight;
+        } else if (value < -max_width/2){
+            return -max_hight;
         }
         float incline = max_hight / (max_width/2);
-        return incline*value + min_hight;
+        return abs(incline * (value + x_axis));
     }
 
     float MeshController::parValue(float max_hight, float max_width, float value){
@@ -314,7 +320,7 @@ namespace mesh_controller{
         return shape*pow(value, 2);
     }
 
-    float MeshController::gaussValue(float max_hight, float min_hight, float max_width, float value){
+    float MeshController::gaussValue(float max_hight, float max_width, float value){
         // in case value lays outside width, the function goes to zero
         if(value > max_width/2){
             return 0.0;
@@ -326,7 +332,7 @@ namespace mesh_controller{
 
         // calculating y value of given normal distribution
         // stretched to max_hight and desired width
-        float y_value = max_hight * 1/(sqrtf(2*M_PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2))) + min_hight;
+        float y_value = max_hight * 1/(sqrtf(2*M_PI*std_dev))* pow(E, (-pow(value, 2) * pow((2*std_dev), 2)));
 
         return y_value;
     }
@@ -360,7 +366,6 @@ namespace mesh_controller{
         tf::Vector3 tf_plan_vec = {plan_vec.x, plan_vec.y, plan_vec.z};
 
         if(tf_robot_vec.distance(tf_plan_vec) > config.off_plan){
-            ROS_INFO("true");
             return true;
         }
         return false;
@@ -520,7 +525,7 @@ namespace mesh_controller{
              cost_result = tanValue(config.max_lin_velocity, 2.0, cost_difference);
          } else {
              // if yes, set the linear velocity factor small depending on distance to the lethal vertex
-             cost_result = gaussValue(config.max_lin_velocity, config.min_lin_velocity, 2*max_steps, steps);
+             cost_result = gaussValue(config.max_lin_velocity, 2*max_steps, steps);
          }
 
          // TODO dirction of turn for angular vel
@@ -583,7 +588,7 @@ namespace mesh_controller{
         return lvr2::OptionalFaceHandle();
     }
 
-    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, mesh_map::Vector plan_vec){
+    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, mesh_map::Vector plan_vec) {
         mesh_map::Vector dir_vec = poseToDirectionVector(pose);
         mesh_map::Vector position_vec = poseToPositionVector(pose);
 
@@ -594,19 +599,38 @@ namespace mesh_controller{
 
         // output: angle publishing
         std_msgs::Float32 angle32;
-        angle32.data = angle*180/M_PI;
+        angle32.data = angle * 180 / M_PI;
         angle_pub.publish(angle32);
 
         // to determine in which direction to turn (neg for left, pos for right)
         float leftRight = direction(dir_vec, plan_vec);
 
         // calculate a direction velocity depending on the turn direction and difference angle
-        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, config.min_ang_velocity, 2*M_PI, angle);
+        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
-        // LINEAR movementq
-        // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
-        float final_lin_vel = gaussValue(config.max_lin_velocity, config.min_ang_velocity, 2*M_PI, angle) * fadingFactor();
-
+        // LINEAR movement
+        float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
+        float final_lin_vel;
+        // check the size of the angle. If it is not more than about 35 degrees, integrate position costs to linear velocity
+        if (angle < 0.6) {
+            float cost_lin_vel = cost(position_vec);
+            // in case current vertex is a lethal vertex
+            if (cost_lin_vel == std::numeric_limits<float>::max()) {
+                final_lin_vel = cost_lin_vel;
+            } else {
+                // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
+                float lin_factor_by_cost = linValue(config.max_lin_velocity/10,  0.0, 2.0, cost_lin_vel);
+                lin_vel_by_ang -= lin_factor_by_cost;
+                if (lin_vel_by_ang < 0.0) {
+                    lin_vel_by_ang = 0.0;
+                } else if (lin_vel_by_ang > config.max_lin_velocity) {
+                    ROS_INFO_STREAM("larger than max vel through cost "<<lin_factor_by_cost);
+                    lin_vel_by_ang = config.max_lin_velocity;
+                }
+            }
+        }
+        final_lin_vel = lin_vel_by_ang * fadingFactor();
+        // store new velocity to use as previous velocity
         set_linear_velocity = final_lin_vel;
         return {final_ang_vel, final_lin_vel};
 
