@@ -160,6 +160,7 @@ namespace mesh_controller{
             current_plan = plan;
             current_plan.erase(current_plan.begin());
             goal = current_plan.back();
+            initial_dist = std::numeric_limits<float>::max();
             return true;
         }
         else {
@@ -201,7 +202,7 @@ namespace mesh_controller{
             }
             initial_dist = update_dist;
         }
-        ROS_INFO_STREAM("initial dist : "<<initial_dist);
+        //ROS_INFO_STREAM("initial dist : "<<initial_dist);
 
         // transform the first pose of plan to a tf position vector
         tf::Vector3 tf_start_vec;
@@ -224,34 +225,33 @@ namespace mesh_controller{
             tf_start_vec = tf_next_vec;
 
         }
-        ROS_INFO_STREAM("dist :"<<dist);
+
 
         // compare the now travelled distance with the path length
-        if(dist <= initial_dist) {
-            // in case the travelled distance is close to start position
-            if (dist < config.fading) {
-                ROS_INFO("start fading");
-                if (dist == 0.0) {
-                    // return small factor in case of initial position to enable movement
-                    // note: if max_velocity is zero, this factor will not matter
-                    last_fading = config.max_lin_velocity / 10;
-                    return last_fading;
-                }
-                // returns a factor slowly increasing to 1 while getting closer to the
-                // distance from which the full velocity is driven
-                return dist / config.fading;
-            }
-                // in case the travelled distance is close to goal position
-            else if ((initial_dist - dist) < config.fading) {
-                ROS_INFO("end fading");
-                // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
-                last_fading = (initial_dist - dist) / config.fading;
+        ROS_INFO_STREAM("plan position :"<<plan_iter<<" distance "<<dist);
+        // in case the travelled distance is close to start position
+        if (dist < config.fading) {
+            //ROS_INFO("start fading");
+            if (dist == 0.0) {
+                // return small factor in case of initial position to enable movement
+                // note: if max_velocity is zero, this factor will not matter
+                last_fading = config.max_lin_velocity / 10;
                 return last_fading;
             }
-            // for the part of the path when the velocity does not have to be influenced by a changing factor
-            last_fading = 1.0;
+            // returns a factor slowly increasing to 1 while getting closer to the
+            // distance from which the full velocity is driven
+            return dist / config.fading;
+        }
+            // in case the travelled distance is close to goal position
+        else if ((initial_dist - dist) < config.fading) {
+            //ROS_INFO("end fading");
+            // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
+            last_fading = (initial_dist - dist) / config.fading;
             return last_fading;
         }
+        // for the part of the path when the velocity does not have to be influenced by a changing factor
+        last_fading = 1.0;
+        return last_fading;
     }
 
     mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose){
@@ -929,8 +929,6 @@ namespace mesh_controller{
 
         // for recording - true = record, false = no record
         record = false;
-
-        initial_dist = std::numeric_limits<float>::max();
 
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig> > (
                 new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));
