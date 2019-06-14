@@ -433,8 +433,8 @@ namespace mesh_controller{
 
     std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
     {
+        ROS_INFO("1");
         mesh_map::Vector robot_heading = poseToDirectionVector(pose);
-        mesh_map::Vector robot_position = poseToPositionVector(pose);
         if(last_lookahead_call.isZero())
         {
             ROS_INFO("first time look ahead");
@@ -443,21 +443,21 @@ namespace mesh_controller{
         }
         ros::Time now = ros::Time::now();
         ros::Duration time_delta = now - last_lookahead_call;
-
+        ROS_INFO("2");
         // the faster the robot, the further the distance that can be travelled and therefore the look ahead
         double max_travelled_dist = velocity * time_delta.toSec();
         double max_dist_by_max_vel = config.max_lin_velocity * time_delta.toSec();
         // select how far to look ahead depending on the max travelled distance
-        int steps = (int)linValue(50.0, 0.0, 2*max_dist_by_max_vel, max_travelled_dist);
+        int steps = (int)linValue(current_plan.size(), 0.0, 2*max_dist_by_max_vel, max_travelled_dist);
+        ROS_INFO("3");
         if (steps == 0){
             // no look ahead when there is no linear velocity
             return {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
         }
+        ROS_INFO("4");
 
         // variable to add how many times the cost could not be calculated and therefore not added up
         int missed_steps = 0;
-        // variable carrying how far was actually looked ahead
-        int steps_originally = steps;
         // variable to store on which position of the plan a lethal vertex will be first encountered
         int lethal_step = 0;
         // variables to accumulate the cost and direction values of the future positions
@@ -465,7 +465,7 @@ namespace mesh_controller{
         float accum_turn = 0.0;
         // face handle to store the face of the position ahead
         lvr2::OptionalFaceHandle future_face = current_face;
-
+        ROS_INFO("5");
         // look ahead when using the planned path for navigation reference
 
         // adds up cost and angles of all steps ahead
@@ -475,23 +475,27 @@ namespace mesh_controller{
                 steps = i;
                 break;
             }
+            ROS_INFO("6");
             // gets the pose of the ahead position
             geometry_msgs::PoseStamped& pose_ahead = current_plan[plan_iter+i];
             // converts the pose to a position vector
             mesh_map::Vector pose_ahead_vec =  poseToPositionVector(pose_ahead);
             // finds the face which contains the current ahead face
             future_face = setAheadFace(future_face.unwrap(), pose_ahead_vec);
+            ROS_INFO("7");
 
             // find cost of the future position
             float new_cost = cost(future_face, pose_ahead_vec);
             if (new_cost == std::numeric_limits<float>::infinity() && lethal_step == 0){
                 ROS_INFO_STREAM("lethal vertex "<<i);
                 lethal_step = i;
+                ROS_INFO("8");
             } else if (new_cost == -1.0){
                 ROS_INFO("cost could not be accessed");
                 // cost could not be accessed
                 // CAUTION could lead to division by zero
                 missed_steps += 1;
+                ROS_INFO("9");
             } else {
                 mesh_map::Vector future_heading = poseToDirectionVector(current_plan[plan_iter + i]);
                 // get direction difference between current position and next position
@@ -502,6 +506,7 @@ namespace mesh_controller{
                 // accumulate cost and angle
                 accum_cost += new_cost;
                 accum_turn += (future_turn*leftRight);
+                ROS_INFO("10");
             }
         }
 
@@ -509,7 +514,7 @@ namespace mesh_controller{
         //  take averages of future values
         float av_cost = accum_cost / (steps - missed_steps);
         float av_turn = accum_turn / (steps - missed_steps);
-
+        ROS_INFO("11");
         return {av_turn, av_cost};
     }
 
@@ -532,6 +537,8 @@ namespace mesh_controller{
             current_face = map_ptr->getContainingFaceHandle(position_vec);
             if(!current_face){
                 ROS_ERROR("searched through mesh - no current face");
+            } else {
+                return;
             }
         } else {
             // search through neighbours of the last set face to find face that contains position
@@ -539,6 +546,8 @@ namespace mesh_controller{
             // if no neighbour is fond that contains position, call the function again
             if(!current_face){
                 setCurrentFace(position_vec);
+            } else {
+                return;
             }
         }
     }
@@ -619,6 +628,7 @@ namespace mesh_controller{
         // LINEAR movement
         float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
         float final_lin_vel;
+
         // check the size of the angle. If it is not more than about 35 degrees, integrate position costs to linear velocity
         if (angle < 0.6) {
             float cost_lin_vel = cost(position_vec);
@@ -639,6 +649,7 @@ namespace mesh_controller{
         // ADDITIONAL factors
         // look ahead
         std::vector<float> ahead_values = lookAhead(pose, set_linear_velocity);
+
         if(ahead_values[1] != std::numeric_limits<float>::max()) {
             // get the direction factor from the calculated ahead values
             float aheadLR = ahead_values[0]/abs(ahead_values[0]);
