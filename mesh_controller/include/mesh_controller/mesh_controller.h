@@ -215,6 +215,7 @@ namespace mesh_controller{
             void updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
 
             /**
+             * FOR PLANNED PATH NAVIGATION
              * Checks the difficulty of the next vertex / vertices (depending on velocity) to calculate a factor by which to change the velocity
              * @param pose          current position of the robot
              * @param velocity      speed of the robot
@@ -267,7 +268,7 @@ namespace mesh_controller{
              * @param plan_vec      vector of supposed position (necessary if using the mesh Gradient and not the plan)
              * @return              vector with new angular velocity and new linear velocity
              */
-            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity, mesh_map::Vector plan_vec);
+            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir);
 
             /**
              * Calls the pid controllers for the distance to the desired position and desired direction control and combines those
@@ -329,7 +330,6 @@ namespace mesh_controller{
 
             geometry_msgs::PoseStamped goal;
             geometry_msgs::PoseStamped plan_position;
-            float init_distance;
 
             // for pid control
             float int_dis_error;
@@ -340,15 +340,13 @@ namespace mesh_controller{
             bool goalSet;
             float set_linear_velocity;
 
-            // for mesh use
-            bool haveStartFace;
             lvr2::OptionalFaceHandle current_face;
             // angle between pose vector and planned / supposed vector
             float angle;
             // stores the current vector map containing vectors pointing to the source (path goal)
             lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
             // face handle to store the face of the position ahead
-            lvr2::OptionalFaceHandle ahead_face;
+            lvr2::OptionalFaceHandle mesh_ahead_face;
 
             // Server for Reconfiguration
             std::string name;
