@@ -117,9 +117,10 @@ namespace mesh_controller{
             /**
              * Results in a slow increase of velocity in the beginning and decrease towards end.
              * Can be modulated via fading variable.
+             * @param current pose of robot (for meshGradient use)
              * @return factor by which to multiply the linear velocity for smooth start and end
              */
-            float fadingFactor();
+            float fadingFactor(const geometry_msgs::PoseStamped& pose);
 
             /**
              * Transforms a PoseStamped into a direction mesh_map Vector
@@ -303,7 +304,7 @@ namespace mesh_controller{
              * @param face  face of the direction vector
              * @return      new vector (also updates the ahead_face handle to correspond to the new vector)
              */
-            lvr2::BaseVector<float> stepUpdate(mesh_map::Vector& vec, lvr2::FaceHandle face);
+            lvr2::BaseVector<float> meshAhead(mesh_map::Vector& vec, lvr2::FaceHandle face);
 
             void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
@@ -329,6 +330,8 @@ namespace mesh_controller{
             ros::Time last_lookahead_call;
 
             geometry_msgs::PoseStamped goal;
+            // distance between the current robot position and the goal - important when using mesh gradient
+            float goal_dist_mesh;
             geometry_msgs::PoseStamped plan_position;
 
             // for pid control
@@ -336,6 +339,7 @@ namespace mesh_controller{
             float int_dir_error;
             float prev_dis_error;
             float prev_dir_error;
+
 
             bool goalSet;
             float set_linear_velocity;

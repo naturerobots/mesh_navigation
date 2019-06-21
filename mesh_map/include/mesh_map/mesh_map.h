@@ -117,6 +117,8 @@ class MeshMap
 
   bool resetLayers();
 
+  const lvr2::DenseVertexMap<mesh_map::Vector>& getVectorMap(){return vector_map;};
+
   const lvr2::HalfEdgeMesh<Vector>& mesh(){return *mesh_ptr;}
 
   const lvr2::DenseVertexMap<float>& vertexCosts(){return vertex_costs;}

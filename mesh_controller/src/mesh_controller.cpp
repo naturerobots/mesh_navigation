@@ -48,9 +48,6 @@
 
 
 
-#include <fstream>
-#include <iostream>
-
 PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController, mbf_mesh_core::MeshController);
 
 namespace mesh_controller{
@@ -81,6 +78,8 @@ namespace mesh_controller{
 
         // set current face
         mesh_map::Vector pos_vec = poseToPositionVector(pose);
+
+
         setCurrentFace(pos_vec);
 
         // update to which position of the plan the robot is closest
@@ -101,12 +100,14 @@ namespace mesh_controller{
             // use supposed orientation from calculated path
             supposed_heading = poseToDirectionVector(plan_position);
         } else {
+            if(!current_face){
+                ROS_INFO("no current face for supposed heading");
+            }
             supposed_heading = map_ptr->directionAtPosition(current_face.unwrap(), pos_vec);
         }
 
         // variable to store the new angular and linear velocities
         std::vector<float> values(2);
-
 
         // used to change type of controller
         switch (config.control_type) {
@@ -132,12 +133,18 @@ namespace mesh_controller{
 
     bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
     {
+        float dist;
         // calculates the distance that is currently between the plan position and the goal
-        tf::Pose plan_pose, goal_pose;
-        tf::poseMsgToTF(plan_position.pose, plan_pose);
-        tf::poseMsgToTF(goal.pose, goal_pose);
+        if(!config.useMeshGradient){
+            tf::Pose plan_pose, goal_pose;
+            tf::poseMsgToTF(plan_position.pose, plan_pose);
+            tf::poseMsgToTF(goal.pose, goal_pose);
 
-        float dist = plan_pose.getOrigin().distance(goal_pose.getOrigin());
+            dist = plan_pose.getOrigin().distance(goal_pose.getOrigin());
+        } else {
+            dist = goal_dist_mesh;
+        }
+
 
         // test if robot is within tolerable distance to goal and if the heading has a tolerable distance to goal heading
         if (dist <= (float)dist_tolerance && angle <= (float)angle_tolerance){
@@ -156,6 +163,7 @@ namespace mesh_controller{
             current_plan.erase(current_plan.begin());
             goal = current_plan.back();
             initial_dist = std::numeric_limits<float>::max();
+            vector_map = map_ptr->getVectorMap();
             return true;
         }
         else {
@@ -168,9 +176,10 @@ namespace mesh_controller{
         return false;
     }
 
-    float MeshController::fadingFactor(){
-        float dist = 0.0;
+    float MeshController::fadingFactor(const geometry_msgs::PoseStamped& pose){
+        float last_fading;
         if (!config.useMeshGradient) {
+            float dist = 0.0;
             // calculate the distance between  the plan positions to get the plan length once
             if (initial_dist == std::numeric_limits<float>::max()) {
                 // transform the first pose of plan to a tf position vector
@@ -219,43 +228,78 @@ namespace mesh_controller{
                 tf_start_vec = tf_next_vec;
 
             }
-
+            // compare the now travelled distance with the path length
+            // in case the travelled distance is close to start position
+            if (dist < config.fading) {
+                if (dist == 0.0) {
+                    // return small factor in case of initial position to enable movement
+                    // note: if max_velocity is zero, this factor will not matter
+                    last_fading = config.max_lin_velocity / 10;
+                    return last_fading;
+                }
+                // returns a factor slowly increasing to 1 while getting closer to the
+                // distance from which the full velocity is driven
+                return dist / config.fading;
+            }
+                // in case the travelled distance is close to goal position
+            else if ((initial_dist - dist) < config.fading) {
+                // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
+                last_fading = (initial_dist - dist) / config.fading;
+                return last_fading;
+            }
+            // for the part of the path when the velocity does not have to be influenced by a changing factor
+            last_fading = 1.0;
+            return last_fading;
         } else {
+            // TODO change vectors to tf_vectors
             // When the mesh gradient is used only the beeline can be used to ESTIMATE the distance between
             // the start position and the goal as no knowledge about the path that will be travelled is available.
             // If this should be more accurate than a a path would have to be calculated which is not the intention
             // when using the mesh gradient for navigation.
             if (initial_dist == std::numeric_limits<float>::max()){
                 // the position from which the distance is calculated is the first pose of the robot
-                initial_dist = euclideanDistance(goal);
+                geometry_msgs::PoseStamped start_pose = current_plan.at(0);
+                mesh_map::Vector start_vec = poseToPositionVector(start_pose);
+                mesh_map::Vector goal_vec = poseToPositionVector(goal);
+
+                initial_dist = euclideanDistance(start_vec, goal_vec);
             }
 
-            // calculate the distance between the current robot position and the goal
-            dist = euclideanDistance(goal);
-        }
+            // calculate the distance between the current robot position and the start position as well as the
+            // distance between the current robot position and the goal position
+            geometry_msgs::PoseStamped start_pose = current_plan.at(0);
+            mesh_map::Vector start_vec = poseToPositionVector(start_pose);
+            mesh_map::Vector goal_vec = poseToPositionVector(goal);
+            mesh_map::Vector current_vec = poseToPositionVector(pose);
 
-        // compare the now travelled distance with the path length
-        // in case the travelled distance is close to start position
-        if (dist < config.fading) {
-            if (dist == 0.0) {
-                // return small factor in case of initial position to enable movement
-                // note: if max_velocity is zero, this factor will not matter
-                last_fading = config.max_lin_velocity / 10;
+            float dist_start = euclideanDistance(start_vec, current_vec);
+            float dist_goal = euclideanDistance(current_vec, goal_vec);
+            // set the global variable goal_dist_mesh to be able to check if the goal is reached
+            goal_dist_mesh = dist_goal;
+
+            // compare the now travelled distance with the path length
+            // in case the travelled distance is close to start position
+            if (dist_start < config.fading) {
+                if (dist_start == 0.0) {
+                    // return small factor in case of initial position to enable movement
+                    // note: if max_velocity is zero, this factor will not matter
+                    last_fading = config.max_lin_velocity / 10;
+                    return last_fading;
+                }
+                // returns a factor slowly increasing to 1 while getting closer to the
+                // distance from which the full velocity is driven
+                return dist_start / config.fading;
+            }
+            // in case the travelled distance is close to goal position
+            else if (dist_goal < config.fading) {
+                // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
+                last_fading = 1 - (dist_goal / config.fading);
                 return last_fading;
             }
-            // returns a factor slowly increasing to 1 while getting closer to the
-            // distance from which the full velocity is driven
-            return dist / config.fading;
-        }
-            // in case the travelled distance is close to goal position
-        else if ((initial_dist - dist) < config.fading) {
-            // returns a factor slowly decreasing to 0 the end of the full velocity towards the goal position
-            last_fading = (initial_dist - dist) / config.fading;
+            // for the part of the path when the velocity does not have to be influenced by a changing factor
+            last_fading = 1.0;
             return last_fading;
         }
-        // for the part of the path when the velocity does not have to be influenced by a changing factor
-        last_fading = 1.0;
-        return last_fading;
     }
 
     mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose){
@@ -415,7 +459,7 @@ namespace mesh_controller{
         iter = plan_iter;
 
         float dist = 0;
-        // look ahead
+        // look forward
         do{
             geometry_msgs::PoseStamped iter_pose = current_plan[iter];
             mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
@@ -431,6 +475,7 @@ namespace mesh_controller{
         iter = plan_iter;
         dist = 0.0;
 
+        // look back
         do{
             geometry_msgs::PoseStamped iter_pose = current_plan[iter];
             mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
@@ -450,7 +495,7 @@ namespace mesh_controller{
 
     std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
     {
-
+        ROS_INFO("look ahead start");
         mesh_map::Vector robot_heading = poseToDirectionVector(pose);
         mesh_map::Vector robot_position = poseToPositionVector(pose);
         // determine the time that has passed since the last look ahead
@@ -466,13 +511,25 @@ namespace mesh_controller{
 
         // the faster the robot, the further the distance that can be travelled and therefore the look ahead
         double max_travelled_dist = velocity * time_delta.toSec();
-        double max_dist_by_max_vel = config.max_lin_velocity * time_delta.toSec();
 
         // select how far to look ahead depending on the max travelled distance
-        int steps = (int)linValue(initial_dist, 0.0, 2*max_dist_by_max_vel, max_travelled_dist);
+        int steps;
+        if (!config.useMeshGradient){
+            // calculates approximately how many elements of the path have to be called and travelled along to
+            // reach the maximum distance that could be travelled with the given velocity
+            steps = (int)linValue(current_plan.size(), 0.0, 2*initial_dist, max_travelled_dist)-plan_iter;
+        } else {
+            // calculates how many steps ahead have to be checked when travelling in the current robot direction
+            // with the given velocity
+            steps = (int)(max_travelled_dist/0.03);
+        }
+
+
+        ROS_INFO_STREAM("step number "<<steps<<" init dist "<<initial_dist);
 
 
         if (steps == 0){
+            ROS_INFO("steps equal zero");
             // no look ahead when there is no linear velocity
             return {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
         }
@@ -490,17 +547,18 @@ namespace mesh_controller{
         if (!config.useMeshGradient){
             future_face = current_face;
         } else {
+            ROS_INFO("set ahead face with current face");
             mesh_ahead_face = current_face;
         }
 
 
-        // look ahead when using the planned path for navigation reference
-
+        float new_cost;
+        mesh_map::Vector ahead_position_vec;
+        mesh_map::Vector ahead_direction_vec;
         // adds up cost and angles of all steps ahead
-        for (int i = 0; i < steps; i++) {
-            float new_cost;
-            mesh_map::Vector ahead_position_vec;
-            mesh_map::Vector ahead_direction_vec;
+        for (int i = 0; i <= steps; i++) {
+            ROS_INFO("start for loop");
+            // look ahead when using the planned path for navigation reference
             if (!config.useMeshGradient) {
                 // in case look ahead extends planned path
                 if ((plan_iter + i) >= current_plan.size()) {
@@ -519,13 +577,17 @@ namespace mesh_controller{
 
                 // find cost of the future position
                 new_cost = cost(future_face, ahead_position_vec);
-            } else {
+            }
+            // look ahead for using mesh gradient for navigation reference
+            else {
                 if (i == 0){
-                    ahead_position_vec = stepUpdate(robot_position, mesh_ahead_face.unwrap());
+                    ahead_position_vec = meshAhead(robot_position, mesh_ahead_face.unwrap());
                 } else {
-                    ahead_position_vec = stepUpdate(ahead_position_vec, mesh_ahead_face.unwrap());
+                    ROS_INFO_STREAM("before ahead vector : "<<ahead_position_vec<<" before ahead face "<<mesh_ahead_face);
+                    ahead_position_vec = meshAhead(ahead_position_vec, mesh_ahead_face.unwrap());
                 }
                 ahead_direction_vec = map_ptr->directionAtPosition(mesh_ahead_face.unwrap(), ahead_position_vec);
+                ROS_INFO_STREAM("after ahead vector : "<<ahead_position_vec<<" after ahead face "<<mesh_ahead_face);
                 new_cost = cost(mesh_ahead_face, ahead_position_vec);
             }
 
@@ -544,16 +606,20 @@ namespace mesh_controller{
                                                         ahead_direction_vec);
                 // to determine in which direction to turn in future (neg for left, pos for right)
                 float leftRight = direction(robot_heading, ahead_direction_vec);
+                ROS_INFO_STREAM("new cost : "<<new_cost<<" direction "<<(future_turn*leftRight));
                 // accumulate cost and angle
                 accum_cost += new_cost;
                 accum_turn += (future_turn*leftRight);
             }
         }
 
-
+        if(accum_turn == 0.0){
+            ROS_INFO("accum_turn is zero");
+        }
         //  take averages of future values
-        float av_cost = accum_cost / (steps - missed_steps);
         float av_turn = accum_turn / (steps - missed_steps);
+        float av_cost = accum_cost / (steps - missed_steps);
+        ROS_INFO_STREAM("average turn "<<av_turn<<" average cost "<<av_cost);
         return {av_turn, av_cost};
     }
 
@@ -616,7 +682,6 @@ namespace mesh_controller{
     }
 
     lvr2::OptionalFaceHandle MeshController::searchNeighbourFaces(const mesh_map::Vector& pose_vec, const lvr2::FaceHandle face){
-
         std::list<lvr2::FaceHandle> possible_faces;
         possible_faces.push_back(face);
         std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
@@ -683,7 +748,10 @@ namespace mesh_controller{
                 }
             }
         }
+
         final_lin_vel = lin_vel_by_ang;
+        ROS_INFO_STREAM("ang velocity before lookAhead "<<final_ang_vel<<" lin "<<final_lin_vel);
+
 
         // ADDITIONAL factors
         // look ahead
@@ -717,7 +785,6 @@ namespace mesh_controller{
             final_lin_vel = (1.0-config.ahead_amount) * final_lin_vel + config.ahead_amount * final_ahead_lin_vel;
 
 
-
             // output: AHEAD angle publishing
             std_msgs::Float32 aheadAngle32;
             aheadAngle32.data = abs(ahead_values[0]) * 180 / M_PI;
@@ -729,9 +796,10 @@ namespace mesh_controller{
         }
 
         // TODO check if fadingFactor makes sense for mesh gradient use
-        final_lin_vel = final_lin_vel * fadingFactor();
+        final_lin_vel = final_lin_vel * fadingFactor(pose);
         // store new velocity to use as previous velocity
         set_linear_velocity = final_lin_vel;
+        ROS_INFO_STREAM("final angular vel "<<final_ang_vel<<" final linear vel "<<final_lin_vel);
 
         return {final_ang_vel, final_lin_vel};
 
@@ -866,69 +934,77 @@ namespace mesh_controller{
         return angular;//*leftRight;
     }
 
-    lvr2::BaseVector<float> MeshController::stepUpdate(mesh_map::Vector& vec, lvr2::FaceHandle face){
-        // clear vector field map
-        vector_map.clear();
+    lvr2::BaseVector<float> MeshController::meshAhead(mesh_map::Vector& vec, lvr2::FaceHandle face){
 
         const auto& face_normals = map_ptr->faceNormals();
 
-        bool foundConnectedFace = false;
-        std::list<lvr2::FaceHandle> possible_faces;
-        std::vector<lvr2::FaceHandle> neighbour_faces;
-        map_ptr->mesh_ptr->getNeighboursOfFace(face, neighbour_faces);
-        possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
-        std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
+        constexpr float step_width = 0.03;
+
+        // steps to take to project vector onto face
+        lvr2::FaceHandle used_face = face;
+        auto face_vertices = map_ptr->mesh_ptr->getVerticesOfFace(used_face);
+        auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(used_face);
+        mesh_map::Vector normal_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[used_face]);
+
         mesh_map::Vector dir;
-        float step_width = 0.03;
 
-        // Set start distance to zero
-        // add start vertex to priority queue
-        for(auto vH : map_ptr->mesh_ptr->getVerticesOfFace(face))
+
+        float u, v;
+        // check if vector is in current face
+        if(mesh_map::barycentricCoords(normal_vec, vertices[0], vertices[1], vertices[2], u, v))
         {
-            const mesh_map::Vector diff = vec - map_ptr->mesh_ptr->getVertexPosition(vH);
-            vector_map.insert(vH, diff);
+            float w = 1 - u - v;
+            dir = ( vector_map[face_vertices[0]]*u + vector_map[face_vertices[1]]*v + vector_map[face_vertices[2]]*w ).normalized() * step_width;
         }
-
-        int cnt = 0;
-        int max = 40; // TODO to config
-
-        while(possible_faces.end() != current && max != cnt++)
+        else
         {
-            lvr2::FaceHandle fH = *current;
-            auto vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(fH);
-            auto face_vertices = map_ptr->mesh_ptr->getVerticesOfFace(fH);
-            float u, v;
+            bool foundConnectedFace = false;
+            std::list<lvr2::FaceHandle> possible_faces;
+            std::vector<lvr2::FaceHandle> neighbour_faces;
+            map_ptr->mesh_ptr->getNeighboursOfFace(face, neighbour_faces);
+            possible_faces.insert(possible_faces.end(), neighbour_faces.begin(), neighbour_faces.end());
+            std::list<lvr2::FaceHandle>::iterator current = possible_faces.begin();
 
-            // Projection onto the triangle plane
-            mesh_map::Vector tmp_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
+            int cnt = 0;
+            int max = 40; // TODO to config
 
-            // Check if the projected point lies in the current testing face
-            if(vector_map.containsKey(face_vertices[0]) && vector_map.containsKey(face_vertices[1]) && vector_map.containsKey(face_vertices[2])
-               && mesh_map::barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
+            while(possible_faces.end() != current && max != cnt++)
             {
-                foundConnectedFace = true;
-                // update ahead_face as face of the new vector
-                mesh_ahead_face = fH;
-                vec = tmp_vec;
-                float w = 1 - u - v;
-                dir = ( vector_map[face_vertices[0]]*u + vector_map[face_vertices[1]]*v + vector_map[face_vertices[2]]*w ).normalized() * step_width ;
-                break;
+                // steps to take to project vector onto neighbour face
+                lvr2::FaceHandle fH = *current;
+                vertices = map_ptr->mesh_ptr->getVertexPositionsOfFace(fH);
+                face_vertices = map_ptr->mesh_ptr->getVerticesOfFace(fH);
+                mesh_map::Vector tmp_vec = mesh_map::projectVectorOntoPlane(vec, vertices[0], face_normals[fH]);
+
+                // Check if the projected point lies in the current testing face
+                if(vector_map.containsKey(face_vertices[0]) && vector_map.containsKey(face_vertices[1]) && vector_map.containsKey(face_vertices[2])
+                   && mesh_map::barycentricCoords(tmp_vec, vertices[0], vertices[1], vertices[2], u, v))
+                {
+                    foundConnectedFace = true;
+                    used_face = fH;
+                    vec = tmp_vec;
+                    float w = 1 - u - v;
+                    dir = ( vector_map[face_vertices[0]]*u + vector_map[face_vertices[1]]*v + vector_map[face_vertices[2]]*w ).normalized() * step_width ;
+                    break;
+                }
+                else
+                {
+                    // add neighbour of neighbour, if we overstep a small face or the peak of it
+                    std::vector<lvr2::FaceHandle> nn_faces;
+                    map_ptr->mesh_ptr->getNeighboursOfFace(fH, nn_faces);
+                    possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
+                }
+                current++;
             }
-            else
-            {
-                // add neighbour of neighbour, if we overstep a small face or the peak of it
-                std::vector<lvr2::FaceHandle> nn_faces;
-                map_ptr->mesh_ptr->getNeighboursOfFace(fH, nn_faces);
-                possible_faces.insert(possible_faces.end(), nn_faces.begin(), nn_faces.end());
+            if(!foundConnectedFace){
+                ROS_ERROR_STREAM("Sample path failed! Could not find a connected face in vector direction!");
+                return lvr2::BaseVector<float>();
             }
-            current++;
         }
 
-        if(!foundConnectedFace){
-            return lvr2::BaseVector<float>();
-        }
-
+        mesh_ahead_face = used_face;
         return vec + dir;
+
     }
 
     /*

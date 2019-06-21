@@ -199,6 +199,7 @@ namespace mesh_planner{
             const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
             vector_map.insert(v3, dirVec);
         }
+        mesh_map->setVectorMap(vector_map);
     }
 
     uint32_t MeshPlanner::waveFrontPropagation(
