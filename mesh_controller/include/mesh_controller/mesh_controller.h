@@ -146,15 +146,6 @@ namespace mesh_controller{
             float angleBetweenVectors(mesh_map::Vector pos, mesh_map::Vector plan);
 
             /**
-             * A *tangens* function to return a phased response value given a value
-             * @param max_hight     maximum value that will be returned
-             * @param max_width     range that the given value can take before the maximum is returned
-             * @param value         value on x axis
-             * @return              value on y axis that corresponds to input value
-             */
-            float tanValue(float max_hight, float max_width, float value);
-
-            /**
              * A linear function to return a phased response value given a value
              * @param max_hight     maximum value that will be returned
              * @param x_axis        determines the intersection point with the x-axis
@@ -163,15 +154,6 @@ namespace mesh_controller{
              * @return              value on y axis that corresponds to input value
              */
             float linValue(float max_hight, float x_axis, float max_width, float value);
-
-            /**
-             * A parabola function to return a phased response value given a value
-             * @param max_hight     maximum value that will be returned
-             * @param max_width     range that the given value can take before the maximum is returned
-             * @param value         value on x axis
-             * @return              value on y axis that corresponds to input value
-             */
-            float parValue(float max_hight, float max_width, float value);
 
             /**
              * A *normal distribution / gaussian* function to return a phased response value given a value

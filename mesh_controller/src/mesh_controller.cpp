@@ -94,22 +94,19 @@ namespace mesh_controller{
             }
         }
 
-        // variable that contains the planned / supposed orientation of the robot
+        // variable that contains the planned / supposed orientation of the robot at the current position
         mesh_map::Vector supposed_heading;
         if (!config.useMeshGradient) {
             // use supposed orientation from calculated path
             supposed_heading = poseToDirectionVector(plan_position);
         } else {
-            if(!current_face){
-                ROS_INFO("no current face for supposed heading");
-            }
             supposed_heading = map_ptr->directionAtPosition(current_face.unwrap(), pos_vec);
         }
 
         // variable to store the new angular and linear velocities
         std::vector<float> values(2);
 
-        // used to change type of controller
+        // used to select type of controller used
         switch (config.control_type) {
             case 0:
                 values = naiveControl(pose, supposed_heading);
@@ -160,9 +157,13 @@ namespace mesh_controller{
         if (!plan.empty()) {
             // assign given plan to current_plan variable to make it usable for navigation
             current_plan = plan;
+            // erase first plan pose as it (usually) contains a unuseful direction
             current_plan.erase(current_plan.begin());
+            // set goal according to plan
             goal = current_plan.back();
+            // set initial distance as infinite as indicator for later initializations
             initial_dist = std::numeric_limits<float>::max();
+            // set the variable vector_map with the current vector map
             vector_map = map_ptr->getVectorMap();
             return true;
         }
@@ -177,10 +178,10 @@ namespace mesh_controller{
     }
 
     float MeshController::fadingFactor(const geometry_msgs::PoseStamped& pose){
-        float last_fading;
+        // calculating the fading factor when using the path for naviagation
         if (!config.useMeshGradient) {
             float dist = 0.0;
-            // calculate the distance between  the plan positions to get the plan length once
+            // calculate the distance between neighbouring plan positions to get the whole path length
             if (initial_dist == std::numeric_limits<float>::max()) {
                 // transform the first pose of plan to a tf position vector
                 tf::Vector3 tf_start_vec;
@@ -190,8 +191,7 @@ namespace mesh_controller{
 
                 tf::Vector3 tf_next_vec;
                 float update_dist = 0.0;
-                // go through plan and add up each distance between the current and its following position
-                // to get the length of the whole path
+
                 for (int i = 1; i < current_plan.size(); i++) {
                     // get the next pose of the plan and transform it to a tf position vector
                     geometry_msgs::PoseStamped next_pose = current_plan.at(i);
@@ -250,8 +250,9 @@ namespace mesh_controller{
             // for the part of the path when the velocity does not have to be influenced by a changing factor
             last_fading = 1.0;
             return last_fading;
-        } else {
-            // TODO change vectors to tf_vectors
+        }
+        // for mesh gradient use
+        else {
             // When the mesh gradient is used only the beeline can be used to ESTIMATE the distance between
             // the start position and the goal as no knowledge about the path that will be travelled is available.
             // If this should be more accurate than a a path would have to be calculated which is not the intention
@@ -324,48 +325,16 @@ namespace mesh_controller{
         return tf_robot.angle(tf_planned);
     }
 
-    float MeshController::tanValue(float max_hight, float max_width, float value){
-        // as tangens goes to pos and neg infinity and never meets the width borders,
-        // they have to be checked individually
-        if (value >= max_width/2){
-            return max_hight;
-        } else if (value <= max_width/(-2)) {
-            return -max_hight;
-        }
-
-
-        // to widen or narrow the curve
-        float width = max_width/M_PI;
-        // to compress tangens
-        float compress = max_hight/(tan(value*width));
-
-        // calculating corresponding y-value
-        float result = compress*tan(value * width);
-        // limit max and min return (just in case)
-        if (result > max_hight){
-            return max_hight;
-        } else if (result < -max_hight) {
-            return -max_hight;
-        }
-        return result;
-    }
-
     float MeshController::linValue(float max_hight, float x_axis, float max_width, float value){
+        // checking higher and lower boarders
         if (value > max_width/2){
             return max_hight;
         } else if (value < -max_width/2){
             return -max_hight;
         }
+        // calculating the incline of the linear function
         float incline = max_hight / (max_width/2);
         return abs(incline * (value + x_axis));
-    }
-
-    float MeshController::parValue(float max_hight, float max_width, float value){
-        if (value > max_width/2){
-            return max_hight;
-        }
-        float shape = max_hight / pow((max_width/2), 2);
-        return shape*pow(value, 2);
     }
 
     float MeshController::gaussValue(float max_hight, float max_width, float value){
@@ -400,8 +369,10 @@ namespace mesh_controller{
         float tf_dot_prod = tf_cross_prod.dot(tf_up);
 
         if (tf_dot_prod < 0.0) {
+            // left turn
             return 1.0;
         } else {
+            // right turn
             return -1.0;
         }
     }
@@ -409,31 +380,29 @@ namespace mesh_controller{
     bool MeshController::offPlan(const geometry_msgs::PoseStamped& robot_pose){
         // transform the first pose of plan to a tf position vector
         mesh_map::Vector robot_vec = poseToPositionVector(robot_pose);
-        tf::Vector3 tf_robot_vec = {robot_vec.x, robot_vec.y, robot_vec.z};
         mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
-        tf::Vector3 tf_plan_vec = {plan_vec.x, plan_vec.y, plan_vec.z};
 
-        if(tf_robot_vec.distance(tf_plan_vec) > config.off_plan){
+        if(euclideanDistance(robot_vec, plan_vec) > config.off_plan){
             return true;
         }
         return false;
     }
 
     float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose){
-        // https://en.wikipedia.org/wiki/Euclidean_distance
+        mesh_map::Vector pose_vec = poseToPositionVector(pose);
+        tf::Vector3 tf_pose_vec = {pose_vec.x, pose_vec.y, pose_vec.z};
 
-        // transform position of poses to position vectors
-        lvr2::BaseVector<float> pose_vector = {(float)pose.pose.position.x, (float)pose.pose.position.y, (float)pose.pose.position.z};
-        lvr2::BaseVector<float> plan_vector = {(float)plan_position.pose.position.x, (float)plan_position.pose.position.y, (float)plan_position.pose.position.z};
+        mesh_map::Vector goal_vec = poseToPositionVector(goal);
+        tf::Vector3 tf_goal_vec = {goal_vec.x, goal_vec.y, goal_vec.z};
 
-        return euclideanDistance(pose_vector, plan_vector);
+        return tf_pose_vec.distance(tf_goal_vec);
     }
 
     float MeshController::euclideanDistance(lvr2::BaseVector<float>& current, lvr2::BaseVector<float>& planned){
-        float power = 2.0;
-        // calculate the euclidean distance of two position vectors
-        float dist = sqrtf((pow((planned.x-current.x),power) + pow((planned.y-current.y),power) + pow((planned.z-current.z),power)));
-        return dist;
+        tf::Vector3 tf_current_vec = {current.x, current.y, current.z};
+        tf::Vector3 tf_planned_vec = {planned.x, planned.y, planned.z};
+
+        return tf_current_vec.distance(tf_planned_vec);
     }
 
     void MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity){
