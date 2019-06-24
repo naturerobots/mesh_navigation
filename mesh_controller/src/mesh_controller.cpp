@@ -100,23 +100,37 @@ namespace mesh_controller{
             // use supposed orientation from calculated path
             supposed_heading = poseToDirectionVector(plan_position);
         } else {
-            supposed_heading = map_ptr->directionAtPosition(current_face.unwrap(), pos_vec);
+            auto vertices = map_ptr->mesh_ptr->getVerticesOfFace(current_face.unwrap());
+            if (vector_map.containsKey(vertices[0]) && vector_map.containsKey(vertices[1]) && vector_map.containsKey(vertices[2])){
+                ROS_INFO("vertex exists in map");
+            } else {
+                ROS_INFO("vertex NOT in map");
+            }
+            float u, v, w;
+            if(map_ptr->barycentricCoords(pos_vec, current_face.unwrap(), u, v))
+            {
+                w = 1 - u - v;
+                supposed_heading = vector_map[vertices[0]] * u + vector_map[vertices[1]] * v + vector_map[vertices[2]] * w;
+            }
+            /*
+            try{
+                supposed_heading = map_ptr->directionAtPosition(current_face.unwrap(), pos_vec);
+            } catch(...) {
+                auto vertices = map_ptr->mesh_ptr->getVerticesOfFace(current_face.unwrap());
+                if(vector_map.containsKey(vertices[0])){
+                    ROS_ERROR("vertex found in vector map");
+                } else {
+                    ROS_ERROR("vertex NOT found in vector map");
+                }
+            }*/
         }
 
         // variable to store the new angular and linear velocities
         std::vector<float> values(2);
 
-        // used to select type of controller used
-        switch (config.control_type) {
-            case 0:
-                values = naiveControl(pose, supposed_heading);
-                break;
-            case 1:
-                values = pidControl(pose, pose, velocity);
-                break;
-            default:
-                return mbf_msgs::GetPathResult::NOT_INITIALIZED;
-        }
+        // determine values via naive controller
+        values = naiveControl(pose, supposed_heading);
+
 
         if (values[1] == std::numeric_limits<float>::max()){
             return mbf_msgs::GetPathResult::FAILURE;
@@ -406,79 +420,93 @@ namespace mesh_controller{
     }
 
     void MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity){
+        // checking if the function has been called before
+        // if not - set the time for the first time
         if(last_call.isZero())
         {
             last_call = ros::Time::now();
+            // initialize the iterator for the planned path with zero = start position
             plan_iter = 0;
             return;
         }
+        // calculate the time between now and the last call of the function
         ros::Time now = ros::Time::now();
         ros::Duration time_delta = now - last_call;
 
-        // the faster the robot, the further the robot might have travelled on the planned path
+        // determine the maximum distance that the robot could have driven between the last function call
+        // and now based on its velocity
+        // reason : the faster the robot, the further the robot might have travelled on the planned path
         double max_dist = velocity * time_delta.toSec();
         float min_dist = std::numeric_limits<float>::max();
 
-        tf::Vector3 tf_robot_vec, tf_iter_vec;
+        // transform the current robot pose to a position vector
         mesh_map::Vector robot_vec = poseToPositionVector(pose);
-        mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
-        tf_robot_vec = {robot_vec.x, robot_vec.y, robot_vec.z};
 
         int iter, ret_iter;
+        // iterator from which to start search
         iter = plan_iter;
 
         float dist = 0;
-        // look forward
+        // look forward on the plan and check if another position on the plan is closer to the robot
         do{
+            // get the position on the path
             geometry_msgs::PoseStamped iter_pose = current_plan[iter];
+            // transform it to a position vector
             mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
-            tf_iter_vec = {iter_vec.x, iter_vec.y, iter_vec.z};
-            dist = tf_robot_vec.distance(tf_iter_vec);
+            // calculate the distance between the robot position and the planned path position
+            dist = euclideanDistance(robot_vec, iter_vec);
+            // if the distance is smaller than the previously calculated one, save the values
             if(dist < min_dist){
                 ret_iter = iter;
                 min_dist = dist;
             }
             iter++;
-        } while(dist > max_dist && iter < current_plan.size());
+        }
+        // repeat this until either the maximum travelled distance is reached or the planned path ends
+        while(dist > max_dist && iter < current_plan.size());
 
+        // reset iterator
         iter = plan_iter;
-        dist = 0.0;
 
-        // look back
+        // look back, as above but going backwards through the plan
         do{
             geometry_msgs::PoseStamped iter_pose = current_plan[iter];
             mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
-            tf_iter_vec = {iter_vec.x, iter_vec.y, iter_vec.z};
-            dist = tf_robot_vec.distance(tf_iter_vec);
+            dist = euclideanDistance(robot_vec, iter_vec);
             if(dist < min_dist){
                 ret_iter = iter;
                 min_dist = dist;
             }
             iter--;
-        } while(dist > max_dist && iter >= 0);
+        }
+        // do this until either the maximum travelled distance is or the start of the planned path is reached
+        while(dist > max_dist && iter >= 0);
 
+        // update the values
+        // plan iter becomes the iterator of the position with the smallest distance to the robot
         plan_iter = ret_iter;
+        // plan position becomes the position of the plan with the smallest distance to the robot
         plan_position = current_plan[plan_iter];
         last_call = now;
     }
 
     std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
     {
-        ROS_INFO("look ahead start");
         mesh_map::Vector robot_heading = poseToDirectionVector(pose);
         mesh_map::Vector robot_position = poseToPositionVector(pose);
-        // determine the time that has passed since the last look ahead
-        // to later calculate the possibly travelled distance
+
+        // initialize time of last look ahead call when function has not been called before
         if(last_lookahead_call.isZero())
         {
-            ROS_INFO("first time look ahead");
             last_lookahead_call = ros::Time::now();
             return {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
         }
+        // determine the time that has passed since the last look ahead
         ros::Time now = ros::Time::now();
         ros::Duration time_delta = now - last_lookahead_call;
 
-        // the faster the robot, the further the distance that can be travelled and therefore the look ahead
+        // calculate the maximum distance the robot could have travelled since the last function call
+        // because: the faster the robot, the further the distance that may be travelled and therefore the look ahead
         double max_travelled_dist = velocity * time_delta.toSec();
 
         // select how far to look ahead depending on the max travelled distance
@@ -489,17 +517,15 @@ namespace mesh_controller{
             steps = (int)linValue(current_plan.size(), 0.0, 2*initial_dist, max_travelled_dist)-plan_iter;
         } else {
             // calculates how many steps ahead have to be checked when travelling in the current robot direction
-            // with the given velocity
+            // with the given velocity by dividing it through the step size that is later used
+            // therefore the look ahead will be as far as the maximum travelled distance
             steps = (int)(max_travelled_dist/0.03);
         }
 
 
-        ROS_INFO_STREAM("step number "<<steps<<" init dist "<<initial_dist);
-
-
         if (steps == 0){
-            ROS_INFO("steps equal zero");
             // no look ahead when there is no linear velocity
+            // values have to be dealt with after function call
             return {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
         }
 
@@ -513,20 +539,18 @@ namespace mesh_controller{
         float accum_turn = 0.0;
         // face handle to store the face of the position ahead
         lvr2::OptionalFaceHandle future_face;
+        // initialize the face ahead with the current face
         if (!config.useMeshGradient){
             future_face = current_face;
         } else {
-            ROS_INFO("set ahead face with current face");
             mesh_ahead_face = current_face;
         }
-
 
         float new_cost;
         mesh_map::Vector ahead_position_vec;
         mesh_map::Vector ahead_direction_vec;
         // adds up cost and angles of all steps ahead
         for (int i = 0; i <= steps; i++) {
-            ROS_INFO("start for loop");
             // look ahead when using the planned path for navigation reference
             if (!config.useMeshGradient) {
                 // in case look ahead extends planned path
@@ -549,14 +573,16 @@ namespace mesh_controller{
             }
             // look ahead for using mesh gradient for navigation reference
             else {
+                // if the step size is zero, check one step from current robot position
                 if (i == 0){
                     ahead_position_vec = meshAhead(robot_position, mesh_ahead_face.unwrap());
-                } else {
-                    ROS_INFO_STREAM("before ahead vector : "<<ahead_position_vec<<" before ahead face "<<mesh_ahead_face);
+                }
+                // otherwise use the previously calculated ahead face and position to calculate the next step
+                else {
                     ahead_position_vec = meshAhead(ahead_position_vec, mesh_ahead_face.unwrap());
                 }
+                // determine the direction and cost at the new positions
                 ahead_direction_vec = map_ptr->directionAtPosition(mesh_ahead_face.unwrap(), ahead_position_vec);
-                ROS_INFO_STREAM("after ahead vector : "<<ahead_position_vec<<" after ahead face "<<mesh_ahead_face);
                 new_cost = cost(mesh_ahead_face, ahead_position_vec);
             }
 
@@ -575,20 +601,20 @@ namespace mesh_controller{
                                                         ahead_direction_vec);
                 // to determine in which direction to turn in future (neg for left, pos for right)
                 float leftRight = direction(robot_heading, ahead_direction_vec);
-                ROS_INFO_STREAM("new cost : "<<new_cost<<" direction "<<(future_turn*leftRight));
                 // accumulate cost and angle
                 accum_cost += new_cost;
                 accum_turn += (future_turn*leftRight);
             }
         }
 
-        if(accum_turn == 0.0){
-            ROS_INFO("accum_turn is zero");
+
+        if ((steps - missed_steps) <= 0 || steps <= 0) {
+            return {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
         }
         //  take averages of future values
         float av_turn = accum_turn / (steps - missed_steps);
         float av_cost = accum_cost / (steps - missed_steps);
-        ROS_INFO_STREAM("average turn "<<av_turn<<" average cost "<<av_cost);
+
         return {av_turn, av_cost};
     }
 
@@ -678,231 +704,6 @@ namespace mesh_controller{
         return lvr2::OptionalFaceHandle();
     }
 
-    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir) {
-        mesh_map::Vector dir_vec = poseToDirectionVector(pose);
-        mesh_map::Vector position_vec = poseToPositionVector(pose);
-
-        // ANGULAR MOVEMENT
-        // calculate angle between orientation vectors
-        // angle will never be negative and smaller or equal to pi
-        angle = angleBetweenVectors(dir_vec, supposed_dir);
-
-        // output: angle publishing
-        std_msgs::Float32 angle32;
-        angle32.data = angle * 180 / M_PI;
-        angle_pub.publish(angle32);
-
-        // to determine in which direction to turn (neg for left, pos for right)
-        float leftRight = direction(dir_vec, supposed_dir);
-
-        // calculate a direction velocity depending on the turn direction and difference angle
-        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
-
-        // LINEAR movement
-        float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
-        float final_lin_vel;
-
-        // check the size of the angle. If it is not more than about 35 degrees, integrate position costs to linear velocity
-        if (angle < 0.6) {
-            float cost_lin_vel = cost(position_vec);
-            // in case current vertex is a lethal vertex
-            if (cost_lin_vel != std::numeric_limits<float>::max()) {
-                // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
-                float lin_factor_by_cost = linValue(config.max_lin_velocity/10,  0.0, 2.0, cost_lin_vel);
-                lin_vel_by_ang -= lin_factor_by_cost;
-                if (lin_vel_by_ang < 0.0) {
-                    lin_vel_by_ang = 0.0;
-                } else if (lin_vel_by_ang > config.max_lin_velocity) {
-                    lin_vel_by_ang = config.max_lin_velocity;
-                }
-            }
-        }
-
-        final_lin_vel = lin_vel_by_ang;
-        ROS_INFO_STREAM("ang velocity before lookAhead "<<final_ang_vel<<" lin "<<final_lin_vel);
-
-
-        // ADDITIONAL factors
-        // look ahead
-        std::vector<float> ahead_values = lookAhead(pose, set_linear_velocity);
-
-        if(ahead_values[1] != std::numeric_limits<float>::max()) {
-            // get the direction factor from the calculated ahead values
-            float aheadLR = ahead_values[0]/abs(ahead_values[0]);
-            // calculating angular velocity based on angular ahead value
-            float final_ahead_ang_vel = aheadLR * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, abs(ahead_values[0]));
-            // calculating linear value based on angular ahead value
-            float ahead_lin_vel = gaussValue(config.max_lin_velocity, 2 * M_PI, abs(ahead_values[0]));
-            float final_ahead_lin_vel;
-            if (abs(ahead_values[0]) < 0.6) {
-                // in case current vertex is a lethal vertex
-                if (ahead_values[1] != std::numeric_limits<float>::max()) {
-                    // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
-                    float lin_ahead_by_cost = linValue(config.max_lin_velocity/10,  0.0, 2.0, ahead_values[1]);
-                    ahead_lin_vel -= lin_ahead_by_cost;
-                    if (ahead_lin_vel < 0.0) {
-                        ahead_lin_vel = 0.0;
-                    } else if (ahead_lin_vel > config.max_lin_velocity) {
-                        ahead_lin_vel = config.max_lin_velocity;
-                    }
-                }
-            }
-            final_ahead_lin_vel = ahead_lin_vel;
-
-            // calculating the velocities by proportionally, combining the look ahead velocity with the velocity (without look ahead)
-            final_ang_vel = (1.0-config.ahead_amount) * final_ang_vel + config.ahead_amount * final_ahead_ang_vel;
-            final_lin_vel = (1.0-config.ahead_amount) * final_lin_vel + config.ahead_amount * final_ahead_lin_vel;
-
-
-            // output: AHEAD angle publishing
-            std_msgs::Float32 aheadAngle32;
-            aheadAngle32.data = abs(ahead_values[0]) * 180 / M_PI;
-            ahead_angle_pub.publish(aheadAngle32);
-            // output: AHEAD angle publishing
-            std_msgs::Float32 aheadCost32;
-            aheadCost32.data = ahead_values[1];
-            ahead_cost_pub.publish(aheadCost32);
-        }
-
-        // TODO check if fadingFactor makes sense for mesh gradient use
-        final_lin_vel = final_lin_vel * fadingFactor(pose);
-        // store new velocity to use as previous velocity
-        set_linear_velocity = final_lin_vel;
-        ROS_INFO_STREAM("final angular vel "<<final_ang_vel<<" final linear vel "<<final_lin_vel);
-
-        return {final_ang_vel, final_lin_vel};
-
-
-/*        // dynamic obstacle avoidance
-
-
-        // adding or subtracting percentage of previously set angular velocity (turn_angle diff) depending on angular ahead factor
-        // combine the basic velocity calculations with the look ahead
-        float ahead_ang;
-        if(ahead_factor[0] < 0){
-            ahead_ang = turn_angle_diff - (1-(ahead_factor[0] / turn_angle_diff));
-        } else if (ahead_factor[0] > 0){
-            ahead_ang = turn_angle_diff + (1-(ahead_factor[0] / turn_angle_diff));
-        } else {
-            ahead_ang = turn_angle_diff;
-        }
-
-        // adding or subtracting percentage of previously set linear velocity (vel_given_angle) depending on linear ahead factor
-        float ahead_lin;
-        if (ahead_factor[1] < 0){
-            ahead_lin = vel_given_angle - (1-(ahead_factor[1] / vel_given_angle));
-        } else if (ahead_factor[1] > 0){
-            ahead_lin = vel_given_angle + (1-(ahead_factor[1] / vel_given_angle));
-        } else{
-            ahead_lin = vel_given_angle;
-        }
-
-        // setting linear velocity depending on robot position in relation to start / goal
-        float new_vel = start * end * ahead_lin;
-
-        return {ahead_ang, new_vel};
-*/
-    }
-
-    std::vector<float> MeshController::pidControl(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv, const geometry_msgs::TwistStamped& velocity){
-        // LINEAR movement
-        float linear_vel = pidControlDistance(setpoint, pv);
-        // ANGULAR movement
-        const mesh_map::Vector& angular_sp = poseToDirectionVector(setpoint);
-        const mesh_map::Vector& angular_pv = poseToDirectionVector(pv);
-        float angular_vel = pidControlDir(angular_sp, angular_pv, pv);
-
-        // ADDITIONAL factors
-        // to regulate linear velocity depending on angular velocity (higher angular vel => lower linear vel)
-        float vel_given_angle = linear_vel - ((angular_vel/config.max_ang_velocity) * linear_vel);
-
-        std::vector<float> ahead = lookAhead(pv, velocity.twist.linear.x);
-
-
-        // adding or subtracting percentage of previously set angular velocity (turn_angle diff) depending on angular ahead factor
-        // combine the basic velocity calculations with the look ahead
-        float ahead_ang;
-        if(ahead[0] < 0){
-            ahead_ang = angular_vel - (1-(ahead[0] / angular_vel));
-        } else if (ahead[0] > 0){
-            ahead_ang = angular_vel + (1-(ahead[0] / angular_vel));
-        } else {
-            ahead_ang = angular_vel;
-        }
-
-        // adding or subtracting percentage of previously set linear velocity (vel_given_angle) depending on linear ahead factor
-        float ahead_lin;
-        if (ahead[1] < 0){
-            ahead_lin = vel_given_angle - (1-(ahead[1] / vel_given_angle));
-        } else if (ahead[1] > 0){
-            ahead_lin = vel_given_angle + (1-(ahead[1] / vel_given_angle));
-        } else{
-            ahead_lin = vel_given_angle;
-        }
-
-        return {ahead_ang, ahead_lin};
-    }
-
-    float MeshController::pidControlDistance(const geometry_msgs::PoseStamped& setpoint, const geometry_msgs::PoseStamped& pv){
-        // setpoint is desired position, pv is actual position
-        // https://gist.github.com/bradley219/5373998
-
-        float error = euclideanDistance(setpoint);
-
-        // proportional part
-        float proportional = config.prop_dis_gain * error;
-
-        // integral part
-        int_dis_error += (error * config.int_time);
-        float integral = config.int_dis_gain * int_dis_error;
-
-        // derivative part
-        float derivative = config.deriv_dis_gain * ((error - prev_dis_error) / config.int_time);
-
-        float linear = proportional + integral + derivative;
-
-        // TODO check if max and min output useful
-        //if( output > _max )
-        //    output = _max;
-        //else if( output < _min )
-        //    output = _min;
-
-        prev_dis_error = error;
-        return linear;
-    }
-
-    float MeshController::pidControlDir(const mesh_map::Vector& setpoint, const mesh_map::Vector& pv, const geometry_msgs::PoseStamped& pv_pose){
-        // setpoint is desired direction, pv is actual direction
-        // https://gist.github.com/bradley219/5373998
-
-        float dir_error = angleBetweenVectors(setpoint, pv);
-
-        // proportional part
-        float proportional = config.prop_dir_gain * dir_error;
-
-        // integral part
-        int_dir_error += (dir_error * config.int_time);
-        float integral = config.int_dir_gain * int_dir_error;
-
-        // derivative part
-        float derivative = config.deriv_dir_gain * ((dir_error - prev_dir_error) / config.int_time);
-
-        float angular = proportional + integral + derivative;
-
-        // TODO check if max and min output useful
-        //if( output > _max )
-        //    output = _max;
-        //else if( output < _min )
-        //    output = _min;
-
-        prev_dir_error = dir_error;
-
-        // to determine in which direction to turn (neg for left, pos for right)
-        //float leftRight = direction(pv_pose, setpoint);
-
-        return angular;//*leftRight;
-    }
-
     lvr2::BaseVector<float> MeshController::meshAhead(mesh_map::Vector& vec, lvr2::FaceHandle face){
 
         const auto& face_normals = map_ptr->faceNormals();
@@ -976,35 +777,101 @@ namespace mesh_controller{
 
     }
 
-    /*
-    void MeshController::obstacleAvoidance(pose, mesh_map, path){
-        // make new measurement + make mesh layer of it
-        // compare new measurement to old one - find new lethal faces
-        // check if new lethal faces are on path
-        // check if new lethal faces are on path
-            // if on path: reduce velocity + make new plan
+    std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir) {
+        mesh_map::Vector dir_vec = poseToDirectionVector(pose);
+        mesh_map::Vector position_vec = poseToPositionVector(pose);
 
+        // ANGULAR MOVEMENT
+        // calculate angle between orientation vectors
+        // angle will never be negative and smaller or equal to pi
+        angle = angleBetweenVectors(dir_vec, supposed_dir);
+
+        // output: angle publishing
+        std_msgs::Float32 angle32;
+        angle32.data = angle * 180 / M_PI;
+        angle_pub.publish(angle32);
+
+        // to determine in which direction to turn (neg for left, pos for right)
+        float leftRight = direction(dir_vec, supposed_dir);
+
+        // calculate a direction velocity depending on the turn direction and difference angle
+        float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
+
+        // LINEAR movement
+        float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
+        float final_lin_vel;
+
+        // check the size of the angle. If it is not more than about 35 degrees, integrate position costs to linear velocity
+        if (angle < 0.6) {
+            float cost_lin_vel = cost(position_vec);
+            // in case current vertex is a lethal vertex
+            if (cost_lin_vel != std::numeric_limits<float>::max()) {
+                // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
+                float lin_factor_by_cost = linValue(config.max_lin_velocity/10,  0.0, 2.0, cost_lin_vel);
+                lin_vel_by_ang -= lin_factor_by_cost;
+                if (lin_vel_by_ang < 0.0) {
+                    lin_vel_by_ang = 0.0;
+                } else if (lin_vel_by_ang > config.max_lin_velocity) {
+                    lin_vel_by_ang = config.max_lin_velocity;
+                }
+            }
+        }
+
+        final_lin_vel = lin_vel_by_ang;
+
+        // ADDITIONAL factors
+        // look ahead
+        std::vector<float> ahead_values = lookAhead(pose, set_linear_velocity);
+
+        if(ahead_values[1] != std::numeric_limits<float>::max()) {
+            // get the direction factor from the calculated ahead values
+            float aheadLR = ahead_values[0]/abs(ahead_values[0]);
+            // calculating angular velocity based on angular ahead value
+            float final_ahead_ang_vel = aheadLR * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, abs(ahead_values[0]));
+            // calculating linear value based on angular ahead value
+            float ahead_lin_vel = gaussValue(config.max_lin_velocity, 2 * M_PI, abs(ahead_values[0]));
+            float final_ahead_lin_vel;
+            if (abs(ahead_values[0]) < 0.6) {
+                // in case current vertex is a lethal vertex
+                if (ahead_values[1] != std::numeric_limits<float>::max()) {
+                    // basic linear velocity depending on angle difference between robot pose and plan and the cost at position
+                    float lin_ahead_by_cost = linValue(config.max_lin_velocity/10,  0.0, 2.0, ahead_values[1]);
+                    ahead_lin_vel -= lin_ahead_by_cost;
+                    if (ahead_lin_vel < 0.0) {
+                        ahead_lin_vel = 0.0;
+                    } else if (ahead_lin_vel > config.max_lin_velocity) {
+                        ahead_lin_vel = config.max_lin_velocity;
+                    }
+                }
+            }
+            final_ahead_lin_vel = ahead_lin_vel;
+
+            // calculating the velocities by proportionally, combining the look ahead velocity with the velocity (without look ahead)
+            final_ang_vel = (1.0-config.ahead_amount) * final_ang_vel + config.ahead_amount * final_ahead_ang_vel;
+            final_lin_vel = (1.0-config.ahead_amount) * final_lin_vel + config.ahead_amount * final_ahead_lin_vel;
+
+
+            // output: AHEAD angle publishing
+            std_msgs::Float32 aheadAngle32;
+            aheadAngle32.data = abs(ahead_values[0]) * 180 / M_PI;
+            ahead_angle_pub.publish(aheadAngle32);
+            // output: AHEAD angle publishing
+            std_msgs::Float32 aheadCost32;
+            aheadCost32.data = ahead_values[1];
+            ahead_cost_pub.publish(aheadCost32);
+        }
+
+        // TODO check if fadingFactor makes sense for mesh gradient use
+        final_lin_vel = final_lin_vel * fadingFactor(pose);
+        // store new velocity to use as previous velocity
+        set_linear_velocity = final_lin_vel;
+
+        return {final_ang_vel, final_lin_vel};
     }
-    */
 
     void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
     {
-
-        ROS_INFO("Reconfigure Request: %f %f %f %f %f %f %f %f %f %f %f %f %s %i ",
-                config.prop_dis_gain,
-                config.int_dis_gain,
-                config.deriv_dis_gain,
-                config.prop_dir_gain,
-                config.int_dir_gain,
-                config.deriv_dir_gain,
-                config.max_lin_velocity,
-                config.max_ang_velocity,
-                config.fading,
-                config.int_time,
-                config.off_plan,
-                config.ahead_amount,
-                config.useMeshGradient?"True":"False",
-                config.control_type);
+        ROS_INFO("Value configuration for mesh controller.");
 
         if (first_config)
         {
