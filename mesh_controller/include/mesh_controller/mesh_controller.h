@@ -195,7 +195,7 @@ namespace mesh_controller{
              * @param pose      current position of the robot
              * @param velocity  current velocity of the robot
              */
-            void updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
+            uint32_t updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
 
             /**
              * FOR PLANNED PATH NAVIGATION
@@ -208,59 +208,13 @@ namespace mesh_controller{
             std::vector<float> lookAhead(const geometry_msgs::PoseStamped& pose, float velocity);
 
             /**
-             * Calculates the cost of the current position
-             * @param pose          Desired Position
-             * @return              Cost of the position, -1 if cost could not be calculated
-             */
-            float cost(mesh_map::Vector& pose_vec);
-
-            /**
-             * Calculates the cost of any position given its face
-             * @param face          Face that contains the position
-             * @param pose_vec      Position of which to calculate the face
-             * @return              Cost at the position, -1 if cost could not be calculated
-             */
-            float cost(lvr2::OptionalFaceHandle face, mesh_map::Vector& pose_vec);
-
-            /**
-             * sets the variable current face to the face of the current position
-             * @param position_vec
-             */
-            void setCurrentFace(mesh_map::Vector& position_vec);
-
-            /**
-             * returns the face that contains the given position
-             * @param face              face from which to start looking
-             * @param position_vec      position to which a corresponding face should be found
-             * @return                  face handle of the face containing the position
-             */
-            lvr2::OptionalFaceHandle setAheadFace(lvr2::OptionalFaceHandle face, mesh_map::Vector& position_vec);
-
-            /**
-             * Searches the face on the mesh map where a pose lays
-             * @param pose_vec  Vector of the pose whose position is searched for
-             * @param face      Face handle from which search begins
-             * @return          Face handle of the position - empty face handle if position could not be found
-             */
-            lvr2::OptionalFaceHandle searchNeighbourFaces(const mesh_map::Vector& pose_vec, lvr2::FaceHandle face);
-
-            /**
-             * Finds the next position given a direction vector and its corresponding face handle by following the direction
-             * For: look ahead when using mesh gradient
-             * @param vec   direction vector from which the next step vector is calculated
-             * @param face  face of the direction vector
-             * @return      new vector (also updates the ahead_face handle to correspond to the new vector)
-             */
-            lvr2::BaseVector<float> meshAhead(mesh_map::Vector& vec, lvr2::FaceHandle face);
-
-            /**
              * Combines angle difference, look ahead etc. to determine angular and linear velocities
              * @param pose          Current robot pose.
              * @param velocity      Current velocity of the robot.
              * @param plan_vec      vector of supposed position (necessary if using the mesh Gradient and not the plan)
              * @return              vector with new angular velocity and new linear velocity
              */
-            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir);
+            std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir, const float& cost);
 
             void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
@@ -268,6 +222,7 @@ namespace mesh_controller{
                     const std::string& plugin_name,
                     const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
                     const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
+
 
         protected:
 
@@ -302,6 +257,10 @@ namespace mesh_controller{
 
             lvr2::OptionalFaceHandle current_face;
             // angle between pose vector and planned / supposed vector
+            geometry_msgs::Pose current_pose;
+
+            float goal_distance;
+
             float angle;
             // stores the current vector map containing vectors pointing to the source (path goal)
             lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
@@ -320,10 +279,12 @@ namespace mesh_controller{
             ros::Publisher ahead_angle_pub;
             ros::Publisher ahead_cost_pub;
 
+            ros::Publisher position_pub;
 
             float initial_dist;
             float last_fading;
 
+            std::atomic_bool cancel_requested;
 
             const float E = 2.718281;
 

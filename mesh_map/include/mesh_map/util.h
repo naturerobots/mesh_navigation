@@ -44,11 +44,14 @@
 #include <lvr2/attrmaps/AttrMaps.hpp>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Pose.h>
+#include <std_msgs/ColorRGBA.h>
 
 namespace mesh_map{
 
 typedef lvr2::Normal<float> Normal;
 typedef lvr2::BaseVector<float> Vector;
+
+std_msgs::ColorRGBA color(const float& r, const float& g, const float& b, const float& a=1.0);
 
 void getMinMax(const lvr2::VertexMap<float>& map, float& min, float& max);
 
@@ -56,11 +59,25 @@ Vector toVector(const geometry_msgs::Point& point);
 
 Vector projectVectorOntoPlane(const Vector &vec, const Vector &ref, const Normal &normal);
 
+bool inTriangle(const Vector& p, const Vector& v0, const Vector& v1, const Vector& v2, const float& max_dist, const float& epsilon);
+
 geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vector& direction, const Normal& normal);
 
 geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal);
 
-bool barycentricCoords(const Vector &p, const Vector &v0, const Vector &v1, const Vector &v2, float &u, float &v);
+bool projectedBarycentricCoords(
+    const Vector &p,
+    const std::array<Vector, 3>& vertices,
+    std::array<float, 3>& barycentric_coords,
+    float& dist);
+
+bool barycentricCoords(const Vector &p, const Vector &v0, const Vector &v1, const Vector &v2, float &u, float &v, float &w);
+
+template <typename T>
+T linearCombineBarycentricCoords(const std::array<T, 3>& vertex_properties, const std::array<float, 3>& barycentric_coords)
+{
+  return vertex_properties[0] * barycentric_coords[0] + vertex_properties[1] * barycentric_coords[1] + vertex_properties[2] * barycentric_coords[2];
+}
 
 } /* namespace mesh_map */
 

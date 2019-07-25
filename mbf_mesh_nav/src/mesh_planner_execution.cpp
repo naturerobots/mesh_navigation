@@ -43,10 +43,8 @@ MeshPlannerExecution::MeshPlannerExecution(
     const std::string name,
     const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
     const MeshPtr &mesh_ptr,
-    const MoveBaseFlexConfig &config,
-    boost::function<void()> setup_fn,
-    boost::function<void()> cleanup_fn)
-      : AbstractPlannerExecution(name, planner_ptr, toAbstract(config), setup_fn, cleanup_fn),
+    const MoveBaseFlexConfig &config)
+      : AbstractPlannerExecution(name, planner_ptr, toAbstract(config)),
         mesh_ptr_(mesh_ptr)
 {
   ros::NodeHandle private_nh("~");

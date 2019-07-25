@@ -36,6 +36,7 @@
  */
 
 #include <mesh_map/util.h>
+#include <std_msgs/ColorRGBA.h>
 #include <tf/transform_datatypes.h>
 
 namespace mesh_map{
@@ -93,15 +94,76 @@ geometry_msgs::Pose calculatePoseFromPosition(
   return calculatePoseFromDirection(current, next - current, normal);
 }
 
+bool inTriangle(const Vector& p, const Vector& v0, const Vector& v1, const Vector& v2, const float& max_dist, const float& epsilon)
+{
+  float dist;
+  std::array<float, 3> barycentric_coords;
+  return projectedBarycentricCoords(p, {v0, v1, v2}, barycentric_coords, dist) && dist < max_dist;
+}
+
 Vector projectVectorOntoPlane(const Vector &vec, const Vector &ref, const Normal &normal)
 {
   return vec - (normal * (vec.dot(normal) - (ref.dot(normal))));
 }
 
+bool projectedBarycentricCoords(
+    const Vector &p,
+    const std::array<Vector, 3>& vertices,
+    std::array<float, 3>& barycentric_coords)
+{
+  float dist;
+  return projectedBarycentricCoords(p, vertices, barycentric_coords, dist);
+}
+
+
+bool projectedBarycentricCoords(
+    const Vector &p,
+    const std::array<Vector, 3>& vertices,
+    std::array<float, 3>& barycentric_coords,
+    float& dist)
+{
+  const Vector& a = vertices[0];
+  const Vector& b = vertices[1];
+  const Vector& c = vertices[2];
+
+  Vector u = b-a;
+  Vector v = c-a;
+  Vector w = p-a;
+  Vector n=u.cross(v);
+  // Barycentric coordinates of the projection P′of P onto T:
+  // γ=[(u×w)⋅n]/n²
+  float oneOver4ASquared = 1.0/n.dot(n);
+
+  const float gamma = u.cross(w).dot(n) * oneOver4ASquared;
+  // β=[(w×v)⋅n]/n²
+  const float beta = w.cross(v).dot(n) * oneOver4ASquared;
+  const float alpha = 1 - gamma - beta;
+
+  barycentric_coords = {alpha, beta, gamma};
+  dist = n.dot(w) / n.length();
+
+  const float EPSILON = 0.01;
+  // The point P′ lies inside T if:
+  return ((0 - EPSILON <= alpha) && (alpha <= 1 + EPSILON) &&
+      (0 - EPSILON <= beta)  && (beta  <= 1 + EPSILON) &&
+      (0 - EPSILON <= gamma) && (gamma <= 1 + EPSILON));
+
+}
+
+std_msgs::ColorRGBA color(const float& r, const float& g, const float& b, const float& a)
+{
+  std_msgs::ColorRGBA color;
+  color.r = r;
+  color.g = g;
+  color.b = b;
+  color.a = a;
+  return color;
+}
+
 bool barycentricCoords(
     const Vector &p,
     const Vector &v0, const Vector &v1, const Vector &v2,
-    float &u, float &v)
+    float &u, float &v, float &w)
 {
   // compute plane's normal
   Vector v0v1 = v1 - v0;
@@ -134,6 +196,7 @@ bool barycentricCoords(
 
   u /= denom;
   v /= denom;
+  w = 1 - u - v;
 
   return true;
 }
