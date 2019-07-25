@@ -34,74 +34,78 @@
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
  *
  */
-#include <mesh_map/mesh_map.h>
-#include <mesh_map/util.h>
-#include <lvr2/io/HDF5IO.hpp>
-#include <ros/ros.h>
-#include <lvr2/algorithm/GeometryAlgorithms.hpp>
-#include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <mesh_msgs/MeshGeometryStamped.h>
-#include <lvr_ros/conversions.h>
+#include <XmlRpcException.h>
+#include <algorithm>
+#include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/uuid/random_generator.hpp>
-#include <algorithm>
-#include <XmlRpcException.h>
-#include <geometry_msgs/Vector3.h>
-#include <lvr_ros/colors.h>
 #include <functional>
-#include <mutex>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/Vector3.h>
+
+// TODO fix lvr2 missing includes
+using namespace std;
+#include <lvr2/geometry/Normal.hpp>
+#include <lvr2/io/Timestamp.hpp>
+
+#include <lvr2/algorithm/GeometryAlgorithms.hpp>
+#include <lvr2/algorithm/NormalAlgorithms.hpp>
+#include <lvr2/io/HDF5IO.hpp>
+#include <lvr_ros/colors.h>
+#include <lvr_ros/conversions.h>
+#include <mesh_map/mesh_map.h>
+#include <mesh_map/util.h>
+#include <mesh_msgs/MeshGeometryStamped.h>
+#include <mutex>
+#include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 
-namespace mesh_map{
+namespace mesh_map {
 
-MeshMap::MeshMap(tf2_ros::Buffer& tf_listener)
-    : tf_buffer(tf_buffer),
-      private_nh("~/mesh_map/"),
-      first_config(true),
-      map_loaded(false),
-      layer_loader("mesh_map", "mesh_map::AbstractLayer"),
-      mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
-{
+MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
+    : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true),
+      map_loaded(false), layer_loader("mesh_map", "mesh_map::AbstractLayer"),
+      mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
   private_nh.param<std::string>("mesh_file", mesh_file, "mesh.h5");
   private_nh.param<std::string>("mesh_part", mesh_part, "mesh");
   private_nh.param<std::string>("global_frame", global_frame, "map");
   ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
-  marker_pub = private_nh.advertise<visualization_msgs::Marker>("marker", 100, true);
-  mesh_geometry_pub = private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
-  vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > (
-      new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
+  marker_pub =
+      private_nh.advertise<visualization_msgs::Marker>("marker", 100, true);
+  mesh_geometry_pub =
+      private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
+  vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>(
+      "vertex_costs", 1, false);
+  reconfigure_server_ptr =
+      boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
+          new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
 
-  config_callback = boost::bind(&MeshMap::reconfigureCallback,this, _1, _2);
+  config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
-
 }
 
+bool MeshMap::readMap() { return readMap(mesh_file, mesh_part); }
 
-bool MeshMap::readMap()
-{
-  return readMap(mesh_file, mesh_part);
-}
-
-
-bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part)
-{
-  ROS_INFO_STREAM("Start reading the mesh part '" << mesh_part << "' from the map file '"<< mesh_file << "'...");
-  mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(new lvr2::HDF5IO(mesh_file, mesh_part, HighFive::File::ReadWrite));
+bool MeshMap::readMap(const std::string &mesh_file,
+                      const std::string &mesh_part) {
+  ROS_INFO_STREAM("Start reading the mesh part '"
+                  << mesh_part << "' from the map file '" << mesh_file
+                  << "'...");
+  mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
+      new lvr2::HDF5IO(mesh_file, mesh_part, HighFive::File::ReadWrite));
   auto mesh_opt = mesh_io_ptr->getMesh();
 
-  if(mesh_opt)
-  {
+  if (mesh_opt) {
     *mesh_ptr = mesh_opt.get();
-    ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh_ptr->numVertices() << " vertices and "
-                                                                  << mesh_ptr->numFaces() << " faces and " << mesh_ptr->numEdges() << " edges." );
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
+    ROS_INFO_STREAM("The mesh has been loaded successfully with "
+                    << mesh_ptr->numVertices() << " vertices and "
+                    << mesh_ptr->numFaces() << " faces and "
+                    << mesh_ptr->numEdges() << " edges.");
+  } else {
+    ROS_ERROR_STREAM("Could not load the mesh '"
+                     << mesh_part << "' from the map file '" << mesh_file
+                     << "' ");
     return false;
   }
 
@@ -114,83 +118,73 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   uuid_str = boost::uuids::to_string(uuid);
 
   auto face_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>("face_normals");
+      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>(
+          "face_normals");
 
-  if(face_normals_opt)
-  {
+  if (face_normals_opt) {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
-  }
-  else
-  {
-    ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
+    ROS_INFO_STREAM("Found " << face_normals.numValues()
+                             << " face normals in map file.");
+  } else {
+    ROS_INFO_STREAM(
+        "No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed "<< face_normals.numValues() << " face normals.");
-    if(mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
-    {
+    ROS_INFO_STREAM("Computed " << face_normals.numValues()
+                                << " face normals.");
+    if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals")) {
       ROS_INFO_STREAM("Saved face normals to map file.");
-    }
-    else
-    {
+    } else {
       ROS_ERROR_STREAM("Could not save face normals to map file!");
     }
   }
 
   auto vertex_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<Normal>>("vertex_normals");
+      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<Normal>>(
+          "vertex_normals");
 
-  if(vertex_normals_opt)
-  {
+  if (vertex_normals_opt) {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found "<< vertex_normals.numValues() << " vertex normals in map file!");
-  }
-  else
-  {
-    ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
+    ROS_INFO_STREAM("Found " << vertex_normals.numValues()
+                             << " vertex normals in map file!");
+  } else {
+    ROS_INFO_STREAM(
+        "No vertex normals found in the given map file, computing them...");
     vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-    if(mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
-    {
+    if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals")) {
       ROS_INFO_STREAM("Saved vertex normals to map file.");
-    }
-    else
-    {
+    } else {
       ROS_ERROR_STREAM("Could not save vertex normals to map file!");
     }
   }
 
-  mesh_geometry_pub.publish(lvr_ros::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+  mesh_geometry_pub.publish(lvr_ros::toMeshGeometryStamped<float>(
+      *mesh_ptr, global_frame, uuid_str, vertex_normals));
 
   ROS_INFO_STREAM("Try to read edge distances from map file...");
-  auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
+  auto edge_distances_opt =
+      mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
 
-  if(edge_distances_opt)
-  {
+  if (edge_distances_opt) {
     ROS_INFO_STREAM("Vertex distances have been read successfully.");
     edge_distances = edge_distances_opt.get();
-  }
-  else
-  {
+  } else {
     ROS_INFO_STREAM("Computing edge distances...");
     edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
-    ROS_INFO_STREAM("Saving " << edge_distances.numValues() << " edge distances to map file...");
+    ROS_INFO_STREAM("Saving " << edge_distances.numValues()
+                              << " edge distances to map file...");
 
-    if(mesh_io_ptr->addAttributeMap(edge_distances, "edge_distances"))
-    {
+    if (mesh_io_ptr->addAttributeMap(edge_distances, "edge_distances")) {
       ROS_INFO_STREAM("Saved edge distances to map file.");
-    }
-    else
-    {
+    } else {
       ROS_ERROR_STREAM("Could not save edge distances to map file!");
     }
   }
 
-  if(!loadLayerPlugins())
-  {
+  if (!loadLayerPlugins()) {
     ROS_FATAL_STREAM("Could not load any layer plugin!");
     return false;
   }
-  if(!initLayerPlugins())
-  {
+  if (!initLayerPlugins()) {
     ROS_FATAL_STREAM("Could not initialize plugins!");
     return false;
   }
@@ -204,21 +198,19 @@ bool MeshMap::readMap(const std::string& mesh_file, const std::string& mesh_part
   return true;
 }
 
-bool MeshMap::loadLayerPlugins()
-{
+bool MeshMap::loadLayerPlugins() {
   XmlRpc::XmlRpcValue plugin_param_list;
-  if(!private_nh.getParam("layers", plugin_param_list))
-  {
-    ROS_WARN_STREAM("No layer plugins configured! - Use the param \"layers\" in the namespace \""
-                        << private_nh.getNamespace() << "\". \"layers\" must be must be a list of "
-                                                        "tuples with a name and a type.");
+  if (!private_nh.getParam("layers", plugin_param_list)) {
+    ROS_WARN_STREAM("No layer plugins configured! - Use the param \"layers\" "
+                    "in the namespace \""
+                    << private_nh.getNamespace()
+                    << "\". \"layers\" must be must be a list of "
+                       "tuples with a name and a type.");
     return false;
   }
 
-  try
-  {
-    for (int i = 0; i < plugin_param_list.size(); i++)
-    {
+  try {
+    for (int i = 0; i < plugin_param_list.size(); i++) {
       XmlRpc::XmlRpcValue elem = plugin_param_list[i];
 
       std::string name = elem["name"];
@@ -226,43 +218,40 @@ bool MeshMap::loadLayerPlugins()
 
       typename AbstractLayer::Ptr plugin_ptr;
 
-      if (layer_names.find(name) != layer_names.end())
-      {
-        ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
+      if (layer_names.find(name) != layer_names.end()) {
+        ROS_ERROR_STREAM(
+            "The plugin \""
+            << name << "\" has already been loaded! Names must be unique!");
         return false;
       }
 
-      try
-      {
+      try {
         plugin_ptr = layer_loader.createInstance(type);
-      }
-      catch(pluginlib::LibraryLoadException &e)
-      {
+      } catch (pluginlib::LibraryLoadException &e) {
         ROS_ERROR_STREAM(e.what());
       }
 
-      if(plugin_ptr)
-      {
-        std::pair<std::string, typename mesh_map::AbstractLayer::Ptr> elem(name, plugin_ptr);
+      if (plugin_ptr) {
+        std::pair<std::string, typename mesh_map::AbstractLayer::Ptr> elem(
+            name, plugin_ptr);
 
         layers.push_back(elem);
         layer_names.insert(elem);
 
-        ROS_INFO_STREAM("The layer plugin with the type \"" << type
-          << "\" has been loaded successfully under the name \"" << name << "\".");
+        ROS_INFO_STREAM("The layer plugin with the type \""
+                        << type
+                        << "\" has been loaded successfully under the name \""
+                        << name << "\".");
 
-      }
-      else
-      {
+      } else {
         ROS_ERROR_STREAM("Could not load the layer plugin with the name \""
-          << name << "\" and the type \"" << type << "\"!");
+                         << name << "\" and the type \"" << type << "\"!");
       }
     }
-  }
-  catch (XmlRpc::XmlRpcException &e)
-  {
-    ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter has to be a list of structs "
-                         << "with fields \"name\" and \"type\"!");
+  } catch (XmlRpc::XmlRpcException &e) {
+    ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter "
+                     "has to be a list of structs "
+                     << "with fields \"name\" and \"type\"!");
     ROS_ERROR_STREAM(e.getMessage());
     return false;
   }
@@ -270,7 +259,7 @@ bool MeshMap::loadLayerPlugins()
   return !layers.empty();
 }
 
-void MeshMap::layerChanged(const std::string &layer_name){
+void MeshMap::layerChanged(const std::string &layer_name) {
 
   std::lock_guard<std::mutex> lock(layer_mtx);
 
@@ -282,43 +271,35 @@ void MeshMap::layerChanged(const std::string &layer_name){
 
   // TODO pre-compute combined lethals upto a layer level
   auto layer_iter = layers.begin();
-  for(;layer_iter != layers.end(); layer_iter++)
-  {
-    lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
+  for (; layer_iter != layers.end(); layer_iter++) {
+    lethals.insert(layer_iter->second->lethals().begin(),
+                   layer_iter->second->lethals().end());
     // TODO merge with std::set_merge
-    if(layer_iter->first == layer_name) break;
+    if (layer_iter->first == layer_name)
+      break;
   }
 
-  vertex_costs_pub.publish(
-      lvr_ros::toVertexCostsStamped(
-          layer_iter->second->costs(),
-          mesh_ptr->numVertices(),
-          layer_iter->second->defaultValue(),
-          layer_iter->first,
-          global_frame,
-          uuid_str));
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+      layer_iter->second->costs(), mesh_ptr->numVertices(),
+      layer_iter->second->defaultValue(), layer_iter->first, global_frame,
+      uuid_str));
 
-  if(layer_iter != layers.end()) layer_iter++;
+  if (layer_iter != layers.end())
+    layer_iter++;
 
   ROS_INFO_STREAM("Combine  lethal sets...");
 
-  for(;layer_iter != layers.end(); layer_iter++)
-  {
+  for (; layer_iter != layers.end(); layer_iter++) {
 
     layer_iter->second->updateLethal(lethals, lethals);
 
-    lethals.insert(
-        layer_iter->second->lethals().begin(),
-        layer_iter->second->lethals().end());
+    lethals.insert(layer_iter->second->lethals().begin(),
+                   layer_iter->second->lethals().end());
 
-    vertex_costs_pub.publish(
-        lvr_ros::toVertexCostsStamped(
-            layer_iter->second->costs(),
-            mesh_ptr->numVertices(),
-            layer_iter->second->defaultValue(),
-            layer_iter->first,
-            global_frame,
-            uuid_str));
+    vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+        layer_iter->second->costs(), mesh_ptr->numVertices(),
+        layer_iter->second->defaultValue(), layer_iter->first, global_frame,
+        uuid_str));
   }
 
   ROS_INFO_STREAM("Found " << lethals.size() << " lethal vertices");
@@ -326,39 +307,40 @@ void MeshMap::layerChanged(const std::string &layer_name){
 
   combineVertexCosts();
   // TODO new lethals old lethals -> renew potential field! around this areas
-
 }
 
-bool MeshMap::initLayerPlugins()
-{
+bool MeshMap::initLayerPlugins() {
   lethals.clear();
   lethal_indices.clear();
-  for(auto& layer : layers)
-  {
-    auto& layer_plugin = layer.second;
-    const auto& layer_name = layer.first;
+  for (auto &layer : layers) {
+    auto &layer_plugin = layer.second;
+    const auto &layer_name = layer.first;
 
-    auto callback = [this](const std::string &layer_name){layerChanged(layer_name);};
-    if(!layer_plugin->initialize(layer_name, callback, mesh_ptr, mesh_io_ptr)){
-      ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
+    auto callback = [this](const std::string &layer_name) {
+      layerChanged(layer_name);
+    };
+    if (!layer_plugin->initialize(layer_name, callback, mesh_ptr,
+                                  mesh_io_ptr)) {
+      ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \""
+                       << layer_name << "\"!");
       return false;
     }
 
     std::set<lvr2::VertexHandle> empty;
     layer_plugin->updateLethal(lethals, empty);
-    if(!layer_plugin->readLayer())
-    {
+    if (!layer_plugin->readLayer()) {
       layer_plugin->computeLayer();
     }
 
-    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
-    lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
+    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(),
+                                      layer_plugin->lethals().end());
+    lethals.insert(layer_plugin->lethals().begin(),
+                   layer_plugin->lethals().end());
   }
   return true;
 }
 
-void MeshMap::combineVertexCosts()
-{
+void MeshMap::combineVertexCosts() {
   ROS_INFO_STREAM("Combining costs...");
 
   float combined_min = std::numeric_limits<float>::max();
@@ -367,74 +349,69 @@ void MeshMap::combineVertexCosts()
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
   bool hasNaN = false;
-  for(auto layer : layers)
-  {
-    const auto& costs = layer.second->costs();
+  for (auto layer : layers) {
+    const auto &costs = layer.second->costs();
     float min, max;
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
     const float factor = private_nh.param<float>(layer.first + "/factor", 1.0);
     const float norm_factor = factor / norm;
-    ROS_INFO_STREAM("Layer \"" << layer.first
-                               << "\" max value: " << max << " min value: " << min
-                               << " norm: " << norm << " factor: " << factor << " norm factor: " << norm_factor);
-
+    ROS_INFO_STREAM("Layer \"" << layer.first << "\" max value: " << max
+                               << " min value: " << min << " norm: " << norm
+                               << " factor: " << factor
+                               << " norm factor: " << norm_factor);
 
     const float default_value = layer.second->defaultValue();
     hasNaN = false;
-    for(auto vH: mesh_ptr->vertices())
-    {
+    for (auto vH : mesh_ptr->vertices()) {
       const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
-      if(std::isnan(cost)) hasNaN = true;
+      if (std::isnan(cost))
+        hasNaN = true;
       vertex_costs[vH] += factor * cost;
-      if(std::isfinite(cost))
-      {
+      if (std::isfinite(cost)) {
         combined_max = std::max(combined_max, vertex_costs[vH]);
         combined_min = std::min(combined_min, vertex_costs[vH]);
       }
     }
-    if(hasNaN) ROS_ERROR_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
+    if (hasNaN)
+      ROS_ERROR_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
   }
 
   const float combined_norm = combined_max - combined_min;
 
-  for(auto vH : lethals)
-  {
+  for (auto vH : lethals) {
     vertex_costs[vH] = std::numeric_limits<float>::infinity();
   }
 
-  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+      vertex_costs, "Combined Costs", global_frame, uuid_str));
 
   hasNaN = false;
 
   ROS_INFO_STREAM("Layer weighting factor is: " << config.layer_factor);
-  for(auto eH: mesh_ptr->edges())
-  {
+  for (auto eH : mesh_ptr->edges()) {
     // Get both Vertices of the current Edge
     std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
     const lvr2::VertexHandle &vH1 = eH_vHs[0];
     const lvr2::VertexHandle &vH2 = eH_vHs[1];
-    // Get the Riskiness for the current Edge (the maximum value from both Vertices)
-    if(config.layer_factor != 0)
-    {
-      if(std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2]))
-      {
+    // Get the Riskiness for the current Edge (the maximum value from both
+    // Vertices)
+    if (config.layer_factor != 0) {
+      if (std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2])) {
         edge_weights[eH] = edge_distances[eH];
-        //edge_weights[eH] = std::numeric_limits<float>::infinity();
-      }
-      else
-      {
+        // edge_weights[eH] = std::numeric_limits<float>::infinity();
+      } else {
         float cost_diff = std::fabs(vertex_costs[vH1] - vertex_costs[vH2]);
 
         float vertex_factor = config.layer_factor * cost_diff;
-        if(std::isnan(vertex_factor))
-          ROS_INFO_STREAM("NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
-            << " vertex_factor:" << vertex_factor << " cost_diff:" << cost_diff);
+        if (std::isnan(vertex_factor))
+          ROS_INFO_STREAM("NaN: v1:" << vertex_costs[vH1]
+                                     << " v2:" << vertex_costs[vH2]
+                                     << " vertex_factor:" << vertex_factor
+                                     << " cost_diff:" << cost_diff);
         edge_weights[eH] = edge_distances[eH] * (1 + vertex_factor);
       }
-    }
-    else
-    {
+    } else {
       edge_weights[eH] = edge_distances[eH];
     }
   }
@@ -442,44 +419,37 @@ void MeshMap::combineVertexCosts()
   ROS_INFO("Successfully combined costs!");
 }
 
-
-
-void MeshMap::findLethalByContours(
-    const int& min_contour_size,
-    std::set<lvr2::VertexHandle>& lethals)
-{
+void MeshMap::findLethalByContours(const int &min_contour_size,
+                                   std::set<lvr2::VertexHandle> &lethals) {
   int size = lethals.size();
-  std::vector<std::vector<lvr2::VertexHandle> > contours;
+  std::vector<std::vector<lvr2::VertexHandle>> contours;
   findContours(contours, min_contour_size);
-  for(auto contour : contours)
-  {
+  for (auto contour : contours) {
     lethals.insert(contour.begin(), contour.end());
   }
-  ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices as contour vertices");
+  ROS_INFO_STREAM("Found " << lethals.size() - size
+                           << " lethal vertices as contour vertices");
 }
 
-void MeshMap::findLethalAreas(
-    const int min_contour_size,
-    const float height_diff_threshold,
-    const float roughness_threshold)
-{
+void MeshMap::findLethalAreas(const int min_contour_size,
+                              const float height_diff_threshold,
+                              const float roughness_threshold) {
   ROS_INFO_STREAM("Find lethal vertices...");
   lethals.clear();
   findLethalByContours(min_contour_size, lethals);
 }
 
 void MeshMap::findContours(
-    std::vector<std::vector<lvr2::VertexHandle> >& contours,
+    std::vector<std::vector<lvr2::VertexHandle>> &contours,
     int min_contour_size) {
 
   ROS_INFO_STREAM("Find contours...");
 
-  std::vector<std::vector<lvr2::VertexHandle> > tmp_contours;
+  std::vector<std::vector<lvr2::VertexHandle>> tmp_contours;
 
   array<lvr2::OptionalFaceHandle, 2> facepair;
   lvr2::SparseEdgeMap<bool> usedEdges(false);
-  for (auto eHStart: mesh_ptr->edges())
-  {
+  for (auto eHStart : mesh_ptr->edges()) {
     lvr2::SparseVertexMap<bool> usedVertices(false);
     lvr2::SparseEdgeMap<bool> local_usedEdges(false);
     int count = 0;
@@ -488,11 +458,12 @@ void MeshMap::findContours(
     facepair = mesh_ptr->getFacesOfEdge(eHStart);
 
     // If border Edge found
-    if((!facepair[0]||!facepair[1])&&!usedEdges[eHStart])
-    {
-      std:vector<lvr2::VertexHandle> contour;
+    if ((!facepair[0] || !facepair[1]) && !usedEdges[eHStart]) {
+    std:
+      vector<lvr2::VertexHandle> contour;
       // Set vector which links to the following Edge
-      array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
+      array<lvr2::VertexHandle, 2> vertexPair =
+          mesh_ptr->getVerticesOfEdge(eHStart);
       lvr2::VertexHandle vH = vertexPair[1];
       vector<lvr2::EdgeHandle> curEdges;
       lvr2::EdgeHandle eHTemp = eHStart;
@@ -500,20 +471,16 @@ void MeshMap::findContours(
       bool vertex_flag = false;
 
       // While the conotur did not come full circle
-      while(moving)
-      {
+      while (moving) {
         moving = false;
         usedEdges.insert(eHTemp, true);
         local_usedEdges.insert(eHTemp, true);
         // Set vector which links to the following Edge
         vertexPair = mesh_ptr->getVerticesOfEdge(eHTemp);
         // Eliminate the possibility to choose the previous Vertex
-        if(vH != vertexPair[0])
-        {
+        if (vH != vertexPair[0]) {
           vH = vertexPair[0];
-        }
-        else if(vH != vertexPair[1])
-        {
+        } else if (vH != vertexPair[1]) {
           vH = vertexPair[1];
         }
 
@@ -524,13 +491,10 @@ void MeshMap::findContours(
         mesh_ptr->getEdgesOfVertex(vH, curEdges);
 
         // Look for other edge of vertex that is a border Edge
-        for(auto eHT: curEdges)
-        {
-          if(!usedEdges[eHT] && !local_usedEdges[eHT])
-          {
+        for (auto eHT : curEdges) {
+          if (!usedEdges[eHT] && !local_usedEdges[eHT]) {
             facepair = mesh_ptr->getFacesOfEdge(eHT);
-            if(!facepair[0]||!facepair[1])
-            {
+            if (!facepair[0] || !facepair[1]) {
               eHTemp = eHT;
               moving = true;
               continue;
@@ -539,8 +503,7 @@ void MeshMap::findContours(
         }
       }
       // Add contour to list of contours
-      if(contour.size() > min_contour_size)
-      {
+      if (contour.size() > min_contour_size) {
         contours.push_back(contour);
       }
     }
@@ -549,46 +512,40 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
-void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
-{
-    this->vector_map = vector_map;
+void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector> &vector_map) {
+  this->vector_map = vector_map;
 }
 
-
-
-boost::optional<Vector> MeshMap::directionAtPosition(
-    const std::array<lvr2::VertexHandle, 3>& vertices,
-    const std::array<float, 3>& barycentric_coords)
-{
+boost::optional<Vector>
+MeshMap::directionAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
+                             const std::array<float, 3> &barycentric_coords) {
   const auto &a = vector_map.get(vertices[0]);
   const auto &b = vector_map.get(vertices[1]);
   const auto &c = vector_map.get(vertices[2]);
 
-  if(a && b && c)
-  {
-    return a.get() * barycentric_coords[0] + b.get() * barycentric_coords[1] + c.get() * barycentric_coords[2];
+  if (a && b && c) {
+    return a.get() * barycentric_coords[0] + b.get() * barycentric_coords[1] +
+           c.get() * barycentric_coords[2];
   }
   return boost::none;
 }
 
-float MeshMap::costAtPosition(
-    const std::array<lvr2::VertexHandle, 3>& vertices,
-    const std::array<float, 3>& barycentric_coords)
-{
+float MeshMap::costAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
+                              const std::array<float, 3> &barycentric_coords) {
   const auto &a = vertex_costs.get(vertices[0]);
   const auto &b = vertex_costs.get(vertices[1]);
   const auto &c = vertex_costs.get(vertices[2]);
 
-  if(a && b && c)
-  {
-    std::array<float, 3>costs = {a.get(), b.get(), c.get()};
+  if (a && b && c) {
+    std::array<float, 3> costs = {a.get(), b.get(), c.get()};
     return mesh_map::linearCombineBarycentricCoords(costs, barycentric_coords);
   }
   return -1;
 }
 
-void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name)
-{
+void MeshMap::publishDebugPoint(const Vector pos,
+                                const std_msgs::ColorRGBA &color,
+                                const std::string &name) {
   visualization_msgs::Marker marker;
   marker.header.frame_id = mapFrame();
   marker.header.stamp = ros::Time();
@@ -603,7 +560,9 @@ void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& col
   marker.scale = scale;
 
   geometry_msgs::Pose p;
-  p.position.x = pos.x; p.position.y = pos.y; p.position.z = pos.z;
+  p.position.x = pos.x;
+  p.position.y = pos.y;
+  p.position.z = pos.z;
   marker.pose = p;
   marker.color = color;
   marker_pub.publish(marker);
@@ -611,8 +570,8 @@ void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& col
 
 void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
                                const std_msgs::ColorRGBA &color,
-                               const std::string& name){
-  const auto& vertices = mesh_ptr->getVerticesOfFace(face_handle);
+                               const std::string &name) {
+  const auto &vertices = mesh_ptr->getVerticesOfFace(face_handle);
   visualization_msgs::Marker marker;
   marker.header.frame_id = mapFrame();
   marker.header.stamp = ros::Time();
@@ -626,82 +585,78 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
   scale.z = 1.0;
   marker.scale = scale;
 
-  for(auto vertex : vertices){
-    auto& pos = mesh_ptr->getVertexPosition(vertex);
+  for (auto vertex : vertices) {
+    auto &pos = mesh_ptr->getVertexPosition(vertex);
     geometry_msgs::Point p;
-    p.x = pos.x; p.y = pos.y; p.z = pos.z;
+    p.x = pos.x;
+    p.y = pos.y;
+    p.z = pos.z;
     marker.points.push_back(p);
     marker.colors.push_back(color);
   }
   marker_pub.publish(marker);
 }
 
-bool MeshMap::inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const float& dist)
-{
-  const auto& vertices = mesh_ptr->getVerticesOfFace(face);
-  return mesh_map::inTriangle(pos, mesh_ptr->getVertexPosition(vertices[0]), mesh_ptr->getVertexPosition(vertices[1]), mesh_ptr->getVertexPosition(vertices[2]), dist, 0.0001);
+bool MeshMap::inTriangle(const Vector &pos, const lvr2::FaceHandle &face,
+                         const float &dist) {
+  const auto &vertices = mesh_ptr->getVerticesOfFace(face);
+  return mesh_map::inTriangle(pos, mesh_ptr->getVertexPosition(vertices[0]),
+                              mesh_ptr->getVertexPosition(vertices[1]),
+                              mesh_ptr->getVertexPosition(vertices[2]), dist,
+                              0.0001);
 }
 
-bool MeshMap::searchNeighbourFaces(
-    Vector& pos,
-    lvr2::FaceHandle& face,
-    std::array<float, 3>& barycentric_coords,
-    const float& max_radius,
-    const float& max_dist)
-{
+bool MeshMap::searchNeighbourFaces(Vector &pos, lvr2::FaceHandle &face,
+                                   std::array<float, 3> &barycentric_coords,
+                                   const float &max_radius,
+                                   const float &max_dist) {
   std::list<lvr2::FaceHandle> possible_faces;
   possible_faces.push_back(face);
   std::list<lvr2::FaceHandle>::iterator face_iter = possible_faces.begin();
 
-
-  Vector center(0,0,0);
-  const auto& start_vertices = mesh_ptr->getVertexPositionsOfFace(face);
-  for(auto vertex : start_vertices)
-  {
+  Vector center(0, 0, 0);
+  const auto &start_vertices = mesh_ptr->getVertexPositionsOfFace(face);
+  for (auto vertex : start_vertices) {
     center += vertex;
   }
   center /= 3;
 
   float vertex_center_max = 0;
-  for(auto vertex : start_vertices)
-  {
+  for (auto vertex : start_vertices) {
     vertex_center_max = std::max(vertex_center_max, vertex.distance(center));
   }
 
   float ext_radius = max_radius + vertex_center_max;
   float max_radius_sq = ext_radius * ext_radius;
 
-
   lvr2::SparseFaceMap<bool> in_list_map;
   in_list_map.insert(face, true);
 
   std::array<float, 3> bary_coords;
 
-  while(possible_faces.end() != face_iter)
-  {
-    const auto& vertices_positions = mesh_ptr->getVertexPositionsOfFace(*face_iter);
+  while (possible_faces.end() != face_iter) {
+    const auto &vertices_positions =
+        mesh_ptr->getVertexPositionsOfFace(*face_iter);
     float dist;
-    if (mesh_map::projectedBarycentricCoords(pos, vertices_positions, bary_coords, dist) && dist < max_dist)
-    {
+    if (mesh_map::projectedBarycentricCoords(pos, vertices_positions,
+                                             bary_coords, dist) &&
+        dist < max_dist) {
       // update current face, barycentric coords, and the projected position
       face = *face_iter;
       barycentric_coords = bary_coords;
-      pos = vertices_positions[0] * bary_coords[0] + vertices_positions[1] * bary_coords[1] + vertices_positions[2] * bary_coords[2];
+      pos = vertices_positions[0] * bary_coords[0] +
+            vertices_positions[1] * bary_coords[1] +
+            vertices_positions[2] * bary_coords[2];
       return true;
-    }
-    else
-    {
+    } else {
 
-      const auto& vertices = mesh_ptr->getVerticesOfFace(*face_iter);
-      for(auto vertex : vertices)
-      {
-        if(center.distance2(mesh_ptr->getVertexPosition(vertex)) < max_radius_sq)
-        {
-          const auto& nn_faces = mesh_ptr->getFacesOfVertex(vertex);
-          for(auto nn_face : nn_faces)
-          {
-            if(!in_list_map.containsKey(nn_face))
-            {
+      const auto &vertices = mesh_ptr->getVerticesOfFace(*face_iter);
+      for (auto vertex : vertices) {
+        if (center.distance2(mesh_ptr->getVertexPosition(vertex)) <
+            max_radius_sq) {
+          const auto &nn_faces = mesh_ptr->getFacesOfVertex(vertex);
+          for (auto nn_face : nn_faces) {
+            if (!in_list_map.containsKey(nn_face)) {
               possible_faces.push_back(nn_face);
               in_list_map.insert(nn_face, true);
             }
@@ -715,15 +670,18 @@ bool MeshMap::searchNeighbourFaces(
   return false;
 }
 
-bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const float& step_size){
+bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
+                        const float &step_size) {
   const auto &vertices = mesh_ptr->getVerticesOfFace(face);
-  std::array<float, 3> barycentric_coords; float dist;
-  if(mesh_map::projectedBarycentricCoords(pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords, dist)
-    || searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4))
-  {
-    const auto &opt_dir = directionAtPosition(mesh_ptr->getVerticesOfFace(face), barycentric_coords);
-    if(opt_dir)
-    {
+  std::array<float, 3> barycentric_coords;
+  float dist;
+  if (mesh_map::projectedBarycentricCoords(
+          pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords,
+          dist) ||
+      searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4)) {
+    const auto &opt_dir = directionAtPosition(mesh_ptr->getVerticesOfFace(face),
+                                              barycentric_coords);
+    if (opt_dir) {
       pos += opt_dir.get().normalized() * step_size;
       return true;
     }
@@ -731,42 +689,43 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
   return false;
 }
 
-lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
-{
+lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector &position,
+                                                    const float &max_dist) {
   std::array<float, 3> bary_coords;
   lvr2::OptionalFaceHandle face_handle;
-  if(searchContainingFace(position, face_handle, bary_coords, max_dist)) return face_handle;
+  if (searchContainingFace(position, face_handle, bary_coords, max_dist))
+    return face_handle;
 }
 
-bool MeshMap::searchContainingFace(Vector &position, lvr2::OptionalFaceHandle& face_handle, std::array<float, 3>& barycentric_coords, const float& max_dist)
-{
+bool MeshMap::searchContainingFace(Vector &position,
+                                   lvr2::OptionalFaceHandle &face_handle,
+                                   std::array<float, 3> &barycentric_coords,
+                                   const float &max_dist) {
   std::array<float, 3> bary_coords;
-  for(auto face : mesh_ptr->faces())
-  {
-    const auto& vertices = mesh_ptr->getVertexPositionsOfFace(face);
+  for (auto face : mesh_ptr->faces()) {
+    const auto &vertices = mesh_ptr->getVertexPositionsOfFace(face);
     float dist;
-    if(mesh_map::projectedBarycentricCoords(position, vertices, bary_coords, dist) && dist < max_dist)
-    {
+    if (mesh_map::projectedBarycentricCoords(position, vertices, bary_coords,
+                                             dist) &&
+        dist < max_dist) {
       face_handle = face;
       barycentric_coords = bary_coords;
-      position = vertices[0] * bary_coords[0] + vertices[1] * bary_coords[1] + vertices[2] * bary_coords[2];
+      position = vertices[0] * bary_coords[0] + vertices[1] * bary_coords[1] +
+                 vertices[2] * bary_coords[2];
       return true;
     }
   }
   return false;
 }
 
-lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos)
-{
+lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos) {
   double smallest_dist = std::numeric_limits<double>::max();
   lvr2::OptionalVertexHandle nearest_handle;
 
   // For all Vertices of the BaseMesh
-  for(auto vH: mesh_ptr->vertices())
-  {
+  for (auto vH : mesh_ptr->vertices()) {
     float dist = pos.distanceFrom(mesh_ptr->getVertexPosition(vH));
-    if(dist < smallest_dist)
-    {
+    if (dist < smallest_dist) {
       smallest_dist = dist;
       nearest_handle = vH;
     }
@@ -774,8 +733,7 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos)
   return nearest_handle;
 }
 
-inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
-{
+inline const geometry_msgs::Point MeshMap::toPoint(const Vector &vec) {
   geometry_msgs::Point p;
   p.x = vec.x;
   p.y = vec.y;
@@ -783,27 +741,27 @@ inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
   return p;
 }
 
-
-
 constexpr float kEpsilon = 1e-8;
 
-bool MeshMap::projectedBarycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, std::array<float, 3>& barycentric_coords, float &dist)
-{
-  const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
-  return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords, dist);
+bool MeshMap::projectedBarycentricCoords(
+    const Vector &p, const lvr2::FaceHandle &triangle,
+    std::array<float, 3> &barycentric_coords, float &dist) {
+  const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
+  return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords,
+                                              dist);
 }
 
-bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v, float &w)
-{
-  const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
+bool MeshMap::barycentricCoords(const Vector &p,
+                                const lvr2::FaceHandle &triangle, float &u,
+                                float &v, float &w) {
+  const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
   return mesh_map::barycentricCoords(p, face[0], face[1], face[2], u, v, w);
 }
 
-
 bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
-    const Vector &v0, const Vector &v1, const Vector &v2,
-    float &t, float &u, float &v, Vector &p)
-{
+                                   const Vector &v0, const Vector &v1,
+                                   const Vector &v2, float &t, float &u,
+                                   float &v, Vector &p) {
   // compute plane's normal
   Vector v0v1 = v1 - v0;
   Vector v0v2 = v2 - v0;
@@ -826,7 +784,7 @@ bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
   t = (N.dot(orig) + d) / NdotRayDirection;
 
   // check if the triangle is in behind the ray
-  //if (t < 0) return false; // the triangle is behind
+  // if (t < 0) return false; // the triangle is behind
 
   // compute the intersection point using equation 1
   p = orig + dir * t;
@@ -838,19 +796,22 @@ bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
   Vector edge0 = v1 - v0;
   Vector vp0 = p - v0;
   C = edge0.cross(vp0);
-  if (N.dot(C) < 0) return false; // P is on the right side
+  if (N.dot(C) < 0)
+    return false; // P is on the right side
 
   // edge 1
   Vector edge1 = v2 - v1;
   Vector vp1 = p - v1;
   C = edge1.cross(vp1);
-  if ((u = N.dot(C)) < 0) return false; // P is on the right side
+  if ((u = N.dot(C)) < 0)
+    return false; // P is on the right side
 
   // edge 2
   Vector edge2 = v0 - v2;
   Vector vp2 = p - v2;
   C = edge2.cross(vp2);
-  if ((v = N.dot(C)) < 0) return false; // P is on the right side;
+  if ((v = N.dot(C)) < 0)
+    return false; // P is on the right side;
 
   u /= denom;
   v /= denom;
@@ -858,66 +819,40 @@ bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir,
   return true; // this ray hits the triangle
 }
 
-bool MeshMap::resetLayers()
-{
-  return true; //TODO implement
+bool MeshMap::resetLayers() {
+  return true; // TODO implement
 }
 
-void MeshMap::publishCostLayers()
-{
+void MeshMap::publishCostLayers() {
 
-  for(auto& layer : layers)
-  {
-    vertex_costs_pub.publish(
-        lvr_ros::toVertexCostsStamped(
-            layer.second->costs(),
-            mesh_ptr->numVertices(),
-            layer.second->defaultValue(),
-            layer.first,
-            global_frame,
-            uuid_str));
+  for (auto &layer : layers) {
+    vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+        layer.second->costs(), mesh_ptr->numVertices(),
+        layer.second->defaultValue(), layer.first, global_frame, uuid_str));
   }
-  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+      vertex_costs, "Combined Costs", global_frame, uuid_str));
 }
 
-
-void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name)
-{
-  vertex_costs_pub.publish(
-      lvr_ros::toVertexCostsStamped(
-          costs,
-          mesh_ptr->numVertices(),
-          0,
-          name,
-          global_frame,
-          uuid_str));
+void MeshMap::publishVertexCosts(const lvr2::VertexMap<float> &costs,
+                                 const std::string &name) {
+  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
+      costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
 }
 
-void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& cfg, uint32_t level)
-{
+void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg,
+                                  uint32_t level) {
   ROS_INFO_STREAM("Dynamic reconfigure callback...");
-  if(first_config)
-  {
+  if (first_config) {
     config = cfg;
     first_config = false;
   }
 
-  if(!first_config && map_loaded)
-  {
+  if (!first_config && map_loaded) {
     config = cfg;
   }
 }
 
-
-
-const std::string MeshMap::getGlobalFrameID()
-{
-  return global_frame;
-}
+const std::string MeshMap::getGlobalFrameID() { return global_frame; }
 
 } /* namespace mesh_map */
-
-
-
-
-

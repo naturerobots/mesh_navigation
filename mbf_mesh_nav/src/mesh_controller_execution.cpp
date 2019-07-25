@@ -36,32 +36,27 @@
  */
 #include "mbf_mesh_nav/mesh_controller_execution.h"
 
-namespace mbf_mesh_nav
-{
+namespace mbf_mesh_nav {
 
 MeshControllerExecution::MeshControllerExecution(
     const std::string name,
     const mbf_mesh_core::MeshController::Ptr &controller_ptr,
-    const ros::Publisher& vel_pub,
-    const ros::Publisher& goal_pub,
-    const TFPtr &tf_listener_ptr,
-    const MeshPtr &mesh_ptr,
+    const ros::Publisher &vel_pub, const ros::Publisher &goal_pub,
+    const TFPtr &tf_listener_ptr, const MeshPtr &mesh_ptr,
     const MoveBaseFlexConfig &config)
-      : AbstractControllerExecution(name, controller_ptr, vel_pub, goal_pub, tf_listener_ptr,
-          toAbstract(config)),
-        mesh_ptr_(mesh_ptr)
-{
+    : AbstractControllerExecution(name, controller_ptr, vel_pub, goal_pub,
+                                  tf_listener_ptr, toAbstract(config)),
+      mesh_ptr_(mesh_ptr) {
   ros::NodeHandle private_nh("~");
   private_nh.param("controller_lock_mesh", lock_mesh_, true);
 }
 
-MeshControllerExecution::~MeshControllerExecution()
-{
-}
+MeshControllerExecution::~MeshControllerExecution() {}
 
-mbf_abstract_nav::MoveBaseFlexConfig MeshControllerExecution::toAbstract(const MoveBaseFlexConfig &config)
-{
-  // copy the controller-related abstract configuration common to all MBF-based navigation
+mbf_abstract_nav::MoveBaseFlexConfig
+MeshControllerExecution::toAbstract(const MoveBaseFlexConfig &config) {
+  // copy the controller-related abstract configuration common to all MBF-based
+  // navigation
   mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
   abstract_config.controller_frequency = config.controller_frequency;
   abstract_config.controller_patience = config.controller_patience;
@@ -72,19 +67,19 @@ mbf_abstract_nav::MoveBaseFlexConfig MeshControllerExecution::toAbstract(const M
 }
 
 uint32_t MeshControllerExecution::computeVelocityCmd(
-    const geometry_msgs::PoseStamped& robot_pose,
-    const geometry_msgs::TwistStamped& robot_velocity,
-    geometry_msgs::TwistStamped& vel_cmd,
-    std::string& message)
-{
-  // Lock the mesh while planning, but following issue #4, we allow to move the responsibility to the planner itself
-  if (lock_mesh_)
-  {
+    const geometry_msgs::PoseStamped &robot_pose,
+    const geometry_msgs::TwistStamped &robot_velocity,
+    geometry_msgs::TwistStamped &vel_cmd, std::string &message) {
+  // Lock the mesh while planning, but following issue #4, we allow to move the
+  // responsibility to the planner itself
+  if (lock_mesh_) {
     // TODO
-    //boost::lock_guard<mesh::Mesh::mutex_t> lock(*(mesh_ptr_->getMutex()));
-    //return controller_->computeVelocityCommands(robot_pose, robot_velocity, vel_cmd, message);
+    // boost::lock_guard<mesh::Mesh::mutex_t> lock(*(mesh_ptr_->getMutex()));
+    // return controller_->computeVelocityCommands(robot_pose, robot_velocity,
+    // vel_cmd, message);
   }
-  return controller_->computeVelocityCommands(robot_pose, robot_velocity, vel_cmd, message);
+  return controller_->computeVelocityCommands(robot_pose, robot_velocity,
+                                              vel_cmd, message);
 }
 
 } /* namespace mbf_mesh_nav */

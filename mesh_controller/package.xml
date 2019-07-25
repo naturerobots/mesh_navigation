@@ -1,21 +1,21 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>mesh_controller</name>
-  <version>0.0.0</version>
-  <description>The mesh_controller package</description>
+    <name>mesh_controller</name>
+    <version>0.0.0</version>
+    <description>The mesh_controller package</description>
 
-  <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
-  <license>BSD</license>
-  <author email="sfrohn@uos.de">Sabrina Frohn</author>
+    <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
+    <license>BSD</license>
+    <author email="sfrohn@uos.de">Sabrina Frohn</author>
 
-  <buildtool_depend>catkin</buildtool_depend>
+    <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>roscpp</depend>
-  <depend>mbf_mesh_core</depend>
-  <depend>mesh_map</depend>
-  <depend>lvr_ros</depend>
+    <depend>roscpp</depend>
+    <depend>mbf_mesh_core</depend>
+    <depend>mesh_map</depend>
+    <depend>lvr_ros</depend>
 
-  <export>
-    <mbf_mesh_core plugin="${prefix}/mesh_controller.xml" />
-  </export>
+    <export>
+        <mbf_mesh_core plugin="${prefix}/mesh_controller.xml"/>
+    </export>
 </package>

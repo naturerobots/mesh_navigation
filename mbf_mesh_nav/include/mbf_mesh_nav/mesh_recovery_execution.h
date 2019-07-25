@@ -39,21 +39,21 @@
 #define MBF_MESH_NAV__MESH_RECOVERY_EXECUTION_H
 
 #include <mbf_abstract_nav/abstract_recovery_execution.h>
-#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mbf_mesh_core/mesh_recovery.h>
+#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 
-
-namespace mbf_mesh_nav
-{
+namespace mbf_mesh_nav {
 /**
- * @brief The MeshRecoveryExecution binds a local and a global mesh to the AbstractRecoveryExecution and uses the
- *        nav_core/MeshRecovery class as base plugin interface. This class makes move_base_flex compatible to the old move_base.
+ * @brief The MeshRecoveryExecution binds a local and a global mesh to the
+ * AbstractRecoveryExecution and uses the nav_core/MeshRecovery class as base
+ * plugin interface. This class makes move_base_flex compatible to the old
+ * move_base.
  *
  * @ingroup recovery_execution move_base_server
  */
-class MeshRecoveryExecution : public mbf_abstract_nav::AbstractRecoveryExecution
-{
+class MeshRecoveryExecution
+    : public mbf_abstract_nav::AbstractRecoveryExecution {
 
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
@@ -65,25 +65,22 @@ public:
    * @param global_mesh Shared pointer to the global mesh.
    * @param local_mesh Shared pointer to the local mesh.
    */
-  MeshRecoveryExecution(
-      const std::string name,
-      const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
-      const TFPtr &tf_listener_ptr,
-      const MeshPtr &mesh_ptr,
-      const MoveBaseFlexConfig &config);
+  MeshRecoveryExecution(const std::string name,
+                        const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
+                        const TFPtr &tf_listener_ptr, const MeshPtr &mesh_ptr,
+                        const MoveBaseFlexConfig &config);
   /**
    * Destructor
    */
   virtual ~MeshRecoveryExecution();
 
 protected:
-
   //! Shared pointer to the mesh for 3D navigation planning
   const MeshPtr &mesh_ptr_;
 
 private:
-
-  mbf_abstract_nav::MoveBaseFlexConfig toAbstract(const MoveBaseFlexConfig &config);
+  mbf_abstract_nav::MoveBaseFlexConfig
+  toAbstract(const MoveBaseFlexConfig &config);
 };
 
 } /* namespace mbf_mesh_nav */

@@ -1,5 +1,6 @@
 <library path="lib/libmesh_controller">
-    <class name="mesh_controller/MeshController" type="mesh_controller::MeshController" base_class_type="mbf_mesh_core::MeshController">
+    <class name="mesh_controller/MeshController" type="mesh_controller::MeshController"
+           base_class_type="mbf_mesh_core::MeshController">
         <description>
             A mesh controller for mbf_mesh_nav
         </description>

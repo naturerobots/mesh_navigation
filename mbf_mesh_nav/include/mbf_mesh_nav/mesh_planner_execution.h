@@ -39,33 +39,32 @@
 #define MBF_MESH_NAV__MESH_PLANNER_EXECUTION_H
 
 #include <mbf_abstract_nav/abstract_planner_execution.h>
-#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mbf_mesh_core/mesh_planner.h>
+#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 
-namespace mbf_mesh_nav
-{
+namespace mbf_mesh_nav {
 /**
- * @brief The MeshPlannerExecution binds a global mesh to the AbstractPlannerExecution and uses the
- *        nav_core/BaseMeshPlanner class as base plugin interface. This class makes move_base_flex compatible to the old move_base.
+ * @brief The MeshPlannerExecution binds a global mesh to the
+ * AbstractPlannerExecution and uses the nav_core/BaseMeshPlanner class as base
+ * plugin interface. This class makes move_base_flex compatible to the old
+ * move_base.
  *
  * @ingroup planner_execution move_base_server
  */
-class MeshPlannerExecution : public mbf_abstract_nav::AbstractPlannerExecution
-{
+class MeshPlannerExecution : public mbf_abstract_nav::AbstractPlannerExecution {
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
   /**
    * @brief Constructor
-   * @param condition Thread sleep condition variable, to wake up connected threads
+   * @param condition Thread sleep condition variable, to wake up connected
+   * threads
    * @param mesh Shared pointer to the mesh.
    */
-  MeshPlannerExecution(
-      const std::string name,
-      const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
-      const MeshPtr &mesh,
-      const MoveBaseFlexConfig &config);
+  MeshPlannerExecution(const std::string name,
+                       const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
+                       const MeshPtr &mesh, const MoveBaseFlexConfig &config);
 
   /**
    * @brief Destructor
@@ -73,27 +72,28 @@ public:
   virtual ~MeshPlannerExecution();
 
 private:
-
-  mbf_abstract_nav::MoveBaseFlexConfig toAbstract(const MoveBaseFlexConfig &config);
+  mbf_abstract_nav::MoveBaseFlexConfig
+  toAbstract(const MoveBaseFlexConfig &config);
 
   /**
-   * @brief Calls the planner plugin to make a plan from the start pose to the goal pose with the given tolerance,
-   *        if a goal tolerance is enabled in the planner plugin.
+   * @brief Calls the planner plugin to make a plan from the start pose to the
+   * goal pose with the given tolerance, if a goal tolerance is enabled in the
+   * planner plugin.
    * @param start The start pose for planning
    * @param goal The goal pose for planning
    * @param tolerance The goal tolerance
    * @param plan The computed plan by the plugin
    * @param cost The computed costs for the corresponding plan
-   * @param message An optional message which should correspond with the returned outcome
-   * @return An outcome number, see also the action definition in the GetPath.action file
+   * @param message An optional message which should correspond with the
+   * returned outcome
+   * @return An outcome number, see also the action definition in the
+   * GetPath.action file
    */
-  virtual uint32_t makePlan(
-      const geometry_msgs::PoseStamped &start,
-      const geometry_msgs::PoseStamped &goal,
-      double tolerance,
-      std::vector<geometry_msgs::PoseStamped> &plan,
-      double &cost,
-      std::string &message);
+  virtual uint32_t makePlan(const geometry_msgs::PoseStamped &start,
+                            const geometry_msgs::PoseStamped &goal,
+                            double tolerance,
+                            std::vector<geometry_msgs::PoseStamped> &plan,
+                            double &cost, std::string &message);
 
   //! Shared pointer to the mesh for 3d navigation planning
   const MeshPtr &mesh_ptr_;

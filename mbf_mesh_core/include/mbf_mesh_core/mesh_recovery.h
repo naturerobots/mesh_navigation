@@ -37,52 +37,55 @@
 #ifndef MBF_MESH_CORE__ABSTRACT_RECOVERY_H
 #define MBF_MESH_CORE__ABSTRACT_RECOVERY_H
 
-#include <stdint.h>
-#include <string>
 #include <boost/shared_ptr.hpp>
 #include <mbf_abstract_core/abstract_recovery.h>
 #include <mesh_map/mesh_map.h>
+#include <stdint.h>
+#include <string>
 
 namespace mbf_mesh_core {
+/**
+ * @class MeshRecovery
+ * @brief Provides an interface for recovery behaviors used in navigation.
+ * All recovery behaviors written as plugins for the navigation stack must
+ * adhere to this interface.
+ */
+class MeshRecovery : public mbf_abstract_core::AbstractRecovery {
+public:
+  typedef boost::shared_ptr<::mbf_mesh_core::MeshRecovery> Ptr;
+
   /**
-   * @class MeshRecovery
-   * @brief Provides an interface for recovery behaviors used in navigation.
-   * All recovery behaviors written as plugins for the navigation stack must adhere to this interface.
+   * @brief Runs the AbstractRecovery
+   * @param message The recovery behavior could set, the message should
+   * correspond to the return value
+   * @return An outcome which will be hand over to the action result.
    */
-  class MeshRecovery : public mbf_abstract_core::AbstractRecovery{
-    public:
+  virtual uint32_t runBehavior(std::string &message) = 0;
 
-      typedef boost::shared_ptr< ::mbf_mesh_core::MeshRecovery > Ptr;
+  /**
+   * @brief Virtual destructor for the interface
+   */
+  virtual ~MeshRecovery() {}
 
-      /**
-       * @brief Runs the AbstractRecovery
-       * @param message The recovery behavior could set, the message should correspond to the return value
-       * @return An outcome which will be hand over to the action result.
-       */
-      virtual uint32_t runBehavior(std::string& message) = 0;
+  /**
+   * @brief Requests the recovery behavior to cancel, e.g. if it takes too much
+   * time.
+   * @return True if a cancel has been successfully requested, false if not
+   * implemented.
+   */
+  virtual bool cancel() = 0;
 
-      /**
-       * @brief Virtual destructor for the interface
-       */
-      virtual ~MeshRecovery(){}
+  virtual bool
+  initialize(const std::string &name,
+             const boost::shared_ptr<tf2_ros::Buffer> &tf_ptr,
+             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr) = 0;
 
-      /**
-       * @brief Requests the recovery behavior to cancel, e.g. if it takes too much time.
-       * @return True if a cancel has been successfully requested, false if not implemented.
-       */
-      virtual bool cancel() = 0;
+protected:
+  /**
+   * @brief Constructor
+   */
+  MeshRecovery(){};
+};
+}; /* namespace mbf_mesh_core */
 
-      virtual bool initialize(
-          const std::string& name,
-          const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
-
-    protected:
-      /**
-       * @brief Constructor
-       */
-      MeshRecovery(){};
-  };
-};  /* namespace mbf_mesh_core */
-
-#endif  /* MBF_MESH_CORE__ABSTRACT_RECOVERY_H */
+#endif /* MBF_MESH_CORE__ABSTRACT_RECOVERY_H */

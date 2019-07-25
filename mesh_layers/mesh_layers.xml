@@ -1,25 +1,25 @@
 <class_libraries>
-<library path="lib/libmesh_layers">
-  <class name="mesh_layers/RoughnessLayer"
-         type="mesh_layers::RoughnessLayer"
-         base_class_type="mesh_map::AbstractLayer">
-    <description>
-      A roughness mesh layer, computing the roughness of the surface as cost layer.
-    </description>
-  </class>
-  <class name="mesh_layers/HeightDiffLayer"
-         type="mesh_layers::HeightDiffLayer"
-         base_class_type="mesh_map::AbstractLayer">
-    <description>
-      A height differences mesh layer, computing the height differences of the surface as cost layer.
-    </description>
-  </class>
-  <class name="mesh_layers/InflationLayer"
-         type="mesh_layers::InflationLayer"
-         base_class_type="mesh_map::AbstractLayer">
-    <description>
-      A inflation mesh layer, computing the inflation of the surface as cost layer.
-    </description>
-  </class>
-</library>
+    <library path="lib/libmesh_layers">
+        <class name="mesh_layers/RoughnessLayer"
+               type="mesh_layers::RoughnessLayer"
+               base_class_type="mesh_map::AbstractLayer">
+            <description>
+                A roughness mesh layer, computing the roughness of the surface as cost layer.
+            </description>
+        </class>
+        <class name="mesh_layers/HeightDiffLayer"
+               type="mesh_layers::HeightDiffLayer"
+               base_class_type="mesh_map::AbstractLayer">
+            <description>
+                A height differences mesh layer, computing the height differences of the surface as cost layer.
+            </description>
+        </class>
+        <class name="mesh_layers/InflationLayer"
+               type="mesh_layers::InflationLayer"
+               base_class_type="mesh_map::AbstractLayer">
+            <description>
+                A inflation mesh layer, computing the inflation of the surface as cost layer.
+            </description>
+        </class>
+    </library>
 </class_libraries>

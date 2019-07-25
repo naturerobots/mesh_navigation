@@ -36,28 +36,23 @@
  */
 #include "mbf_mesh_nav/mesh_planner_execution.h"
 
-namespace mbf_mesh_nav
-{
+namespace mbf_mesh_nav {
 
 MeshPlannerExecution::MeshPlannerExecution(
-    const std::string name,
-    const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
-    const MeshPtr &mesh_ptr,
-    const MoveBaseFlexConfig &config)
-      : AbstractPlannerExecution(name, planner_ptr, toAbstract(config)),
-        mesh_ptr_(mesh_ptr)
-{
+    const std::string name, const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
+    const MeshPtr &mesh_ptr, const MoveBaseFlexConfig &config)
+    : AbstractPlannerExecution(name, planner_ptr, toAbstract(config)),
+      mesh_ptr_(mesh_ptr) {
   ros::NodeHandle private_nh("~");
   private_nh.param("planner_lock_mesh", lock_mesh_, true);
 }
 
-MeshPlannerExecution::~MeshPlannerExecution()
-{
-}
+MeshPlannerExecution::~MeshPlannerExecution() {}
 
-mbf_abstract_nav::MoveBaseFlexConfig MeshPlannerExecution::toAbstract(const MoveBaseFlexConfig &config)
-{
-  // copy the planner-related abstract configuration common to all MBF-based navigation
+mbf_abstract_nav::MoveBaseFlexConfig
+MeshPlannerExecution::toAbstract(const MoveBaseFlexConfig &config) {
+  // copy the planner-related abstract configuration common to all MBF-based
+  // navigation
   mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
   abstract_config.planner_frequency = config.planner_frequency;
   abstract_config.planner_patience = config.planner_patience;
@@ -65,18 +60,17 @@ mbf_abstract_nav::MoveBaseFlexConfig MeshPlannerExecution::toAbstract(const Move
   return abstract_config;
 }
 
-uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped& start,
-                                           const geometry_msgs::PoseStamped& goal,
-                                           double tolerance,
-                                           std::vector<geometry_msgs::PoseStamped> &plan,
-                                           double &cost,
-                                           std::string &message)
-{
-  if (lock_mesh_)
-  {
+uint32_t
+MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped &start,
+                               const geometry_msgs::PoseStamped &goal,
+                               double tolerance,
+                               std::vector<geometry_msgs::PoseStamped> &plan,
+                               double &cost, std::string &message) {
+  if (lock_mesh_) {
     // TODO
-    //boost::unique_lock<mesh_map::MeshMap::mutex_t> lock(*(mesh_ptr_->getMutex()));
-    //return planner_->makePlan(start, goal, tolerance, plan, cost, message);
+    // boost::unique_lock<mesh_map::MeshMap::mutex_t>
+    // lock(*(mesh_ptr_->getMutex())); return planner_->makePlan(start, goal,
+    // tolerance, plan, cost, message);
   }
   return planner_->makePlan(start, goal, tolerance, plan, cost, message);
 }
