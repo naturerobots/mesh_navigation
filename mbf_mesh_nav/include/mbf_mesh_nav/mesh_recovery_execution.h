@@ -70,9 +70,7 @@ public:
       const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
       const TFPtr &tf_listener_ptr,
       const MeshPtr &mesh_ptr,
-      const MoveBaseFlexConfig &config,
-      boost::function<void()> setup_fn = 0,
-      boost::function<void()> cleanup_fn = 0);
+      const MoveBaseFlexConfig &config);
   /**
    * Destructor
    */

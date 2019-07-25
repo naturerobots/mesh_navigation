@@ -65,9 +65,7 @@ public:
       const std::string name,
       const mbf_mesh_core::MeshPlanner::Ptr &planner_ptr,
       const MeshPtr &mesh,
-      const MoveBaseFlexConfig &config,
-      boost::function<void()> setup_fn = 0,
-      boost::function<void()> cleanup_fn = 0);
+      const MoveBaseFlexConfig &config);
 
   /**
    * @brief Destructor

@@ -44,10 +44,8 @@ MeshRecoveryExecution::MeshRecoveryExecution(
     const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
     const TFPtr &tf_listener_ptr,
     const MeshPtr &mesh_ptr,
-    const MoveBaseFlexConfig &config,
-    boost::function<void()> setup_fn,
-    boost::function<void()> cleanup_fn)
-      : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config), setup_fn, cleanup_fn),
+    const MoveBaseFlexConfig &config)
+      : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config)),
         mesh_ptr_(mesh_ptr)
 {
 }

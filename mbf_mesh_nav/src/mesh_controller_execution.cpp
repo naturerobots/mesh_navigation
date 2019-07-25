@@ -46,11 +46,9 @@ MeshControllerExecution::MeshControllerExecution(
     const ros::Publisher& goal_pub,
     const TFPtr &tf_listener_ptr,
     const MeshPtr &mesh_ptr,
-    const MoveBaseFlexConfig &config,
-    boost::function<void()> setup_fn,
-    boost::function<void()> cleanup_fn)
+    const MoveBaseFlexConfig &config)
       : AbstractControllerExecution(name, controller_ptr, vel_pub, goal_pub, tf_listener_ptr,
-          toAbstract(config), setup_fn, cleanup_fn),
+          toAbstract(config)),
         mesh_ptr_(mesh_ptr)
 {
   ros::NodeHandle private_nh("~");

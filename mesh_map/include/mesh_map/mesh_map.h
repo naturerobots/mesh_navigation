@@ -38,17 +38,18 @@
 #ifndef MESH_MAP__MESH_MAP_H
 #define MESH_MAP__MESH_MAP_H
 
-#include <lvr2/io/HDF5IO.hpp>
-#include <lvr2/geometry/BaseVector.hpp>
-#include <tf2_ros/buffer.h>
-#include <mesh_msgs/MeshVertexCosts.h>
-#include <mesh_map/MeshMapConfig.h>
-#include <geometry_msgs/Point.h>
-#include <dynamic_reconfigure/server.h>
-#include <mesh_map/abstract_layer.h>
-#include <pluginlib/class_loader.h>
-#include <mutex>
 #include <atomic>
+#include <dynamic_reconfigure/server.h>
+#include <geometry_msgs/Point.h>
+#include <lvr2/geometry/BaseVector.hpp>
+#include <lvr2/io/HDF5IO.hpp>
+#include <mesh_map/MeshMapConfig.h>
+#include <mesh_map/abstract_layer.h>
+#include <mesh_msgs/MeshVertexCosts.h>
+#include <mutex>
+#include <pluginlib/class_loader.h>
+#include <std_msgs/ColorRGBA.h>
+#include <tf2_ros/buffer.h>
 
 namespace mesh_map{
 
@@ -72,7 +73,11 @@ class MeshMap
 
   lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector &pos);
 
-  lvr2::OptionalFaceHandle getContainingFaceHandle(const Vector &pos);
+  bool inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const float& dist);
+
+  lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
+
+  bool searchContainingFace(Vector &pos, lvr2::OptionalFaceHandle& face_handle, std::array<float, 3>& barycentric_coords, const float& max_dist);
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
@@ -92,7 +97,9 @@ class MeshMap
 
   void publishCostLayers();
 
-  bool barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v);
+  bool projectedBarycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, std::array<float, 3>& barycentric_coords, float &dist);
+
+  bool barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v, float& w);
 
   void layerChanged(const std::string &layer_name);
 
@@ -106,12 +113,22 @@ class MeshMap
 
   inline const geometry_msgs::Point toPoint(const Vector& vec);
 
+  boost::optional<Vector> directionAtPosition(
+      const std::array<lvr2::VertexHandle, 3>& vertices,
+      const std::array<float, 3>& barycentric_coords);
+
+  float costAtPosition(
+      const std::array<lvr2::VertexHandle, 3>& vertices,
+      const std::array<float, 3>& barycentric_coords);
+
   bool rayTriangleIntersect(
       const Vector &orig, const Vector &dir,
       const Vector &v0, const Vector &v1, const Vector &v2,
       float &t, float &u, float &v, Vector &p);
 
   bool resetLayers();
+
+  const lvr2::DenseVertexMap<mesh_map::Vector>& getVectorMap(){return vector_map;};
 
   const lvr2::HalfEdgeMesh<Vector>& mesh(){return *mesh_ptr;}
 
@@ -127,9 +144,42 @@ class MeshMap
 
   const lvr2::DenseEdgeMap<float>& edgeWeights(){return edge_weights;}
 
- private:
+  /**
+   * Searches in the sourrounding triangles for the triangle in which the given position lies.
+   * @param pose_vec  Vector of the position which searched for
+   * @param face      Face handle from which search begins,
+   * @param max_dist  The maximum distance to the given face vertices
+   * @return          Face handle of the position - empty optional face handle if position could not be found
+   */
+  bool searchNeighbourFaces(
+      Vector& pos,
+      lvr2::FaceHandle& face,
+      std::array<float, 3>& barycentric_coords,
+      const float& max_radius,
+      const float& max_dist);
+
+  /**
+   * Finds the next position given a position vector and its corresponding face handle by following the direction
+   * For: look ahead when using mesh gradient
+   * @param vec   direction vector from which the next step vector is calculated
+   * @param face  face of the direction vector
+   * @return      new vector (also updates the ahead_face handle to correspond to the new vector)
+   */
+  bool meshAhead(Vector& vec, lvr2::FaceHandle &face, const float& step_width);
+
+  void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
+
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
+
+  void publishDebugPoint(const Vector pos,
+      const std_msgs::ColorRGBA& color, const std::string& name);
+
+  void publishDebugFace(const lvr2::FaceHandle &face_handle,
+                        const std_msgs::ColorRGBA &color,
+                        const std::string& name);
+
+ private:
 
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -153,8 +203,9 @@ class MeshMap
   // path surface potential
   lvr2::DenseVertexMap<float> potential;
 
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-  // edge vertex distances
+    // edge vertex distances
   lvr2::DenseEdgeMap<float> edge_distances;
   lvr2::DenseEdgeMap<float> edge_weights;
 
@@ -164,6 +215,7 @@ class MeshMap
 
   ros::Publisher vertex_costs_pub;
   ros::Publisher mesh_geometry_pub;
+  ros::Publisher marker_pub;
 
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > reconfigure_server_ptr;

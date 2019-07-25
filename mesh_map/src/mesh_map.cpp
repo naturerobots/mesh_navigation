@@ -51,6 +51,8 @@
 #include <lvr_ros/colors.h>
 #include <functional>
 #include <mutex>
+#include <geometry_msgs/PointStamped.h>
+#include <visualization_msgs/Marker.h>
 
 namespace mesh_map{
 
@@ -67,6 +69,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf_listener)
   private_nh.param<std::string>("global_frame", global_frame, "map");
   ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
+  marker_pub = private_nh.advertise<visualization_msgs::Marker>("marker", 100, true);
   mesh_geometry_pub = private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
   vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
   reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig> > (
@@ -546,30 +549,211 @@ void MeshMap::findContours(
   ROS_INFO_STREAM("Found " << contours.size() << " contours.");
 }
 
-
-
-
-lvr2::OptionalFaceHandle MeshMap::getContainingFaceHandle(const Vector &pos)
+void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
 {
-  lvr2::OptionalFaceHandle fH;
-  lvr2::OptionalVertexHandle vH_opt = getNearestVertexHandle(pos);
-  if(vH_opt)
-  {
-    lvr2::VertexHandle vH = vH_opt.unwrap();
-    std::vector<lvr2::FaceHandle> faces;
-    mesh_ptr->getFacesOfVertex(vH, faces);
+    this->vector_map = vector_map;
+}
 
-    for(auto face : faces)
+
+
+boost::optional<Vector> MeshMap::directionAtPosition(
+    const std::array<lvr2::VertexHandle, 3>& vertices,
+    const std::array<float, 3>& barycentric_coords)
+{
+  const auto &a = vector_map.get(vertices[0]);
+  const auto &b = vector_map.get(vertices[1]);
+  const auto &c = vector_map.get(vertices[2]);
+
+  if(a && b && c)
+  {
+    return a.get() * barycentric_coords[0] + b.get() * barycentric_coords[1] + c.get() * barycentric_coords[2];
+  }
+  return boost::none;
+}
+
+float MeshMap::costAtPosition(
+    const std::array<lvr2::VertexHandle, 3>& vertices,
+    const std::array<float, 3>& barycentric_coords)
+{
+  const auto &a = vertex_costs.get(vertices[0]);
+  const auto &b = vertex_costs.get(vertices[1]);
+  const auto &c = vertex_costs.get(vertices[2]);
+
+  if(a && b && c)
+  {
+    std::array<float, 3>costs = {a.get(), b.get(), c.get()};
+    return mesh_map::linearCombineBarycentricCoords(costs, barycentric_coords);
+  }
+  return -1;
+}
+
+void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name)
+{
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = mapFrame();
+  marker.header.stamp = ros::Time();
+  marker.ns = name;
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::SPHERE;
+  marker.action = visualization_msgs::Marker::ADD;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.05;
+  scale.y = 0.05;
+  scale.z = 0.05;
+  marker.scale = scale;
+
+  geometry_msgs::Pose p;
+  p.position.x = pos.x; p.position.y = pos.y; p.position.z = pos.z;
+  marker.pose = p;
+  marker.color = color;
+  marker_pub.publish(marker);
+}
+
+void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
+                               const std_msgs::ColorRGBA &color,
+                               const std::string& name){
+  const auto& vertices = mesh_ptr->getVerticesOfFace(face_handle);
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = mapFrame();
+  marker.header.stamp = ros::Time();
+  marker.ns = name;
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  geometry_msgs::Vector3 scale;
+  scale.x = 1.0;
+  scale.y = 1.0;
+  scale.z = 1.0;
+  marker.scale = scale;
+
+  for(auto vertex : vertices){
+    auto& pos = mesh_ptr->getVertexPosition(vertex);
+    geometry_msgs::Point p;
+    p.x = pos.x; p.y = pos.y; p.z = pos.z;
+    marker.points.push_back(p);
+    marker.colors.push_back(color);
+  }
+  marker_pub.publish(marker);
+}
+
+bool MeshMap::inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const float& dist)
+{
+  const auto& vertices = mesh_ptr->getVerticesOfFace(face);
+  return mesh_map::inTriangle(pos, mesh_ptr->getVertexPosition(vertices[0]), mesh_ptr->getVertexPosition(vertices[1]), mesh_ptr->getVertexPosition(vertices[2]), dist, 0.0001);
+}
+
+bool MeshMap::searchNeighbourFaces(
+    Vector& pos,
+    lvr2::FaceHandle& face,
+    std::array<float, 3>& barycentric_coords,
+    const float& max_radius,
+    const float& max_dist)
+{
+  std::list<lvr2::FaceHandle> possible_faces;
+  possible_faces.push_back(face);
+  std::list<lvr2::FaceHandle>::iterator face_iter = possible_faces.begin();
+
+
+  Vector center(0,0,0);
+  const auto& start_vertices = mesh_ptr->getVertexPositionsOfFace(face);
+  for(auto vertex : start_vertices)
+  {
+    center += vertex;
+  }
+  center /= 3;
+
+  float vertex_center_max = 0;
+  for(auto vertex : start_vertices)
+  {
+    vertex_center_max = std::max(vertex_center_max, vertex.distance(center));
+  }
+
+  float ext_radius = max_radius + vertex_center_max;
+  float max_radius_sq = ext_radius * ext_radius;
+
+
+  lvr2::SparseFaceMap<bool> in_list_map;
+  in_list_map.insert(face, true);
+
+  std::array<float, 3> bary_coords;
+
+  while(possible_faces.end() != face_iter)
+  {
+    const auto& vertices_positions = mesh_ptr->getVertexPositionsOfFace(*face_iter);
+    float dist;
+    if (mesh_map::projectedBarycentricCoords(pos, vertices_positions, bary_coords, dist) && dist < max_dist)
     {
-      float u, v;
-      if(barycentricCoords(pos, face, u, v))
+      // update current face, barycentric coords, and the projected position
+      face = *face_iter;
+      barycentric_coords = bary_coords;
+      pos = vertices_positions[0] * bary_coords[0] + vertices_positions[1] * bary_coords[1] + vertices_positions[2] * bary_coords[2];
+      return true;
+    }
+    else
+    {
+
+      const auto& vertices = mesh_ptr->getVerticesOfFace(*face_iter);
+      for(auto vertex : vertices)
       {
-        fH = face;
-        break;
+        if(center.distance2(mesh_ptr->getVertexPosition(vertex)) < max_radius_sq)
+        {
+          const auto& nn_faces = mesh_ptr->getFacesOfVertex(vertex);
+          for(auto nn_face : nn_faces)
+          {
+            if(!in_list_map.containsKey(nn_face))
+            {
+              possible_faces.push_back(nn_face);
+              in_list_map.insert(nn_face, true);
+            }
+          }
+        }
       }
+      ++face_iter;
     }
   }
-  return fH;
+
+  return false;
+}
+
+bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const float& step_size){
+  const auto &vertices = mesh_ptr->getVerticesOfFace(face);
+  std::array<float, 3> barycentric_coords; float dist;
+  if(mesh_map::projectedBarycentricCoords(pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords, dist)
+    || searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4))
+  {
+    const auto &opt_dir = directionAtPosition(mesh_ptr->getVerticesOfFace(face), barycentric_coords);
+    if(opt_dir)
+    {
+      pos += opt_dir.get().normalized() * step_size;
+      return true;
+    }
+  }
+  return false;
+}
+
+lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
+{
+  std::array<float, 3> bary_coords;
+  lvr2::OptionalFaceHandle face_handle;
+  if(searchContainingFace(position, face_handle, bary_coords, max_dist)) return face_handle;
+}
+
+bool MeshMap::searchContainingFace(Vector &position, lvr2::OptionalFaceHandle& face_handle, std::array<float, 3>& barycentric_coords, const float& max_dist)
+{
+  std::array<float, 3> bary_coords;
+  for(auto face : mesh_ptr->faces())
+  {
+    const auto& vertices = mesh_ptr->getVertexPositionsOfFace(face);
+    float dist;
+    if(mesh_map::projectedBarycentricCoords(position, vertices, bary_coords, dist) && dist < max_dist)
+    {
+      face_handle = face;
+      barycentric_coords = bary_coords;
+      position = vertices[0] * bary_coords[0] + vertices[1] * bary_coords[1] + vertices[2] * bary_coords[2];
+      return true;
+    }
+  }
+  return false;
 }
 
 lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos)
@@ -603,10 +787,16 @@ inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
 
 constexpr float kEpsilon = 1e-8;
 
-bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v)
+bool MeshMap::projectedBarycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, std::array<float, 3>& barycentric_coords, float &dist)
 {
   const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
-  return mesh_map::barycentricCoords(p, face[0], face[1], face[2], u, v);
+  return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords, dist);
+}
+
+bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v, float &w)
+{
+  const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
+  return mesh_map::barycentricCoords(p, face[0], face[1], face[2], u, v, w);
 }
 
 

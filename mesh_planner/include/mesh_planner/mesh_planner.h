@@ -99,6 +99,8 @@ class MeshPlanner : public mbf_mesh_core::MeshPlanner
       const std::string& name,
       const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
+  lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
+
  protected:
 
   uint32_t waveFrontPropagation(
