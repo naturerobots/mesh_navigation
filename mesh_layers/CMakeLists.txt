@@ -20,7 +20,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES mesh_layers
-  CATKIN_DEPENDS lvr_ros mesh_map
+  CATKIN_DEPENDS lvr_ros mesh_map dynamic_reconfigure
 )
 
 include_directories(
@@ -38,6 +38,10 @@ add_dependencies(${PROJECT_NAME}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   ${PROJECT_NAME}_gencfg
+)
+
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
 )
 
 install(TARGETS ${PROJECT_NAME}

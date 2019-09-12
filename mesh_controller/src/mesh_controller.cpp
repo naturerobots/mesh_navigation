@@ -44,6 +44,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <std_msgs/Float32.h>
 #include <tf/transform_listener.h>
+#include <mbf_utility/exe_path_exception.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController,
                        mbf_mesh_core::MeshController);
@@ -138,9 +139,15 @@ uint32_t MeshController::computeVelocityCommands(
     supposed_heading = poseToDirectionVector(plan_position);
   } else {
     const auto &opt_dir =
-        map_ptr->directionAtPosition(vertex_handles, barycentric_coords);
+        map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
+
     if (opt_dir) {
       supposed_heading = opt_dir.get().normalized();
+      if(!std::isfinite(supposed_heading.length())){
+
+      }
+
+      ROS_INFO_STREAM("Supposed heading:" << supposed_heading);
     } else {
       map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0),
                                 "no_directions");
@@ -154,8 +161,16 @@ uint32_t MeshController::computeVelocityCommands(
   // variable to store the new angular and linear velocities
   std::vector<float> values(2);
 
-  // determine values via naive controller
-  values = naiveControl(pose, supposed_heading, cost);
+  try
+  {
+    // determine values via naive controller
+    values = naiveControl(pose, supposed_heading, cost);
+  }
+  catch(mbf_utility::ExePathException e)
+  {
+    ROS_ERROR_STREAM("Mbf Exe Path Exception:" << e.what());
+    return e.outcome;
+  }
 
   if (values[1] == std::numeric_limits<float>::max()) {
     ROS_ERROR_STREAM("Mesh controller calculation failed!");
@@ -211,6 +226,8 @@ bool MeshController::setPlan(
     // reset current and ahead face
     current_face = lvr2::OptionalFaceHandle();
     mesh_ahead_face = lvr2::OptionalFaceHandle();
+
+    set_linear_velocity = 0;
 
     // set initial distance as infinite as indicator for later initializations
     initial_dist = std::numeric_limits<float>::max();
@@ -383,9 +400,14 @@ MeshController::poseToPositionVector(const geometry_msgs::PoseStamped &pose) {
 
 float MeshController::angleBetweenVectors(mesh_map::Vector robot_heading,
                                           mesh_map::Vector planned_heading) {
-  tf::Vector3 tf_robot(robot_heading.x, robot_heading.y, robot_heading.z);
-  tf::Vector3 tf_planned(planned_heading.x, planned_heading.y,
-                         planned_heading.z);
+  tf::Vector3 tf_robot(
+      robot_heading.x,
+      robot_heading.y,
+      robot_heading.z);
+  tf::Vector3 tf_planned(
+      planned_heading.x,
+      planned_heading.y,
+      planned_heading.z);
   return tf_robot.angle(tf_planned);
 }
 
@@ -582,10 +604,12 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
   // determine the time that has passed since the last look ahead
   ros::Time now = ros::Time::now();
   ros::Duration time_delta = now - last_lookahead_call;
+  last_lookahead_call = now;
 
   // calculate the maximum distance the robot could have travelled since the
   // last function call because: the faster the robot, the further the distance
   // that may be travelled and therefore the look ahead
+
   double max_travelled_dist = velocity * time_delta.toSec();
 
   // select how far to look ahead depending on the max travelled distance
@@ -597,12 +621,16 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
     steps = (int)linValue(current_plan.size(), 0.0, 2 * initial_dist,
                           max_travelled_dist) -
             plan_iter;
+    ROS_ERROR_STREAM("1 Steps:" << steps);
   } else {
     // calculates how many steps ahead have to be checked when travelling in the
     // current robot direction with the given velocity by dividing it through
     // the step size that is later used therefore the look ahead will be as far
     // as the maximum travelled distance
     steps = (int)(max_travelled_dist / 0.03);
+    ROS_ERROR_STREAM("2 Steps:" << steps << "max travel dist:" << max_travelled_dist);
+    ROS_ERROR_STREAM("velocity:" << velocity);
+    ROS_ERROR_STREAM("time delta:" << time_delta.toSec());
   }
 
   if (steps == 0) {
@@ -628,6 +656,8 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
   mesh_map::Vector ahead_direction_vec;
   float ahead_cost = -1;
 
+  ROS_ERROR_STREAM("4. Steps:" << steps);
+
   lvr2::FaceHandle ahead_face = current_face.unwrap();
   // adds up cost and angles of all steps ahead
   for (int i = 0; i <= steps; i++) {
@@ -637,6 +667,7 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
       // in case look ahead extends planned path
       if ((plan_iter + i) >= current_plan.size()) {
         steps = i;
+        ROS_ERROR_STREAM("3. Steps:" << steps);
         break;
       }
 
@@ -661,12 +692,11 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
                                         barycentric_coords, 0.05, 0.4)) {
         ahead_cost =
             map_ptr->costAtPosition(vertex_handles, barycentric_coords);
+        if(ahead_cost == -1) ROS_ERROR_STREAM("Could not access cost!");
       }
     }
     // look ahead for using mesh gradient for navigation reference
     else {
-      const auto &vertex_handles =
-          map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
       const auto &vertex_positions =
           map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
@@ -675,13 +705,18 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
               ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
           map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face,
                                         barycentric_coords, 0.05, 0.4)) {
+
+        const auto &vertex_handles =
+            map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
+
         const auto &opt_dir =
-            map_ptr->directionAtPosition(vertex_handles, barycentric_coords);
+            map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
         if (opt_dir) {
           ahead_direction_vec = opt_dir.get().normalized() * 0.03;
           ahead_position_vec += ahead_direction_vec;
           ahead_cost =
               map_ptr->costAtPosition(vertex_handles, barycentric_coords);
+          if(ahead_cost == -1) ROS_ERROR_STREAM("Could not access cost!!!");
         } else {
           ROS_ERROR_STREAM("No direction at position!");
           break;
@@ -716,8 +751,8 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
   }
 
   if ((steps - missed_steps) <= 0 || steps <= 0) {
-    return {std::numeric_limits<float>::max(),
-            std::numeric_limits<float>::max()};
+    ROS_ERROR_STREAM("Missed steps:" << missed_steps << " Steps:" << steps);
+    throw mbf_utility::ExePathException(mbf_msgs::ExePathResult::MAP_ERROR);
   }
   //  take averages of future values
   float av_turn = accum_turn / (steps - missed_steps);
@@ -737,6 +772,9 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
   // angle will never be negative and smaller or equal to pi
   angle = angleBetweenVectors(dir_vec, supposed_dir);
 
+  ROS_INFO_STREAM("dir vec:" << dir_vec);
+  ROS_INFO_STREAM("sup vec:" << supposed_dir);
+
   // output: angle publishing
   std_msgs::Float32 angle32;
   angle32.data = angle * 180 / M_PI;
@@ -751,8 +789,11 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
       leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
   // LINEAR movement
+  ROS_ERROR_STREAM("angle: "<< angle);
   float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
   float final_lin_vel;
+
+  ROS_ERROR_STREAM("lin value by angle: "<< lin_vel_by_ang);
 
   // check the size of the angle. If it is not more than about 35 degrees,
   // integrate position costs to linear velocity
@@ -772,8 +813,9 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
       }
     }
   }
-
   final_lin_vel = lin_vel_by_ang;
+  ROS_ERROR_STREAM("Final lin velocity: "<< final_lin_vel);
+
 
   // ADDITIONAL factors
   // look ahead
@@ -789,6 +831,7 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
     // calculating linear value based on angular ahead value
     float ahead_lin_vel =
         gaussValue(config.max_lin_velocity, 2 * M_PI, abs(ahead_values[0]));
+    ROS_ERROR_STREAM("Final lin velocity after gauss: "<< final_lin_vel);
     float final_ahead_lin_vel;
     if (abs(ahead_values[0]) < 0.6) {
       // basic linear velocity depending on angle difference between robot pose
@@ -810,6 +853,7 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
                     config.ahead_amount * final_ahead_ang_vel;
     final_lin_vel = (1.0 - config.ahead_amount) * final_lin_vel +
                     config.ahead_amount * final_ahead_lin_vel;
+    ROS_ERROR_STREAM("Final lin velocity: "<< final_lin_vel << " final ahead lin vel:" << final_ahead_lin_vel);
 
     // output: AHEAD angle publishing
     std_msgs::Float32 aheadAngle32;

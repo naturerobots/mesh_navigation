@@ -42,6 +42,7 @@
 #include <functional>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Vector3.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // TODO fix lvr2 missing includes
 using namespace std;
@@ -77,6 +78,8 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
       private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
   vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>(
       "vertex_costs", 1, false);
+  vector_field_pub = private_nh.advertise<visualization_msgs::MarkerArray>(
+      "vector_field", 1, true);
   reconfigure_server_ptr =
       boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
           new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
@@ -312,6 +315,9 @@ void MeshMap::layerChanged(const std::string &layer_name) {
 bool MeshMap::initLayerPlugins() {
   lethals.clear();
   lethal_indices.clear();
+
+  std::shared_ptr<mesh_map::MeshMap> map(this);
+
   for (auto &layer : layers) {
     auto &layer_plugin = layer.second;
     const auto &layer_name = layer.first;
@@ -319,7 +325,8 @@ bool MeshMap::initLayerPlugins() {
     auto callback = [this](const std::string &layer_name) {
       layerChanged(layer_name);
     };
-    if (!layer_plugin->initialize(layer_name, callback, mesh_ptr,
+
+    if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr,
                                   mesh_io_ptr)) {
       ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \""
                        << layer_name << "\"!");
@@ -517,15 +524,26 @@ void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector> &vector_map) {
 }
 
 boost::optional<Vector>
-MeshMap::directionAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
-                             const std::array<float, 3> &barycentric_coords) {
+MeshMap::directionAtPosition(
+    const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+    const std::array<lvr2::VertexHandle, 3> &vertices,
+    const std::array<float, 3> &barycentric_coords) {
+
   const auto &a = vector_map.get(vertices[0]);
   const auto &b = vector_map.get(vertices[1]);
   const auto &c = vector_map.get(vertices[2]);
 
   if (a && b && c) {
-    return a.get() * barycentric_coords[0] + b.get() * barycentric_coords[1] +
-           c.get() * barycentric_coords[2];
+    auto vec = a.get() * barycentric_coords[0]
+      + b.get() * barycentric_coords[1]
+      + c.get() * barycentric_coords[2];
+    if(std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z))
+      return vec;
+    else
+      ROS_ERROR_THROTTLE(0.3, "vector map contains invalid vectors!");
+  }
+  else{
+    ROS_ERROR_THROTTLE(0.3, "vector map does not contain the corresponding vectors");
   }
   return boost::none;
 }
@@ -595,6 +613,96 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
     marker.colors.push_back(color);
   }
   marker_pub.publish(marker);
+}
+
+void MeshMap::publishVectorField(
+    const std::string& name,
+    const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces) {
+  const auto &mesh = this->mesh();
+  const auto &vertex_costs = vertexCosts();
+  const auto &face_normals = faceNormals();
+
+  visualization_msgs::MarkerArray vector_field;
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = mapFrame();
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.07;
+  scale.y = 0.02;
+  scale.z = 0.02;
+
+  vector_field.markers.reserve(vector_map.numValues());
+
+  unsigned int cnt = 0;
+  unsigned int faces = 0;
+  visualization_msgs::Marker vector;
+  vector.type = visualization_msgs::Marker::ARROW;
+  vector.header = header;
+  vector.ns = name;
+  vector.scale = scale;
+
+  lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh.numFaces(), 0);
+
+  for (auto vH : vector_map) {
+    const auto& dir_vec = vector_map[vH];
+    const float len2 = dir_vec.length2();
+    if(len2 == 0 || !std::isfinite(len2) || !cutting_faces.containsKey(vH))
+    {
+      ROS_DEBUG_STREAM_THROTTLE(0.3, "Found invalid direction vector in vector field \"" << name << "\". Ignoring it!");
+      continue;
+    }
+
+    vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
+    vector.pose = mesh_map::calculatePoseFromDirection(
+        mesh.getVertexPosition(vH), dir_vec,
+        face_normals[cutting_faces[vH]]);
+    vector.header.seq = cnt;
+    vector.id = cnt++;
+    vector_field.markers.push_back(vector);
+    for (auto fH : mesh.getFacesOfVertex(vH)) {
+      if(++vector_field_faces[fH] == 3) faces++;
+    }
+  }
+
+  ROS_INFO_STREAM("Found " << faces << " complete vector faces!");
+
+  vector_field.markers.reserve(faces + cnt);
+
+  for (auto fH : vector_field_faces) {
+    if (vector_field_faces[fH] != 3)
+      continue;
+
+    const auto &vertices = mesh.getVertexPositionsOfFace(fH);
+    const auto &vertex_handles = mesh.getVerticesOfFace(fH);
+    mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
+    std::array<float, 3> barycentric_coords;
+    float dist;
+    if (mesh_map::projectedBarycentricCoords(center, vertices,
+                                             barycentric_coords, dist)) {
+      boost::optional<mesh_map::Vector> dir_opt =
+          directionAtPosition(vector_map, vertex_handles, barycentric_coords);
+      if (dir_opt) {
+        const float &cost = costAtPosition(vertex_handles, barycentric_coords);
+        vector.color = lvr_ros::getRainbowColor(cost);
+        vector.pose = mesh_map::calculatePoseFromDirection(
+            center, dir_opt.get(), face_normals[fH]);
+        vector.header.seq = cnt;
+        vector.id = cnt++;
+        vector_field.markers.push_back(vector);
+      }
+      else
+      {
+        ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the direction!");
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the barycentric coords!");
+    }
+  }
+  vector_field_pub.publish(vector_field);
+  ROS_INFO_STREAM("Published vector field \"" << name << "\" with " << cnt << " elements." );
 }
 
 bool MeshMap::inTriangle(const Vector &pos, const lvr2::FaceHandle &face,
@@ -679,7 +787,7 @@ bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
           pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords,
           dist) ||
       searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4)) {
-    const auto &opt_dir = directionAtPosition(mesh_ptr->getVerticesOfFace(face),
+    const auto &opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face),
                                               barycentric_coords);
     if (opt_dir) {
       pos += opt_dir.get().normalized() * step_size;
@@ -750,6 +858,12 @@ bool MeshMap::projectedBarycentricCoords(
   return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords,
                                               dist);
 }
+
+mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
+{
+  return layer_names[layer_name];
+}
+
 
 bool MeshMap::barycentricCoords(const Vector &p,
                                 const lvr2::FaceHandle &triangle, float &u,
@@ -846,9 +960,18 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg,
   if (first_config) {
     config = cfg;
     first_config = false;
+    return;
   }
 
   if (!first_config && map_loaded) {
+
+    if(cfg.cost_limit != config.cost_limit)
+    {
+      combineVertexCosts();
+    }
+
+
+
     config = cfg;
   }
 }

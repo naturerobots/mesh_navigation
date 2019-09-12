@@ -22,16 +22,20 @@ bool HeightDiffLayer::readLayer() {
     ROS_INFO_STREAM("Height differences have been read successfully.");
     height_diff = height_diff_opt.get();
 
-    lethal_vertices.clear();
-    for (auto vH : height_diff) {
-      if (height_diff[vH] > config.threshold)
-        lethal_vertices.insert(vH);
-    }
-
-    return true;
+    return computeLethals();
   }
 
   return false;
+}
+
+bool HeightDiffLayer::computeLethals()
+{
+  lethal_vertices.clear();
+  for (auto vH : height_diff) {
+    if (height_diff[vH] > config.threshold)
+      lethal_vertices.insert(vH);
+  }
+  return true;
 }
 
 bool HeightDiffLayer::writeLayer() {
@@ -49,12 +53,7 @@ float HeightDiffLayer::threshold() { return config.threshold; }
 
 bool HeightDiffLayer::computeLayer() {
   height_diff = lvr2::calcVertexHeightDifferences(*mesh_ptr, config.radius);
-  lethal_vertices.clear();
-  for (auto vH : height_diff) {
-    if (height_diff[vH] > config.threshold)
-      lethal_vertices.insert(vH);
-  }
-  return true;
+  return computeLethals();
 }
 
 lvr2::VertexMap<float> &HeightDiffLayer::costs() { return height_diff; }
@@ -62,16 +61,23 @@ lvr2::VertexMap<float> &HeightDiffLayer::costs() { return height_diff; }
 void HeightDiffLayer::reconfigureCallback(
     mesh_layers::HeightDiffLayerConfig &cfg, uint32_t level) {
   ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
+
   if (first_config) {
     config = cfg;
     first_config = false;
+    return;
+  }
+
+  if(config.threshold != cfg.threshold)
+  {
+    computeLethals();
+    notifyChange();
   }
 
   config = cfg;
 }
 
 bool HeightDiffLayer::initialize(const std::string &name) {
-  ros::NodeHandle private_nh("~/" + name);
   reconfigure_server_ptr = boost::shared_ptr<
       dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
       new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(

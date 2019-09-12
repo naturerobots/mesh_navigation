@@ -51,7 +51,7 @@
 #include <std_msgs/ColorRGBA.h>
 #include <tf2_ros/buffer.h>
 
-namespace mesh_map {
+namespace mesh_map{
 
 class MeshMap {
 public:
@@ -67,7 +67,7 @@ public:
 
   bool initLayerPlugins();
 
-  lvr2::OptionalVertexHandle getNearestVertexHandle(const Vector &pos);
+  lvr2::OptionalVertexHandle getNearestVertexHandle(const mesh_map::Vector &pos);
 
   bool inTriangle(const Vector &pos, const lvr2::FaceHandle &face,
                   const float &dist);
@@ -115,8 +115,10 @@ public:
   inline const geometry_msgs::Point toPoint(const Vector &vec);
 
   boost::optional<Vector>
-  directionAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
-                      const std::array<float, 3> &barycentric_coords);
+  directionAtPosition(
+      const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+      const std::array<lvr2::VertexHandle, 3> &vertices,
+      const std::array<float, 3> &barycentric_coords);
 
   float costAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
                        const std::array<float, 3> &barycentric_coords);
@@ -145,6 +147,8 @@ public:
   const lvr2::DenseVertexMap<Normal> &vertexNormals() { return vertex_normals; }
 
   const lvr2::DenseEdgeMap<float> &edgeWeights() { return edge_weights; }
+
+  const lvr2::DenseEdgeMap<float> &edgeDistances() { return edge_distances; }
 
   /**
    * Searches in the sourrounding triangles for the triangle in which the given
@@ -181,6 +185,14 @@ public:
                         const std_msgs::ColorRGBA &color,
                         const std::string &name);
 
+  void publishVectorField(
+      const std::string& name,
+      const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces);
+
+
+  mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
+
 private:
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -216,6 +228,7 @@ private:
   ros::Publisher vertex_costs_pub;
   ros::Publisher mesh_geometry_pub;
   ros::Publisher marker_pub;
+  ros::Publisher vector_field_pub;
 
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>

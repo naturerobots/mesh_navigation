@@ -44,8 +44,9 @@ using namespace std;
 #include <lvr_ros/colors.h>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
-#include <mesh_planner/mesh_planner.h>
 #include <pluginlib/class_list_macros.h>
+
+#include <mesh_planner/mesh_planner.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -63,7 +64,7 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   const auto &mesh = mesh_map->mesh();
   std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> path;
 
-  mesh_map->combineVertexCosts(); // TODO should be outside the planner
+  //mesh_map->combineVertexCosts(); // TODO should be outside the planner
   ros::WallTime t_start, t_end;
   t_start = ros::WallTime::now();
 
@@ -113,7 +114,7 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   mesh_map->publishVertexCosts(potential, "Potential");
 
   // computeVectorMap();
-  publishVectorField();
+  mesh_map->publishVectorField("vector_field", vector_map, cutting_faces);
 
   return outcome;
 }
@@ -131,8 +132,6 @@ bool MeshPlanner::initialize(
   map_frame = mesh_map->mapFrame();
   private_nh = ros::NodeHandle("~/" + name);
   path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
-  vector_pub = private_nh.advertise<visualization_msgs::MarkerArray>(
-      "vector_field", 1, true);
   const auto &mesh = mesh_map->mesh();
   direction = lvr2::DenseVertexMap<float>(mesh.nextVertexIndex(), 0);
   // TODO check all map dependencies! (loaded layers etc...)
@@ -159,14 +158,15 @@ void MeshPlanner::reconfigureCallback(mesh_planner::MeshPlannerConfig &cfg,
   if (first_config) {
     config = cfg;
     first_config = false;
+    return;
   }
-
   config = cfg;
 }
 
 void MeshPlanner::computeVectorMap() {
   const auto &mesh = mesh_map->mesh();
   const auto &face_normals = mesh_map->faceNormals();
+
 
   for (auto v3 : mesh.vertices()) {
     // if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3))
@@ -190,7 +190,7 @@ void MeshPlanner::computeVectorMap() {
     // compute the direction vector and rotate it by theta, which is stored in
     // the direction vertex map
     const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
-    vector_map.insert(v3, dirVec);
+    vector_map.insert(v3, dirVec.normalized());
   }
   mesh_map->setVectorMap(vector_map);
 }
@@ -198,10 +198,94 @@ void MeshPlanner::computeVectorMap() {
 uint32_t MeshPlanner::waveFrontPropagation(
     const mesh_map::Vector &start, const mesh_map::Vector &goal,
     std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path) {
-  return waveFrontPropagation(start, goal, mesh_map->edgeWeights(),
+  return waveFrontPropagation(start, goal, mesh_map->edgeDistances(),
                               mesh_map->vertexCosts(), path, potential,
                               predecessors);
 }
+
+/*
+inline bool MeshPlanner::waveFrontUpdate2(
+    lvr2::DenseVertexMap<float> &distances,
+    const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
+    const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3) {
+  const auto &mesh = mesh_map->mesh();
+  const auto &vertex_costs = mesh_map->vertexCosts();
+
+  const double u1 = distances[v1];
+  const double u2 = distances[v2];
+  double u3 = distances[v3]; // new
+
+  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const float c = edge_weights[e12h.unwrap()];
+  const float c_sq = c * c;
+
+  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const float b = edge_weights[e13h.unwrap()];
+  const float b_sq = b * b;
+
+  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const float a = edge_weights[e23h.unwrap()];
+  const float a_sq = a * a;
+
+  float dot = (a_sq + b_sq - c_sq) / (2 * a * b);
+  float cost = vertex_costs[v3] > config.cost_limit ? config.cost_limit : vertex_costs[v3];
+  float weight = 1 + cost/config.cost_limit;
+
+  float u3tmp = mesh_map::computeUpdateSethianMethod(u1, u2, a, b, dot, 1.0);
+
+  if (u3tmp < u3) {
+    u3 = distances[v3] = u3tmp;
+
+    float u1_sq = u1*u1;
+    float u2_sq = u2*u2;
+    float u3_sq = u3*u3;
+
+    float t1a = (u3_sq + b_sq - u1_sq) / (2*u3*b);
+    float t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3);
+
+    bool os2 = std::fabs(t2a) > 1;
+    bool os1 = std::fabs(t1a) > 1;
+
+    float theta0 = acos(dot);
+    float theta1 = acos(t1a);
+    float theta2 = acos(t2a);
+
+    if(!std::isfinite(theta0 + theta1 + theta2)){
+      ROS_ERROR_STREAM("------------------");
+      if(std::isnan(theta0)) ROS_ERROR_STREAM("Theta0 is NaN!");
+      if(std::isnan(theta1)) ROS_ERROR_STREAM("Theta1 is NaN!");
+      if(std::isnan(theta2)) ROS_ERROR_STREAM("Theta2 is NaN!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isnan(t1a)) ROS_ERROR_STREAM("t1a is NaN!");
+      if(std::isnan(t2a)) ROS_ERROR_STREAM("t2a is NaN!");
+      if(std::fabs(t2a) > 1) ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
+      if(std::fabs(t1a) > 1) ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
+    }
+    bool left = theta2 > theta0;
+    bool right = theta1 > theta0;
+
+    if(left && theta2 < theta1) ROS_ERROR_STREAM("theta2 smaller than theta1");
+    if(right && theta1 < theta2) ROS_ERROR_STREAM("theta1 smaller than theta2");
+
+    if (distances[v1] < distances[v2]) {
+      predecessors[v3] = v1;
+      direction[v3] = !left? theta1 : -theta1;
+    }
+    else // right face check
+    {
+      predecessors[v3] = v2;
+      direction[v3] = !right? -theta2 : theta2;
+    }
+
+    cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
+    return vertex_costs[v3] <= config.cost_limit;
+  }
+  else return false;
+}
+
+*/
 
 inline bool MeshPlanner::waveFrontUpdate(
     lvr2::DenseVertexMap<float> &distances,
@@ -244,10 +328,14 @@ inline bool MeshPlanner::waveFrontUpdate(
   const double u1sq = u1 * u1;
   const double u2sq = u2 * u2;
 
+
   const double A = sqrt(std::max<double>(
       (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
   const double B = sqrt(std::max<double>(
       (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
+
+  //const double A = std::fabs((-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c));
+  //const double B = std::fabs((-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c));
 
   const double sx = (c_sq + u1sq - u2sq) / (2 * c);
   const double sx_sq = sx * sx;
@@ -268,7 +356,7 @@ inline bool MeshPlanner::waveFrontUpdate(
   const double u3tmp_sq = dx * dx + dy * dy;
   const double u3tmp = sqrt(u3tmp_sq);
 
-  if (u3tmp < u3) {
+  if (std::isfinite(u3tmp) && u3tmp < u3) {
     distances[v3] = static_cast<float>(u3tmp);
 
     /**
@@ -317,11 +405,57 @@ inline bool MeshPlanner::waveFrontUpdate(
       cutting_faces.insert(v3, f0);
       direction[v3] = 0; // direction lies on g1 or g2
     }
+/*
+    const float u3_sq = u3tmp * u3tmp;
+    const float u2_sq = u2 * u2;
+    const float u1_sq = u1 * u1;
+
+    float t0a = (a_sq + b_sq - c_sq) / (2*a*b);
+    float t1a = (u3_sq + b_sq - u1_sq) / (2*u3*b);
+    float t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3);
+
+    bool os2 = std::fabs(t2a) > 1;
+    bool os1 = std::fabs(t1a) > 1;
+
+    float theta0 = acos(t0a);
+    float theta1 = acos(t1a);
+    float theta2 = acos(t2a);
+
+    if(!std::isfinite(theta0 + theta1 + theta2)){
+      ROS_ERROR_STREAM("------------------");
+      if(std::isnan(theta0)) ROS_ERROR_STREAM("Theta0 is NaN!");
+      if(std::isnan(theta1)) ROS_ERROR_STREAM("Theta1 is NaN!");
+      if(std::isnan(theta2)) ROS_ERROR_STREAM("Theta2 is NaN!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
+      if(std::isnan(t1a)) ROS_ERROR_STREAM("t1a is NaN!");
+      if(std::isnan(t2a)) ROS_ERROR_STREAM("t2a is NaN!");
+      if(std::fabs(t2a) > 1) ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
+      if(std::fabs(t1a) > 1) ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
+    }
+    bool left = theta2 > theta0;
+    bool right = theta1 > theta0;
+
+    if(left && theta2 < theta1) ROS_ERROR_STREAM("theta2 smaller than theta1");
+    if(right && theta1 < theta2) ROS_ERROR_STREAM("theta1 smaller than theta2");
+
+    if (distances[v1] < distances[v2]) {
+      predecessors[v3] = v1;
+      direction[v3] = !left? theta1 : -theta1;
+    }
+    else // right face check
+    {
+      predecessors[v3] = v2;
+      direction[v3] = !right? -theta2 : theta2;
+    }
+    */
 
     return vertex_costs[v3] <= config.cost_limit;
   }
   return false;
 }
+
 
 uint32_t MeshPlanner::waveFrontPropagation(
     const mesh_map::Vector &original_start,
@@ -424,34 +558,44 @@ uint32_t MeshPlanner::waveFrontPropagation(
     // if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
 
-    std::vector<lvr2::FaceHandle> faces;
-    mesh.getFacesOfVertex(current_vh, faces);
+    std::vector<lvr2::VertexHandle> neighbours;
+    mesh.getNeighboursOfVertex(current_vh, neighbours);
+    for(auto nh : neighbours){
+      std::vector<lvr2::FaceHandle> faces;
+      mesh.getFacesOfVertex(nh, faces);
 
-    for (auto fh : faces) {
-      const auto vertices = mesh.getVerticesOfFace(fh);
-      const lvr2::VertexHandle &a = vertices[0];
-      const lvr2::VertexHandle &b = vertices[1];
-      const lvr2::VertexHandle &c = vertices[2];
+      for (auto fh : faces) {
+        const auto vertices = mesh.getVerticesOfFace(fh);
+        const lvr2::VertexHandle &a = vertices[0];
+        const lvr2::VertexHandle &b = vertices[1];
+        const lvr2::VertexHandle &c = vertices[2];
 
-      if (fixed[a] && fixed[b] && fixed[c])
-        continue;
-      else if (fixed[a] && fixed[b] && !fixed[c]) {
-        // c is free
-        if (waveFrontUpdate(distances, edge_weights, a, b, c))
-          pq.insert(c, distances[c]);
-      } else if (fixed[a] && !fixed[b] && fixed[c]) {
-        // b is free
-        if (waveFrontUpdate(distances, edge_weights, c, a, b))
-          pq.insert(b, distances[b]);
-      } else if (!fixed[a] && fixed[b] && fixed[c]) {
-        // a if free
-        if (waveFrontUpdate(distances, edge_weights, b, c, a))
-          pq.insert(a, distances[a]);
-      } else {
-        // two free vertices -> skip that face
-        ROS_DEBUG_STREAM("two vertices are free.");
-        continue;
+        if (fixed[a] && fixed[b] && fixed[c]) {
+          //ROS_INFO_STREAM("All fixed!");
+          continue;
+        }
+        else if (fixed[a] && fixed[b] && !fixed[c]) {
+          // c is free
+          if (waveFrontUpdate(distances, edge_weights, a, b, c))
+            pq.insert(c, distances[c]);
+          if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
+        } else if (fixed[a] && !fixed[b] && fixed[c]) {
+          // b is free
+          if (waveFrontUpdate(distances, edge_weights, c, a, b))
+            pq.insert(b, distances[b]);
+          if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
+        } else if (!fixed[a] && fixed[b] && fixed[c]) {
+          // a if free
+          if (waveFrontUpdate(distances, edge_weights, b, c, a))
+            pq.insert(a, distances[a]);
+          if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
+        } else {
+          // two free vertices -> skip that face
+          //ROS_INFO_STREAM("two vertices are free.");
+          continue;
+        }
       }
+
     }
   }
 
@@ -536,72 +680,11 @@ uint32_t MeshPlanner::waveFrontPropagation(
 */
 }
 
-void MeshPlanner::publishVectorField() {
-  const auto &mesh = mesh_map->mesh();
-  const auto &vertex_costs = mesh_map->vertexCosts();
-  const auto &face_normals = mesh_map->faceNormals();
-
-  visualization_msgs::MarkerArray vector_field;
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
-  header.frame_id = map_frame;
-  geometry_msgs::Vector3 scale;
-  scale.x = 0.07;
-  scale.y = 0.02;
-  scale.z = 0.02;
-
-  vector_field.markers.reserve(vector_map.numValues());
-
-  unsigned int cnt = 0;
-  visualization_msgs::Marker vector;
-  vector.type = visualization_msgs::Marker::ARROW;
-  vector.header = header;
-  vector.ns = "vector_field";
-  vector.scale = scale;
-
-  lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh.numFaces(), 0);
-
-  for (auto vH : vector_map) {
-    vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
-    vector.pose = mesh_map::calculatePoseFromDirection(
-        mesh.getVertexPosition(vH), vector_map[vH],
-        face_normals[cutting_faces[vH]]);
-    vector.header.seq = cnt;
-    vector.id = cnt++;
-    vector_field.markers.push_back(vector);
-    for (auto fH : mesh_map->mesh_ptr->getFacesOfVertex(vH)) {
-      vector_field_faces[fH]++;
-    }
-  }
-
-  for (auto fH : vector_field_faces) {
-    if (vector_field_faces[fH] != 3)
-      continue;
-
-    const auto &vertices = mesh.getVertexPositionsOfFace(fH);
-    const auto &vertex_handles = mesh.getVerticesOfFace(fH);
-    mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
-    std::array<float, 3> barycentric_coords;
-    float dist;
-    boost::optional<mesh_map::Vector> dir_opt;
-    if (mesh_map::projectedBarycentricCoords(center, vertices,
-                                             barycentric_coords, dist) &&
-        (dir_opt = mesh_map->directionAtPosition(vertex_handles,
-                                                 barycentric_coords))) {
-      const float &cost =
-          mesh_map->costAtPosition(vertex_handles, barycentric_coords);
-      vector.color = lvr_ros::getRainbowColor(cost);
-      vector.pose = mesh_map::calculatePoseFromDirection(center, dir_opt.get(),
-                                                         face_normals[fH]);
-      vector.header.seq = cnt;
-      vector.id = cnt++;
-      vector_field.markers.push_back(vector);
-    } else {
-      ROS_ERROR_STREAM("Could not compute the barycentric coords!");
-    }
-  }
-
-  vector_pub.publish(vector_field);
-}
 
 } /* namespace mesh_planner */
+
+int main(int argc, char** argv)
+{
+
+  return 1;
+}

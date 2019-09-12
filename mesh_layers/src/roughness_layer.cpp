@@ -20,16 +20,10 @@ bool RoughnessLayer::readLayer() {
           "roughness");
   if (roughness_opt) {
     roughness = roughness_opt.get();
-
-    lethal_vertices.clear();
-    for (auto vH : roughness) {
-      if (roughness[vH] > config.threshold)
-        lethal_vertices.insert(vH);
-    }
-    return true;
-  } else {
-    return false;
+    return computeLethals();
   }
+
+  return false;
 }
 
 bool RoughnessLayer::writeLayer() {
@@ -40,6 +34,16 @@ bool RoughnessLayer::writeLayer() {
     ROS_ERROR_STREAM("Could not save roughness to map file!");
     return false;
   }
+}
+
+bool RoughnessLayer::computeLethals()
+{
+  lethal_vertices.clear();
+  for (auto vH : roughness) {
+    if (roughness[vH] > config.threshold)
+      lethal_vertices.insert(vH);
+  }
+  return true;
 }
 
 float RoughnessLayer::threshold() { return config.threshold; }
@@ -95,13 +99,7 @@ bool RoughnessLayer::computeLayer() {
   roughness =
       lvr2::calcVertexRoughness(*mesh_ptr, config.radius, vertex_normals);
 
-  lethal_vertices.clear();
-  for (auto vH : roughness) {
-    if (roughness[vH] > config.threshold)
-      lethal_vertices.insert(vH);
-  }
-
-  return true;
+  return computeLethals();
 }
 
 lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness; }
@@ -112,13 +110,19 @@ void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg,
   if (first_config) {
     config = cfg;
     first_config = false;
+    return;
+  }
+
+  if(config.threshold != cfg.threshold)
+  {
+    computeLethals();
+    notifyChange();
   }
 
   config = cfg;
 }
 
 bool RoughnessLayer::initialize(const std::string &name) {
-  ros::NodeHandle private_nh("~/" + name);
   reconfigure_server_ptr = boost::shared_ptr<
       dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>>(
       new dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>(

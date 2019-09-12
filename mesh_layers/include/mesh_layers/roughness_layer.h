@@ -20,6 +20,8 @@ class RoughnessLayer : public mesh_map::AbstractLayer {
 
   virtual bool computeLayer();
 
+  bool computeLethals();
+
   virtual lvr2::VertexMap<float> &costs();
 
   virtual std::set<lvr2::VertexHandle> &lethals() { return lethal_vertices; }

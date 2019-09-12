@@ -43,7 +43,6 @@
 #include <mesh_map/mesh_map.h>
 #include <mesh_planner/MeshPlannerConfig.h>
 #include <nav_msgs/Path.h>
-#include <visualization_msgs/MarkerArray.h>
 
 namespace mesh_planner {
 
@@ -115,13 +114,20 @@ protected:
       lvr2::DenseVertexMap<float> &distances,
       lvr2::DenseVertexMap<lvr2::VertexHandle> &predecessors);
 
-  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float> &distances,
+  /*
+  inline bool waveFrontUpdate2(lvr2::DenseVertexMap<float> &distances,
                               const lvr2::DenseEdgeMap<float> &edge_weights,
                               const lvr2::VertexHandle &v1,
                               const lvr2::VertexHandle &v2,
                               const lvr2::VertexHandle &v3);
 
-  void publishVectorField();
+   */
+
+  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float> &distances,
+                              const lvr2::DenseEdgeMap<float> &edge_weights,
+                              const lvr2::VertexHandle &v1,
+                              const lvr2::VertexHandle &v2,
+                              const lvr2::VertexHandle &v3);
 
   void computeVectorMap();
 
@@ -134,7 +140,6 @@ private:
   ros::NodeHandle private_nh;
   std::atomic_bool cancel_planning;
   ros::Publisher path_pub;
-  ros::Publisher vector_pub;
 
   std::string map_frame;
 

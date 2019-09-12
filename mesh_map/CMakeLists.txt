@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   lvr_ros
   visualization_msgs
   dynamic_reconfigure
+  pluginlib
 )
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -21,7 +22,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include ${LVR2_INCLUDE_DIRS}
   LIBRARIES mesh_map
-  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs
+  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs dynamic_reconfigure pluginlib
   DEPENDS LVR2
 )
 

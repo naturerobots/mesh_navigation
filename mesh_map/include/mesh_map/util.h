@@ -85,8 +85,22 @@ T linearCombineBarycentricCoords(
     const std::array<T, 3> &vertex_properties,
     const std::array<float, 3> &barycentric_coords) {
   return vertex_properties[0] * barycentric_coords[0] +
-         vertex_properties[1] * barycentric_coords[1] +
-         vertex_properties[2] * barycentric_coords[2];
+      vertex_properties[1] * barycentric_coords[1] +
+      vertex_properties[2] * barycentric_coords[2];
+}
+
+template <typename T>
+T linearCombineBarycentricCoords(
+    const std::array<lvr2::VertexHandle, 3>& vertices,
+    const lvr2::VertexMap<T>& attribute_map,
+    const std::array<float, 3>& barycentric_coords)
+{
+  const std::array<T, 3> values = {
+      attribute_map[vertices[0]],
+      attribute_map[vertices[1]],
+      attribute_map[vertices[2]]};
+
+  return linearCombineBarycentricCoords<T>(values, barycentric_coords);
 }
 
 } /* namespace mesh_map */
