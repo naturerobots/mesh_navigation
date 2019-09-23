@@ -88,6 +88,7 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   header.stamp = ros::Time::now();
   header.frame_id = mesh_map->mapFrame();
 
+  cost = 0;
   if (!path.empty()) {
     mesh_map::Vector vec = path.front().first;
     lvr2::FaceHandle fH = path.front().second;
@@ -470,10 +471,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   const auto &mesh = mesh_map->mesh();
   const auto &face_normals = mesh_map->faceNormals();
 
-  mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0),
-                              "start_point");
-  mesh_map->publishDebugPoint(original_goal, mesh_map::color(1, 0, 0),
-                              "goal_point");
+  //mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
+  //mesh_map->publishDebugPoint(original_goal, mesh_map::color(1, 0, 0), "goal_point");
 
   mesh_map::Vector start = original_start;
   mesh_map::Vector goal = original_goal;
@@ -493,9 +492,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   const auto &start_face = start_opt.unwrap();
   const auto &goal_face = goal_opt.unwrap();
 
-  mesh_map->publishDebugFace(goal_face, mesh_map::color(1, 0, 0), "goal_face");
-  mesh_map->publishDebugFace(start_face, mesh_map::color(0, 1, 0),
-                             "start_face");
+  //mesh_map->publishDebugFace(goal_face, mesh_map::color(1, 0, 0), "goal_face");
+  //mesh_map->publishDebugFace(start_face, mesh_map::color(0, 1, 0), "start_face");
 
   path.clear();
   distances.clear();

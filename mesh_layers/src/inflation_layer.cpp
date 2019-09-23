@@ -145,7 +145,7 @@ inline bool InflationLayer::waveFrontUpdate(
     cutting_faces.insert(v3h, fh);
     vector_map[v1h] = (vector_map[v1h] + dir).normalized();
     vector_map[v2h] = (vector_map[v2h] + dir).normalized();
-    vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32) / (d31 + d32);
+    vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
     //vector_map[v3h] = (vector_map[v3h] + dir).normalized();
   }
 
@@ -155,7 +155,7 @@ inline bool InflationLayer::waveFrontUpdate(
     if(u1 != 0 || u2 != 0)
     {
       cutting_faces.insert(v3h, fh);
-      vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32) / (d31 + d32);
+      vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
     }
 
     if (d31 < d32)
@@ -173,6 +173,23 @@ inline bool InflationLayer::waveFrontUpdate(
   return false;
 }
 
+float InflationLayer::fading(const float val)
+{
+  if (val > config.inflation_radius) return 0;
+
+  // Inflation radius
+  if (val > config.inscribed_radius) {
+    float alpha = (sqrt(val) - config.inscribed_radius) /
+        (config.inflation_radius - config.inscribed_radius) * M_PI;
+    return config.inscribed_value * (cos(alpha) + 1) / 2.0;
+  }
+
+  // Inscribed radius
+  if (val > 0) return config.inscribed_value;
+
+  // Lethality
+  return config.lethal_value;
+}
 
 void InflationLayer::waveCostInflation(
     const std::set<lvr2::VertexHandle> &lethals, const float inflation_radius,
@@ -272,29 +289,12 @@ void InflationLayer::waveCostInflation(
 
   ROS_INFO_STREAM("Finished inflation wave front propagation.");
 
+
   for (auto vH : mesh_ptr->vertices()) {
-    if (distances[vH] > inflation_radius) {
-      riskiness.insert(vH, 0);
-    }
-
-      // Inflation radius
-    else if (distances[vH] > inscribed_radius) {
-      float alpha = (sqrt(distances[vH]) - inscribed_radius) /
-          (inflation_radius - inscribed_radius) * M_PI;
-      riskiness.insert(vH, inscribed_value * (cos(alpha) + 1) / 2.0);
-    }
-
-      // Inscribed radius
-    else if (distances[vH] > 0) {
-      riskiness.insert(vH, inscribed_value);
-    }
-
-      // Lethality
-    else {
-      riskiness.insert(vH, lethal_value);
-    }
+    riskiness.insert(vH, fading(distances[vH]));
   }
-  map_ptr->publishVectorField("inflation", vector_map, cutting_faces);
+
+  map_ptr->publishVectorField("inflation", vector_map, cutting_faces, distances, std::bind(&InflationLayer::fading, this, std::placeholders::_1));
 }
 
 lvr2::BaseVector<float> InflationLayer::vectorAt(
@@ -320,6 +320,41 @@ lvr2::BaseVector<float> InflationLayer::vectorAt(
 
   // Lethality
   return mesh_map::linearCombineBarycentricCoords(vertices, vector_map, barycentric_coords) * config.lethal_value;
+}
+
+lvr2::BaseVector<float> InflationLayer::vectorAt(const lvr2::VertexHandle& vH)
+{
+  float distance = 0;
+  lvr2::BaseVector<float> vec;
+
+  auto dist_opt = distances.get(vH);
+  auto vector_opt = vector_map.get(vH);
+  if(dist_opt && vector_opt)
+  {
+    distance = dist_opt.get();
+    vec = vector_opt.get();
+  }
+  else
+  {
+    return vec;
+  }
+
+  if (distance > config.inflation_radius)
+
+  // Inflation radius
+  if(distance > config.inscribed_radius) {
+    float alpha = (sqrt(distance) - config.inscribed_radius) /
+        (config.inflation_radius - config.inscribed_radius) * M_PI;
+    return vec * config.inscribed_value * (cos(alpha) + 1) / 2.0;
+  }
+
+  // Inscribed radius
+  if(distance > 0) {
+    return vec * config.inscribed_value;
+  }
+
+  // Lethality
+  return vec * config.lethal_value;
 }
 
 void InflationLayer::backToSource(
@@ -462,6 +497,15 @@ void InflationLayer::reconfigureCallback(
     waveCostInflation(lethal_vertices, config.inflation_radius,
                       config.inscribed_radius, config.inscribed_value,
                       std::numeric_limits<float>::infinity());
+  }
+
+  if(config.inscribed_radius != cfg.inscribed_radius
+      || config.inflation_radius != cfg.inflation_radius
+      || config.lethal_value != cfg.lethal_value
+      || config.inscribed_value != cfg.inscribed_value) {
+
+    map_ptr->publishVectorField("inflation", vector_map, cutting_faces,
+        distances, std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
   }
 
   /*lethalCostInflation(lethal_vertices, cfg.inflation_radius,

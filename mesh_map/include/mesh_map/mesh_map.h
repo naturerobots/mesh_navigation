@@ -120,8 +120,14 @@ public:
       const std::array<lvr2::VertexHandle, 3> &vertices,
       const std::array<float, 3> &barycentric_coords);
 
-  float costAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
-                       const std::array<float, 3> &barycentric_coords);
+  float costAtPosition(
+      const lvr2::DenseVertexMap<float>& costs,
+      const std::array<lvr2::VertexHandle, 3> &vertices,
+      const std::array<float, 3> &barycentric_coords);
+
+  float costAtPosition(
+      const std::array<lvr2::VertexHandle, 3> &vertices,
+      const std::array<float, 3> &barycentric_coords);
 
   bool rayTriangleIntersect(const Vector &orig, const Vector &dir,
                             const Vector &v0, const Vector &v1,
@@ -190,6 +196,14 @@ public:
       const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
       const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces);
 
+  void publishVectorField(
+      const std::string& name,
+      const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+      const lvr2::DenseVertexMap<float>& values,
+      const std::function<float (float)>& cost_function = {});
+
+  void publishCombinedVectorField();
 
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 

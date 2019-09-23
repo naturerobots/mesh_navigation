@@ -548,17 +548,28 @@ MeshMap::directionAtPosition(
   return boost::none;
 }
 
-float MeshMap::costAtPosition(const std::array<lvr2::VertexHandle, 3> &vertices,
-                              const std::array<float, 3> &barycentric_coords) {
-  const auto &a = vertex_costs.get(vertices[0]);
-  const auto &b = vertex_costs.get(vertices[1]);
-  const auto &c = vertex_costs.get(vertices[2]);
+float MeshMap::costAtPosition(
+    const std::array<lvr2::VertexHandle, 3> &vertices,
+    const std::array<float, 3> &barycentric_coords)
+{
+  return costAtPosition(vertex_costs, vertices, barycentric_coords);
+}
+
+
+float MeshMap::costAtPosition(
+    const lvr2::DenseVertexMap<float>& costs,
+    const std::array<lvr2::VertexHandle, 3> &vertices,
+    const std::array<float, 3> &barycentric_coords) {
+
+  const auto &a = costs.get(vertices[0]);
+  const auto &b = costs.get(vertices[1]);
+  const auto &c = costs.get(vertices[2]);
 
   if (a && b && c) {
     std::array<float, 3> costs = {a.get(), b.get(), c.get()};
     return mesh_map::linearCombineBarycentricCoords(costs, barycentric_coords);
   }
-  return -1;
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 void MeshMap::publishDebugPoint(const Vector pos,
@@ -618,7 +629,67 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
 void MeshMap::publishVectorField(
     const std::string& name,
     const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces) {
+    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces)
+{
+  publishVectorField(name, vector_map, cutting_faces, vertex_costs);
+}
+
+void MeshMap::publishCombinedVectorField()
+{
+
+  lvr2::DenseVertexMap<Vector> vertex_vectors;
+  lvr2::DenseFaceMap<Vector> face_vectors;
+
+  vertex_vectors.reserve(mesh_ptr->nextVertexIndex());
+  face_vectors.reserve(mesh_ptr->nextFaceIndex());
+
+
+  for(auto layer_iter : layer_names){
+    lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
+    AbstractLayer::Ptr layer = layer_iter.second;
+    auto opt_vec_map = layer->vectorMap();
+    if(!opt_vec_map)
+      continue;
+
+    const auto& vecs = opt_vec_map.get();
+    for(auto vH : vecs)
+    {
+      auto opt_val = vertex_vectors.get(vH);
+      vertex_vectors.insert(vH, opt_val? opt_val.get() + vecs[vH] : vecs[vH]);
+      for (auto fH : mesh_ptr->getFacesOfVertex(vH)) vector_field_faces[fH]++;
+    }
+
+    for (auto fH : vector_field_faces) {
+      if (vector_field_faces[fH] != 3)
+        continue;
+
+      const auto &vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+      const auto &vertex_handles = mesh_ptr->getVerticesOfFace(fH);
+      mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      if (mesh_map::projectedBarycentricCoords(center, vertices,
+                                               barycentric_coords, dist)) {
+
+        auto opt_val = face_vectors.get(fH);
+        face_vectors.insert(
+            fH, opt_val ? opt_val.get() + layer->vectorAt(vertex_handles,
+                                                          barycentric_coords)
+                        : layer->vectorAt(vertex_handles, barycentric_coords));
+      }
+    }
+  }
+
+}
+
+void MeshMap::publishVectorField(
+    const std::string& name,
+    const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+    const lvr2::DenseVertexMap<float>& values,
+    const std::function<float (float)>& cost_function)
+{
+
   const auto &mesh = this->mesh();
   const auto &vertex_costs = vertexCosts();
   const auto &face_normals = faceNormals();
@@ -653,10 +724,21 @@ void MeshMap::publishVectorField(
       continue;
     }
 
-    vector.color = lvr_ros::getRainbowColor(vertex_costs[vH]);
+    const float value = cost_function ? cost_function(values[vH]) : values[vH];
+    vector.color = lvr_ros::getRainbowColor(value);
     vector.pose = mesh_map::calculatePoseFromDirection(
         mesh.getVertexPosition(vH), dir_vec,
         face_normals[cutting_faces[vH]]);
+
+    if(!std::isfinite(vector.pose.position.x)
+        || !std::isfinite(vector.pose.position.y)
+        || !std::isfinite(vector.pose.position.z)
+        || !std::isfinite(vector.pose.orientation.x)
+        || !std::isfinite(vector.pose.orientation.y)
+        || !std::isfinite(vector.pose.orientation.z)
+        || !std::isfinite(vector.pose.orientation.w))
+      continue;
+
     vector.header.seq = cnt;
     vector.id = cnt++;
     vector_field.markers.push_back(vector);
@@ -683,10 +765,20 @@ void MeshMap::publishVectorField(
       boost::optional<mesh_map::Vector> dir_opt =
           directionAtPosition(vector_map, vertex_handles, barycentric_coords);
       if (dir_opt) {
-        const float &cost = costAtPosition(vertex_handles, barycentric_coords);
-        vector.color = lvr_ros::getRainbowColor(cost);
+        const float &cost = costAtPosition(values, vertex_handles, barycentric_coords);
+        const float &value = cost_function ? cost_function(cost) : cost;
+        vector.color = lvr_ros::getRainbowColor(value);
         vector.pose = mesh_map::calculatePoseFromDirection(
             center, dir_opt.get(), face_normals[fH]);
+        if(!std::isfinite(vector.pose.position.x)
+            || !std::isfinite(vector.pose.position.y)
+            || !std::isfinite(vector.pose.position.z)
+            || !std::isfinite(vector.pose.orientation.x)
+            || !std::isfinite(vector.pose.orientation.y)
+            || !std::isfinite(vector.pose.orientation.z)
+            || !std::isfinite(vector.pose.orientation.w))
+          continue;
+
         vector.header.seq = cnt;
         vector.id = cnt++;
         vector_field.markers.push_back(vector);
@@ -789,8 +881,12 @@ bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
       searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4)) {
     const auto &opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face),
                                               barycentric_coords);
+
+    // TODO iter over all available vector fields
+    const auto lethal_vec = layer_names["inflation"]->vectorAt(vertices, barycentric_coords);
+
     if (opt_dir) {
-      pos += opt_dir.get().normalized() * step_size;
+      pos += (opt_dir.get().normalized() + lethal_vec).normalized() * step_size;
       return true;
     }
   }

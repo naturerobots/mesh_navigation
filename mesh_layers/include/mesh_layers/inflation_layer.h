@@ -5,6 +5,7 @@
 #include <mesh_layers/InflationLayerConfig.h>
 #include <mesh_map/abstract_layer.h>
 
+
 namespace mesh_layers {
 
 const float EPSILON = 1e-9;
@@ -35,6 +36,8 @@ class InflationLayer : public mesh_map::AbstractLayer {
       const lvr2::FaceHandle &fh, const lvr2::BaseVector<float>& normal,
       const lvr2::VertexHandle &v1, const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3);
 
+  float fading(const float val);
+
   void waveCostInflation(const std::set<lvr2::VertexHandle> &lethals,
                          const float inflation_radius,
                          const float inscribed_radius,
@@ -44,6 +47,13 @@ class InflationLayer : public mesh_map::AbstractLayer {
   lvr2::BaseVector<float> vectorAt(
       const std::array<lvr2::VertexHandle, 3>& vertices,
       const std::array<float, 3>& barycentric_coords);
+
+  lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex);
+
+  const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
+  {
+    return vector_map;
+  }
 
   void backToSource(
       const lvr2::VertexHandle& current_vertex,

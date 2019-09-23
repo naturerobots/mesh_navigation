@@ -2,6 +2,7 @@
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/mesh_map.h>
+#include <boost/optional.hpp>
 
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
@@ -40,9 +41,20 @@ public:
   virtual lvr2::BaseVector<float> vectorAt(
     const std::array<lvr2::VertexHandle, 3>& vertices,
     const std::array<float, 3>& barycentric_coords)
-    {
-      return lvr2::BaseVector<float>();
-    }
+  {
+    return lvr2::BaseVector<float>();
+  }
+
+  virtual const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
+  {
+    return boost::none;
+  }
+
+  virtual lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex)
+  {
+    return lvr2::BaseVector<float>();
+  }
+
 
   virtual bool initialize(const std::string &name) = 0;
 
