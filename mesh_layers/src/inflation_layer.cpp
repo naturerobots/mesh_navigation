@@ -234,7 +234,7 @@ void InflationLayer::waveCostInflation(
   ROS_INFO_STREAM("Start inflation wave front propagation");
 
   while (!pq.isEmpty()) {
-    lvr2::VertexHandle current_vh = pq.popMin().key;
+    lvr2::VertexHandle current_vh = pq.popMin().key();
 
     // check if already fixed
     // if(fixed[current_vh]) continue;

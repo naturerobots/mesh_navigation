@@ -550,7 +550,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
   ROS_INFO_STREAM("Start wave front propagation");
 
   while (!pq.isEmpty() && !cancel_planning) {
-    lvr2::VertexHandle current_vh = pq.popMin().key;
+    lvr2::VertexHandle current_vh = pq.popMin().key();
 
     // check if already fixed
     // if(fixed[current_vh]) continue;
