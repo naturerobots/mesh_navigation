@@ -43,6 +43,7 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <mesh_client/mesh_client.h>
 
 // TODO fix lvr2 missing includes
 using namespace std;
@@ -67,8 +68,12 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
     : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true),
       map_loaded(false), layer_loader("mesh_map", "mesh_map::AbstractLayer"),
       mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
-  private_nh.param<std::string>("mesh_file", mesh_file, "mesh.h5");
-  private_nh.param<std::string>("mesh_part", mesh_part, "mesh");
+  private_nh.param<std::string>("server_uri", srv_uri, "");
+  private_nh.param<int>("server_port", srv_port, 8080);
+  private_nh.param<std::string>("server_path", srv_path, "");
+
+  private_nh.param<std::string>("mesh_file", mesh_file, "");
+  private_nh.param<std::string>("mesh_part", mesh_part, "");
   private_nh.param<std::string>("global_frame", global_frame, "map");
   ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
@@ -88,15 +93,26 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
   reconfigure_server_ptr->setCallback(config_callback);
 }
 
-bool MeshMap::readMap() { return readMap(mesh_file, mesh_part); }
+bool MeshMap::readMap() {
 
-bool MeshMap::readMap(const std::string &mesh_file,
-                      const std::string &mesh_part) {
+  if(!srv_uri.empty() && !srv_path.empty())
+  {
+    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
+        new mesh_client::MeshClient(srv_uri, srv_port, srv_path));
+  }
+  else if(!mesh_file.empty() && !mesh_part.empty())
+  {
+    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
+        new lvr2::HDF5IO(mesh_file, mesh_part, HighFive::File::ReadWrite));
+  }
+  else
+  {
+    return false;
+  }
+
   ROS_INFO_STREAM("Start reading the mesh part '"
                   << mesh_part << "' from the map file '" << mesh_file
                   << "'...");
-  mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-      new lvr2::HDF5IO(mesh_file, mesh_part, HighFive::File::ReadWrite));
   auto mesh_opt = mesh_io_ptr->getMesh();
 
   if (mesh_opt) {

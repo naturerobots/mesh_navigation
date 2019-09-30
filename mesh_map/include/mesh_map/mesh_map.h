@@ -61,6 +61,8 @@ public:
 
   bool readMap();
 
+  bool readMap(const std::string &uri);
+
   bool readMap(const std::string &mesh_map, const std::string &mesh_part);
 
   bool loadLayerPlugins();
@@ -219,6 +221,11 @@ private:
   std::set<lvr2::VertexHandle> lethals;
 
   std::string global_frame;
+
+  std::string srv_uri;
+  std::string srv_path;
+  int srv_port;
+
 
   std::string mesh_file;
   std::string mesh_part;

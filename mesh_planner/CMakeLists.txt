@@ -11,6 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   lvr_ros
 )
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(JSONCPP jsoncpp)
+
 generate_dynamic_reconfigure_options(
   cfg/MeshPlanner.cfg
 )
@@ -44,10 +47,12 @@ add_dependencies(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
+  ${JSONCPP_LIBRARIES}
 )
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${JSONCPP_LIBRARIES}
 )
 
 install(TARGETS ${PROJECT_NAME}

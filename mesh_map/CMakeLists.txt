@@ -10,10 +10,14 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   dynamic_reconfigure
   pluginlib
+  mesh_client
 )
 
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(LVR2 2 REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(JSONCPP jsoncpp)
+
 
 generate_dynamic_reconfigure_options(
   cfg/MeshMap.cfg
@@ -22,14 +26,15 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include ${LVR2_INCLUDE_DIRS}
   LIBRARIES mesh_map
-  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs dynamic_reconfigure pluginlib
-  DEPENDS LVR2
+  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs dynamic_reconfigure pluginlib mesh_client
+  DEPENDS LVR2 Boost jsoncpp
 )
 
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${LVR2_INCLUDE_DIRS}
+  ${JSONCPP_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
@@ -41,6 +46,12 @@ add_dependencies(${PROJECT_NAME}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   ${PROJECT_NAME}_gencfg
+)
+
+link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${LVR2_LIBRARIES}
+  ${JSONCPP_LIBRARIES}
 )
 
 install(TARGETS ${PROJECT_NAME}

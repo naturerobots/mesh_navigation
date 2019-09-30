@@ -13,6 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
   pluginlib
 )
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(JSONCPP jsoncpp)
+
 find_package(LVR2 2 REQUIRED)
 
 generate_dynamic_reconfigure_options(
@@ -43,6 +46,7 @@ add_dependencies(mbf_mesh_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 
 target_link_libraries(mbf_mesh_server
   ${catkin_LIBRARIES}
+  ${JSONCPP_LIBRARIES}
 )
 
 add_executable(${PROJECT_NAME} src/mbf_mesh_nav.cpp)
@@ -51,6 +55,7 @@ add_dependencies(${PROJECT_NAME} mbf_mesh_server ${${PROJECT_NAME}_EXPORTED_TARG
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${JSONCPP_LIBRARIES}
   mbf_mesh_server
 )
 

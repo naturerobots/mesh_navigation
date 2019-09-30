@@ -14,6 +14,7 @@
     <depend>pluginlib</depend>
     <depend>visualization_msgs</depend>
     <depend>lvr_ros</depend>
+    <depend>mesh_client</depend>
 
     <export>
 
