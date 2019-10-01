@@ -13,7 +13,6 @@ namespace mesh_client{
           http_client(srv_address.c_str(), srv_port)
   {
 
-
   }
 
   void MeshClient::setBoundingBox(
@@ -35,6 +34,7 @@ namespace mesh_client{
     Json::Value attr;
     attr["attribute_name"] = attribute_name;
     attr["attribute_group"] = attribute_group;
+    attr["type"] = false;
     attributes.append(attr);
     Json::Value request;
     request["compression"] = false;
@@ -47,8 +47,8 @@ namespace mesh_client{
   bool parseByteDataString(
       const std::string& string,
       char &type,
-      unsigned long& size,
-      char &width,
+      unsigned long &size,
+      unsigned long &width,
       char *data)
   {
     if(string.length() < 10) return false;
@@ -56,8 +56,8 @@ namespace mesh_client{
     const char *body = string.c_str();
     type = body[0]; // one byte
     size = *reinterpret_cast<const unsigned long*>(body + 1); // eight bytes
-    width = body[9]; // one byte
-    data = reinterpret_cast<char*>(const_cast<char*>(body+10));
+    width = *reinterpret_cast<const unsigned long*>(body + 9); // eight bytes
+    data = reinterpret_cast<char*>(const_cast<char*>(body+ 17));
     return true;
   }
 
@@ -65,13 +65,19 @@ namespace mesh_client{
   lvr2::FloatChannelOptional MeshClient::getVertices()
   {
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson("vertices"), "application/json");
+    if(res) 
+      std::cout << "status: " << res->status << std::endl; 
     if(res && res->status == 200)
     {
-      char type, width;
-      unsigned long size;
+      char type;
+      unsigned long size, width;
       char *data;
 
-      if(parseByteDataString(res->body, type, size, width, data) && type == Type::FLOAT)
+      bool ok = parseByteDataString(res->body, type, size, width, data) && type == Type::FLOAT;
+      
+      std::cout << "ok: " << ok << " type: " << (((int)type) & 0xFF) << " size: " << size << " width: " << width << std::endl;
+      
+      if(ok)
       {
         float* float_data = reinterpret_cast<float*>(data);
         return lvr2::FloatChannel(size, width, boost::shared_array<float>(float_data));
@@ -82,11 +88,11 @@ namespace mesh_client{
 
   lvr2::IndexChannelOptional MeshClient::getIndices()
   {
-    auto res = http_client.Post(srv_endpoint.c_str(), buildJson("indices"), "application/json");
+    auto res = http_client.Post(srv_endpoint.c_str(), buildJson("face_indices"), "application/json");
     if(res && res->status == 200)
     {
-      char type, width;
-      unsigned long size;
+      char type;
+      unsigned long size, width;
       char *data;
 
       if(!parseByteDataString(res->body, type, size, width, data) && type == Type::UINT)
@@ -114,8 +120,8 @@ namespace mesh_client{
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
-      char type, width;
-      unsigned long size;
+      char type;
+      unsigned long size, width;
       char *data;
 
       if(parseByteDataString(res->body, type, size, width, data) && type == Type::FLOAT)
@@ -133,8 +139,8 @@ namespace mesh_client{
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
-      char type, width;
-      unsigned long size;
+      char type;
+      unsigned long size, width;
       char *data;
 
       if(!parseByteDataString(res->body, type, size, width, data) && type == Type::UINT)
@@ -152,8 +158,8 @@ namespace mesh_client{
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
-      char type, width;
-      unsigned long size;
+      char type;
+      unsigned long size, width;
       char *data;
 
       if(parseByteDataString(res->body, type, size, width, data) && type == Type::UCHAR)
