@@ -12,18 +12,39 @@ namespace mesh_client{
 class MeshClient : public lvr2::AttributeMeshIOBase {
 
 public:
+  /**
+   * @brief Constructs a mesh client which receaves
+   * @param srv_address The address of the server, use localhost if the server is used locally.
+   * @param srv_port The server's port, default is 8080
+   * @param srv_endpoint, the servers endpoint, e.g., "/mesh"
+   */
   MeshClient(
       const std::string &srv_address,
       const unsigned int &srv_port,
       const std::string &srv_endpoint);
 
+  /**
+   * @brief sets the Bounding box for the query which is send to the server
+   */
   void setBoundingBox(
       const float min_x, const float min_y, const float min_z,
       const float max_x, const float max_y, const float max_z
       );
 
+  /**
+   * @brief Builds a JSON string containing the set bounding
+   *        box and the attribute name and the attribute group
+   * @param attribute_name The name of the corresponding attribute
+   *        to be requested from the server
+   * @param attribute_group The name of the group of the attribute
+   *        (vertex_attribute, face_attribute, ...)
+   * @return the compsoed JSON string following the server's specification
+   */
   std::string buildJson(const std::string& attribute_name, const std::string& attribute_group = "");
 
+  /**
+   * @brief Defines the data type of the transferred channel to decode the byte buffer.
+   */
   enum Type : char{
     UINT = 0,
     FLOAT = 1,
