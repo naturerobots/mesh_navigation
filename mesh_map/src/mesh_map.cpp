@@ -95,10 +95,19 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
 
 bool MeshMap::readMap() {
 
+  ROS_INFO_STREAM("server uri: " << srv_uri << " server path: " << srv_path << " server port: " << srv_port);
+  bool server = false;
+
   if(!srv_uri.empty() && !srv_path.empty())
   {
+    server = true;
+    
+
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
         new mesh_client::MeshClient(srv_uri, srv_port, srv_path));
+    auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
+
+    mesh_client_ptr->setBoundingBox(-100, -100, -100, 100, 100, 100);
   }
   else if(!mesh_file.empty() && !mesh_part.empty())
   {
@@ -107,12 +116,20 @@ bool MeshMap::readMap() {
   }
   else
   {
+    ROS_ERROR_STREAM("Could not open file or server connection!");
     return false;
   }
 
-  ROS_INFO_STREAM("Start reading the mesh part '"
+  if(server)
+  {
+    ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_uri << srv_path << "', port: "<< srv_port );
+  }
+  else{
+    ROS_INFO_STREAM("Start reading the mesh part '"
                   << mesh_part << "' from the map file '" << mesh_file
                   << "'...");
+  }
+    
   auto mesh_opt = mesh_io_ptr->getMesh();
 
   if (mesh_opt) {
