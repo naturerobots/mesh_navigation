@@ -80,11 +80,11 @@ namespace mesh_client{
       if(ok)
       {
         float* float_data = reinterpret_cast<float*>(data);
-        for (int i = 0; i < size * width; i++)
-        {
-          std::cout << float_data[i] << "; ";
-        }
-        std::cout << std::endl;
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << float_data[i] << "; ";
+        // }
+        // std::cout << std::endl;
 
         auto channel = lvr2::FloatChannel(size, width);
         memcpy(channel.dataPtr().get(), float_data, size*width*sizeof(float));
@@ -111,19 +111,19 @@ namespace mesh_client{
       {
         unsigned int* index_data = reinterpret_cast<unsigned int*>(data);
 
-        for (int i = 0; i < size * width; i++)
-        {
-          std::cout << index_data[i] << "; ";
-        }
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << index_data[i] << "; ";
+        // }
 
         auto channel = lvr2::IndexChannel(size, width);
         memcpy(channel.dataPtr().get(), index_data, size*width*sizeof(lvr2::Index));
         std::cout << "done." <<std::endl;
 
-        for (int i = 0; i < size * width; i++)
-        {
-          std::cout << channel.dataPtr()[i] << "; ";
-        }
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << channel.dataPtr()[i] << "; ";
+        // }
 
         return channel;
       }
