@@ -132,6 +132,10 @@ public:
 
 private:
 
+  std::map<std::string, lvr2::UCharChannel> uchar_channels;
+  std::map<std::string, lvr2::IndexChannel> index_channels;
+  std::map<std::string, lvr2::FloatChannel> float_channels;
+
   std::string srv_address;
   std::string srv_endpoint;
   unsigned int srv_port;

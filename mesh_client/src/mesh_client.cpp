@@ -64,6 +64,9 @@ namespace mesh_client{
 
   lvr2::FloatChannelOptional MeshClient::getVertices()
   {
+    if(float_channels.find("vertices") != float_channels.end())
+      return float_channels["vertices"];
+
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson("vertices"), "application/json");
     if(res) 
       std::cout << "status: " << res->status << std::endl; 
@@ -97,6 +100,10 @@ namespace mesh_client{
 
   lvr2::IndexChannelOptional MeshClient::getIndices()
   {
+    if(index_channels.find("face_indices") != index_channels.end())
+      return index_channels["face_indices"];
+
+
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson("face_indices"), "application/json");
     if(res && res->status == 200)
     {
@@ -131,18 +138,25 @@ namespace mesh_client{
     return lvr2::IndexChannelOptional();
   }
 
-  bool MeshClient::addVertices(const lvr2::FloatChannel& channel_ptr)
+  bool MeshClient::addVertices(const lvr2::FloatChannel& channel)
   {
-    return false;
+    float_channels["vertices"] = channel;
+    return true;
   }
 
-  bool MeshClient::addIndices(const lvr2::IndexChannel& channel_ptr)
+  bool MeshClient::addIndices(const lvr2::IndexChannel& channel)
   {
-    return false;
+    index_channels["face_indices"] = channel;
+    return true;
   }
 
   bool MeshClient::getChannel(const std::string group, const std::string name, lvr2::FloatChannelOptional& channel)
   {
+    if(float_channels.find(name) != float_channels.end()){
+      channel = float_channels[name];
+      return true;
+    }
+
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
@@ -163,6 +177,12 @@ namespace mesh_client{
 
   bool MeshClient::getChannel(const std::string group, const std::string name, lvr2::IndexChannelOptional& channel)
   {
+    if(index_channels.find(name) != index_channels.end())
+    {
+      channel = index_channels[name];
+      return true;
+    }
+
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
@@ -183,6 +203,11 @@ namespace mesh_client{
 
   bool MeshClient::getChannel(const std::string group, const std::string name, lvr2::UCharChannelOptional& channel)
   {
+    if(uchar_channels.find(name) != uchar_channels.end()){
+      channel = uchar_channels[name];
+      return true;
+    }
+
     auto res = http_client.Post(srv_endpoint.c_str(), buildJson(name, group), "application/json");
     if(res && res->status == 200)
     {
@@ -203,16 +228,19 @@ namespace mesh_client{
 
   bool MeshClient::addChannel(const std::string group, const std::string name, const lvr2::FloatChannel& channel)
   {
-    return false;
+    float_channels[name] = channel;
+    return true;
   }
 
   bool MeshClient::addChannel(const std::string group, const std::string name, const lvr2::IndexChannel& channel)
   {
-    return false;
+    index_channels[name] = channel;
+    return true;
   }
 
   bool MeshClient::addChannel(const std::string group, const std::string name, const lvr2::UCharChannel& channel)
   {
-    return false;
+    uchar_channels[name] = channel;
+    return true;
   }
 } /* namespace mesh_client */
