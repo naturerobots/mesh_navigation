@@ -195,106 +195,112 @@ void InflationLayer::waveCostInflation(
     const std::set<lvr2::VertexHandle> &lethals, const float inflation_radius,
     const float inscribed_radius, const float inscribed_value,
     const float lethal_value) {
+  if (mesh_ptr) 
+  {
+    auto const &mesh = *mesh_ptr;
 
-  auto const &mesh = *mesh_ptr;
+    ROS_INFO_STREAM("inflation radius:" << inflation_radius);
+    ROS_INFO_STREAM("Init wave inflation.");
 
-  ROS_INFO_STREAM("inflation radius:" << inflation_radius);
-  ROS_INFO_STREAM("Init wave inflation.");
+    lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
+    distances = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(),
+                                          std::numeric_limits<float>::infinity());
+    lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+    predecessors.reserve(mesh_ptr->nextVertexIndex());
 
-  lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
-  distances = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(),
-                                        std::numeric_limits<float>::infinity());
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-  predecessors.reserve(mesh_ptr->nextVertexIndex());
+    vector_map = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh.nextVertexIndex(), lvr2::BaseVector<float>());
 
-  vector_map = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh.nextVertexIndex(), lvr2::BaseVector<float>());
+    direction = lvr2::DenseVertexMap<float>();
 
-  direction = lvr2::DenseVertexMap<float>();
+    const auto &edge_distances = map_ptr->edgeDistances();
+    const auto &face_normals = map_ptr->faceNormals();
 
-  const auto &edge_distances = map_ptr->edgeDistances();
-  const auto &face_normals = map_ptr->faceNormals();
+    lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
 
-  lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
-
-  // initialize distances with infinity
-  // initialize predecessor of each vertex with itself
-  for (auto const &vH : mesh.vertices()) {
-    predecessors.insert(vH, vH);
-  }
-
-  lvr2::Meap<lvr2::VertexHandle, float> pq;
-  // Set start distance to zero
-  // add start vertex to priority queue
-  for (auto vH : lethals) {
-    distances[vH] = 0;
-    fixed[vH] = true;
-    pq.insert(vH, 0);
-  }
-
-  ROS_INFO_STREAM("Start inflation wave front propagation");
-
-  while (!pq.isEmpty()) {
-    lvr2::VertexHandle current_vh = pq.popMin().key();
-
-    // check if already fixed
-    // if(fixed[current_vh]) continue;
-    fixed[current_vh] = true;
-
-    std::vector<lvr2::VertexHandle> neighbours;
-    mesh.getNeighboursOfVertex(current_vh, neighbours);
-    for(auto nh : neighbours){
-      std::vector<lvr2::FaceHandle> faces;
-      mesh.getFacesOfVertex(nh, faces);
-
-      for (auto fh : faces) {
-        const auto vertices = mesh.getVerticesOfFace(fh);
-        const lvr2::VertexHandle &a = vertices[0];
-        const lvr2::VertexHandle &b = vertices[1];
-        const lvr2::VertexHandle &c = vertices[2];
-
-        if (fixed[a] && fixed[b] && fixed[c]) {
-          //ROS_INFO_STREAM("All fixed!");
-          continue;
-        }
-        else if (fixed[a] && fixed[b] && !fixed[c]) {
-          // c is free
-          if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b, c))
-          {
-            pq.insert(c, distances[c]);
-          }
-          //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
-        } else if (fixed[a] && !fixed[b] && fixed[c]) {
-          // b is free
-          if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a, b))
-          {
-            pq.insert(b, distances[b]);
-          }
-          //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
-        } else if (!fixed[a] && fixed[b] && fixed[c]) {
-          // a if free
-          if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c, a))
-          {
-            pq.insert(a, distances[a]);
-          }
-          //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
-        } else {
-          // two free vertices -> skip that face
-          //ROS_INFO_STREAM("two vertices are free.");
-          continue;
-        }
-      }
-
+    // initialize distances with infinity
+    // initialize predecessor of each vertex with itself
+    for (auto const &vH : mesh.vertices()) {
+      predecessors.insert(vH, vH);
     }
+
+    lvr2::Meap<lvr2::VertexHandle, float> pq;
+    // Set start distance to zero
+    // add start vertex to priority queue
+    for (auto vH : lethals) {
+      distances[vH] = 0;
+      fixed[vH] = true;
+      pq.insert(vH, 0);
+    }
+
+    ROS_INFO_STREAM("Start inflation wave front propagation");
+
+    while (!pq.isEmpty()) {
+      lvr2::VertexHandle current_vh = pq.popMin().key();
+
+      // check if already fixed
+      // if(fixed[current_vh]) continue;
+      fixed[current_vh] = true;
+
+      std::vector<lvr2::VertexHandle> neighbours;
+      mesh.getNeighboursOfVertex(current_vh, neighbours);
+      for(auto nh : neighbours){
+        std::vector<lvr2::FaceHandle> faces;
+        mesh.getFacesOfVertex(nh, faces);
+
+        for (auto fh : faces) {
+          const auto vertices = mesh.getVerticesOfFace(fh);
+          const lvr2::VertexHandle &a = vertices[0];
+          const lvr2::VertexHandle &b = vertices[1];
+          const lvr2::VertexHandle &c = vertices[2];
+
+          if (fixed[a] && fixed[b] && fixed[c]) {
+            //ROS_INFO_STREAM("All fixed!");
+            continue;
+          }
+          else if (fixed[a] && fixed[b] && !fixed[c]) {
+            // c is free
+            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b, c))
+            {
+              pq.insert(c, distances[c]);
+            }
+            //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
+          } else if (fixed[a] && !fixed[b] && fixed[c]) {
+            // b is free
+            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a, b))
+            {
+              pq.insert(b, distances[b]);
+            }
+            //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
+          } else if (!fixed[a] && fixed[b] && fixed[c]) {
+            // a if free
+            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c, a))
+            {
+              pq.insert(a, distances[a]);
+            }
+            //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
+          } else {
+            // two free vertices -> skip that face
+            //ROS_INFO_STREAM("two vertices are free.");
+            continue;
+          }
+        }
+
+      }
+    }
+
+    ROS_INFO_STREAM("Finished inflation wave front propagation.");
+
+
+    for (auto vH : mesh_ptr->vertices()) {
+      riskiness.insert(vH, fading(distances[vH]));
+    }
+
+    map_ptr->publishVectorField("inflation", vector_map, cutting_faces, distances, std::bind(&InflationLayer::fading, this, std::placeholders::_1));
   }
-
-  ROS_INFO_STREAM("Finished inflation wave front propagation.");
-
-
-  for (auto vH : mesh_ptr->vertices()) {
-    riskiness.insert(vH, fading(distances[vH]));
+  else
+  {
+    ROS_ERROR_STREAM("Cannot init wave inflation: mesh_ptr points to null");
   }
-
-  map_ptr->publishVectorField("inflation", vector_map, cutting_faces, distances, std::bind(&InflationLayer::fading, this, std::placeholders::_1));
 }
 
 lvr2::BaseVector<float> InflationLayer::vectorAt(

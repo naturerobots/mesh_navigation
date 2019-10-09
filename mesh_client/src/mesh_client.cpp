@@ -49,7 +49,7 @@ namespace mesh_client{
       char &type,
       unsigned long &size,
       unsigned long &width,
-      char *data)
+      char *&data)
   {
     if(string.length() < 10) return false;
     // parse body
@@ -80,7 +80,16 @@ namespace mesh_client{
       if(ok)
       {
         float* float_data = reinterpret_cast<float*>(data);
-        return lvr2::FloatChannel(size, width, boost::shared_array<float>(float_data));
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << float_data[i] << "; ";
+        // }
+        // std::cout << std::endl;
+
+        auto channel = lvr2::FloatChannel(size, width);
+        memcpy(channel.dataPtr().get(), float_data, size*width*sizeof(float));
+        std::cout << "done." <<std::endl;
+        return channel;
       }
     }
     return lvr2::FloatChannelOptional();
@@ -95,14 +104,31 @@ namespace mesh_client{
       unsigned long size, width;
       char *data;
 
-      if(!parseByteDataString(res->body, type, size, width, data) && type == Type::UINT)
+      bool ok = parseByteDataString(res->body, type, size, width, data) && type == Type::UINT;
+      std::cout << "ok: " << ok << " type: " << (((int)type) & 0xFF) << " size: " << size << " width: " << width << std::endl;
+
+      if(ok)
       {
         unsigned int* index_data = reinterpret_cast<unsigned int*>(data);
-        return lvr2::IndexChannel(size, width, boost::shared_array<unsigned int>(index_data));
+
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << index_data[i] << "; ";
+        // }
+
+        auto channel = lvr2::IndexChannel(size, width);
+        memcpy(channel.dataPtr().get(), index_data, size*width*sizeof(lvr2::Index));
+        std::cout << "done." <<std::endl;
+
+        // for (int i = 0; i < size * width; i++)
+        // {
+        //   std::cout << channel.dataPtr()[i] << "; ";
+        // }
+
+        return channel;
       }
     }
     return lvr2::IndexChannelOptional();
-
   }
 
   bool MeshClient::addVertices(const lvr2::FloatChannel& channel_ptr)
@@ -127,7 +153,8 @@ namespace mesh_client{
       if(parseByteDataString(res->body, type, size, width, data) && type == Type::FLOAT)
       {
         float* float_data = reinterpret_cast<float*>(data);
-        channel = lvr2::FloatChannel(size, width, boost::shared_array<float>(float_data));
+        channel = lvr2::FloatChannel(size, width);
+        memcpy(channel.get().dataPtr().get(), float_data, size*width*sizeof(float));
         return true;
       }
     }
@@ -146,7 +173,8 @@ namespace mesh_client{
       if(!parseByteDataString(res->body, type, size, width, data) && type == Type::UINT)
       {
         unsigned int* index_data = reinterpret_cast<unsigned int*>(data);
-        channel = lvr2::IndexChannel(size, width, boost::shared_array<unsigned int>(index_data));
+        channel = lvr2::IndexChannel(size, width);
+        memcpy(channel.get().dataPtr().get(), index_data, size*width*sizeof(lvr2::Index));
         return true;
       }
     }
@@ -165,9 +193,12 @@ namespace mesh_client{
       if(parseByteDataString(res->body, type, size, width, data) && type == Type::UCHAR)
       {
         unsigned char* uchar_data = reinterpret_cast<unsigned char*>(data);
-        channel = lvr2::UCharChannel(size, width, boost::shared_array<unsigned char>(uchar_data));
+        channel = lvr2::UCharChannel(size, width);
+        memcpy(channel.get().dataPtr().get(), uchar_data, size*width*sizeof(unsigned char));
+        return true;
       }
     }
+    return false;
   }
 
   bool MeshClient::addChannel(const std::string group, const std::string name, const lvr2::FloatChannel& channel)

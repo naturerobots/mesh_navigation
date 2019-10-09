@@ -107,7 +107,7 @@ bool MeshMap::readMap() {
         new mesh_client::MeshClient(srv_uri, srv_port, srv_path));
     auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
 
-    mesh_client_ptr->setBoundingBox(-100, -100, -100, 100, 100, 100);
+    mesh_client_ptr->setBoundingBox(-10, -10, -10, 10, 10, 10);
   }
   else if(!mesh_file.empty() && !mesh_part.empty())
   {
@@ -144,6 +144,7 @@ bool MeshMap::readMap() {
                      << "' ");
     return false;
   }
+
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
   edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
