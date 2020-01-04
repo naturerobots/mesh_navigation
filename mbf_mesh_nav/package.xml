@@ -1,15 +1,14 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mbf_mesh_nav</name>
-    <version>0.0.1</version>
+    <version>0.1.0</version>
     <description>The mbf_mesh_nav package</description>
 
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
 
-    <license>BSD</license>
+    <license>BSD 3-Clause</license>
 
     <author email="spuetz@uos.de">Sebastian Pütz</author>
-
 
     <depend>roscpp</depend>
     <buildtool_depend>catkin</buildtool_depend>
@@ -19,10 +18,4 @@
     <depend>mesh_map</depend>
     <depend>pluginlib</depend>
 
-
-    <!-- The export tag contains other, unspecified, tags -->
-    <export>
-        <!-- Other tools can request additional information be placed here -->
-
-    </export>
 </package>

@@ -101,7 +101,7 @@ bool MeshMap::readMap() {
   if(!srv_uri.empty() && !srv_path.empty())
   {
     server = true;
-    
+
 
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
         new mesh_client::MeshClient(srv_uri, srv_port, srv_path));

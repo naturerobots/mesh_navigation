@@ -1,14 +1,21 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mesh_navigation</name>
-    <version>0.0.1</version>
-    <description>The mesh_navigation package</description>
-    <maintainer email="spuetz@todo.todo">Sebastian Pütz</maintainer>
-    <license>BSD</license>
+    <version>0.1.0</version>
+    <description>The mesh_navigation package provides a layered mesh_map implementation, a Move Base Flex mesh navigation server, as well as mesh navigation plugins for path planning and navigation control.</description>
+    <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
+    <license>BSD 3-Clause</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
-    -->
 
     <buildtool_depend>catkin</buildtool_depend>
+	<exec_depend>mbf_mesh_core</buildtool_depend>
+	<exec_depend>mbf_mesh_nav</buildtool_depend>
+	<exec_depend>mesh_client</buildtool_depend>
+	<exec_depend>mesh_controller</buildtool_depend>
+	<exec_depend>mesh_layers</buildtool_depend>
+	<exec_depend>mesh_map</buildtool_depend>
+	<exec_depend>mesh_navigation</buildtool_depend>
+	<exec_depend>mesh_planner</buildtool_depend>
 
     <export>
         <metapackage/>

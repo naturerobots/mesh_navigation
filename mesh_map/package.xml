@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mesh_map</name>
-    <version>0.0.1</version>
+    <version>0.1.0</version>
     <description>The mesh_map package</description>
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
-    <license>BSD</license>
+    <license>BSD 3-Clause</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <depend>roscpp</depend>
@@ -16,7 +16,4 @@
     <depend>lvr_ros</depend>
     <depend>mesh_client</depend>
 
-    <export>
-
-    </export>
 </package>

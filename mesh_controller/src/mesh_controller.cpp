@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019, Sabrina Frohn
+ *  Copyright 2019, Sebastian Pütz, Sabrina Frohn
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -31,7 +31,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sabrina Frohn <sfrohn@uni-osnabrueck.de>
+ *    Sabrina Frohn <sfrohn@uos.de>
+ *    Sebastian Pütz <spuetz@uos.de>
  *
  */
 
@@ -450,9 +451,10 @@ float MeshController::direction(mesh_map::Vector &robot_heading,
   tf::Vector3 tf_planned(planned_heading.x, planned_heading.y,
                          planned_heading.z);
 
-https: // www.gamedev.net/forums/topic/508445-left-or-right-direction/
+  https: // www.gamedev.net/forums/topic/508445-left-or-right-direction/
   tf::Vector3 tf_cross_prod = tf_robot.cross(tf_planned);
 
+  // TODO use face normal
   tf::Vector3 tf_up = {0, 0, -1};
 
   // use normal vector of face for dot product as "up" vector

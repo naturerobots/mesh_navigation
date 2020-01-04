@@ -198,7 +198,7 @@ void MeshPlanner::computeVectorMap() {
 
 uint32_t MeshPlanner::waveFrontPropagation(
     const mesh_map::Vector &start, const mesh_map::Vector &goal,
-    std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path) {
+    std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path){
   return waveFrontPropagation(start, goal, mesh_map->edgeDistances(),
                               mesh_map->vertexCosts(), path, potential,
                               predecessors);
@@ -681,8 +681,3 @@ uint32_t MeshPlanner::waveFrontPropagation(
 
 } /* namespace mesh_planner */
 
-int main(int argc, char** argv)
-{
-
-  return 1;
-}

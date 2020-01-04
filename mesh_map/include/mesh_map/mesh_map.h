@@ -183,9 +183,6 @@ public:
 
   void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector> &vector_map);
 
-  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
-
   void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA &color,
                          const std::string &name);
 
@@ -208,7 +205,10 @@ public:
   void publishCombinedVectorField();
 
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
-
+  
+  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
+  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
+  
 private:
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
