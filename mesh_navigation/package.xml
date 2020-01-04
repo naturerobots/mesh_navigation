@@ -8,14 +8,13 @@
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <buildtool_depend>catkin</buildtool_depend>
-	<exec_depend>mbf_mesh_core</buildtool_depend>
-	<exec_depend>mbf_mesh_nav</buildtool_depend>
-	<exec_depend>mesh_client</buildtool_depend>
-	<exec_depend>mesh_controller</buildtool_depend>
-	<exec_depend>mesh_layers</buildtool_depend>
-	<exec_depend>mesh_map</buildtool_depend>
-	<exec_depend>mesh_navigation</buildtool_depend>
-	<exec_depend>mesh_planner</buildtool_depend>
+    <exec_depend>mbf_mesh_core</exec_depend>
+    <exec_depend>mbf_mesh_nav</exec_depend>
+    <exec_depend>mesh_client</exec_depend>
+    <exec_depend>mesh_controller</exec_depend>
+    <exec_depend>mesh_layers</exec_depend>
+    <exec_depend>mesh_map</exec_depend>
+    <exec_depend>mesh_planner</exec_depend>
 
     <export>
         <metapackage/>
