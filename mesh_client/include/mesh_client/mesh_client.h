@@ -20,7 +20,7 @@ public:
    * @brief Constructs a mesh client which receaves
    * @param srv_url The url of the server, use http://localhost/my/path/to/mesh if the server is used locally.
    */
-  MeshClient(const std::string& srv_url);
+  MeshClient(const std::string& srv_url, const std::string& server_username, const std::string& server_password);
 
   /**
    * @brief sets the Bounding box for the query which is send to the server
@@ -133,6 +133,8 @@ private:
   std::map<std::string, lvr2::FloatChannel> float_channels;
 
   std::string server_url_;
+  std::string server_username_;
+  std::string server_password_;
 
   std::array<float, 6> bounding_box_;
   std::map<std::string, std::pair<float, float>> mesh_filters_;

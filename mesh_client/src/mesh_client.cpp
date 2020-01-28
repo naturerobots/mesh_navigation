@@ -4,7 +4,9 @@
 
 namespace mesh_client
 {
-MeshClient::MeshClient(const std::string& server_url) : server_url_(server_url)
+MeshClient::MeshClient(const std::string& server_url, const std::string& server_username,
+                       const std::string& server_password)
+  : server_url_(server_url), server_username_(server_username), server_password_(server_password)
 {
 }
 
@@ -272,7 +274,8 @@ std::unique_ptr<std::string> MeshClient::requestChannel(std::string channel)
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_body.c_str());
   curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-  curl_easy_setopt(curl, CURLOPT_USERPWD, "pg:plutoIsAPlanet");
+  std::string usr_pwd = server_username_ + ":" + server_password_;
+  curl_easy_setopt(curl, CURLOPT_USERPWD, usr_pwd.c_str());
 
   unique_ptr<std::string> result = std::make_unique<std::string>();
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);

@@ -223,6 +223,8 @@ private:
   std::string global_frame;
 
   std::string srv_url;
+  std::string srv_username;
+  std::string srv_password;
   float min_roughness;
   float max_roughness;
   float min_height_diff;

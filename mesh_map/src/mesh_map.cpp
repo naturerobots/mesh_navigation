@@ -69,6 +69,8 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
       map_loaded(false), layer_loader("mesh_map", "mesh_map::AbstractLayer"),
       mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
   private_nh.param<std::string>("server_url", srv_url, "");
+  private_nh.param<std::string>("server_username",  srv_username, "");
+  private_nh.param<std::string>("server_password", srv_password, "");
   private_nh.param<float>("min_roughness", min_roughness, 0);
   private_nh.param<float>("max_roughness", max_roughness, 0);
   private_nh.param<float>("min_height_diff", min_height_diff, 0);
@@ -112,7 +114,7 @@ bool MeshMap::readMap() {
     
 
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-        new mesh_client::MeshClient(srv_url));
+        new mesh_client::MeshClient(srv_url, srv_username, srv_password));
     auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
 
     mesh_client_ptr->setBoundingBox(bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z);
