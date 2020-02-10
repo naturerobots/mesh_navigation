@@ -5,8 +5,8 @@
 namespace mesh_client
 {
 MeshClient::MeshClient(const std::string& server_url, const std::string& server_username,
-                       const std::string& server_password)
-  : server_url_(server_url), server_username_(server_username), server_password_(server_password)
+                       const std::string& server_password, const std::string& mesh_layer)
+  : server_url_(server_url), server_username_(server_username), server_password_(server_password), mesh_layer_(mesh_layer)
 {
 }
 
@@ -58,6 +58,7 @@ std::string MeshClient::buildJson(const std::string& attribute_name)
   Json::Value request;
   request["boundingbox"] = json_bb;
   request["attribute"] = attr;
+  request["layer"] = mesh_layer_;
   Json::FastWriter fast_writer;
   return fast_writer.write(request);
 }
@@ -267,7 +268,7 @@ std::unique_ptr<std::string> MeshClient::requestChannel(std::string channel)
   }
 
   std::string post_body = buildJson(channel);
-  curl_easy_setopt(curl, CURLOPT_URL, "http://glumanda.informatik.uos.de/v1/scanprojects/7/mesh");
+  curl_easy_setopt(curl, CURLOPT_URL, server_url_.c_str());
 
   struct curl_slist* list = curl_slist_append(list, "Content-Type: application/json");
 

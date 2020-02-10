@@ -225,6 +225,7 @@ private:
   std::string srv_url;
   std::string srv_username;
   std::string srv_password;
+  std::string mesh_layer;
   float min_roughness;
   float max_roughness;
   float min_height_diff;
