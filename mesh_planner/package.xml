@@ -11,6 +11,7 @@
 
     <depend>roscpp</depend>
     <depend>mbf_mesh_core</depend>
+    <depend>mbf_utility</depend>
     <depend>mesh_map</depend>
     <depend>lvr_ros</depend>
 

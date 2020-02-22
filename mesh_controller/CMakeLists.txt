@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS
   mbf_mesh_core
+  mbf_utility
   mesh_map
   lvr_ros
 )
