@@ -1,3 +1,0 @@
-[submodule "mesh_client/include/cpp-httplib"]
-        path = mesh_client/include/cpp-httplib
-        url = https://github.com/yhirose/cpp-httplib.git

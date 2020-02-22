@@ -9,8 +9,11 @@
   <author email="spuetz@uos.de">Sebastian Pütz</author>
   <author email="mklpiening@uos.de">Malte kl. Piening</author>
 
-  <depend>lvr2</depend>
+  <depend>curl</depend>
+  <depend>eigen</depend>
   <depend>libjsoncpp-dev</depend>
+  <depend>lvr2</depend>
+
   <buildtool_depend>catkin</buildtool_depend>
 
 </package>

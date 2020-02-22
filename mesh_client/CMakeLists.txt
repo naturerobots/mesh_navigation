@@ -7,14 +7,15 @@ find_package(catkin REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(LVR2 REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(CURL REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
-
 
 include_directories(
   include
   ${LVR_INCLUDE_DIRS}
   ${JSONCPP_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
+  ${CURL_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
@@ -24,6 +25,7 @@ add_library(${PROJECT_NAME}
 link_libraries(${PROJECT_NAME}
   ${LVR_LIBRARIES}
   ${JSONCPP_LIBRARIES}
+  ${CURL_LIBRARIES}
 )
 
 catkin_package(

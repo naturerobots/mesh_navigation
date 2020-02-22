@@ -222,10 +222,20 @@ private:
 
   std::string global_frame;
 
-  std::string srv_uri;
-  std::string srv_path;
-  int srv_port;
-
+  std::string srv_url;
+  std::string srv_username;
+  std::string srv_password;
+  std::string mesh_layer;
+  float min_roughness;
+  float max_roughness;
+  float min_height_diff;
+  float max_height_diff;
+  float bb_min_x;
+  float bb_min_y;
+  float bb_min_z;
+  float bb_max_x;
+  float bb_max_y;
+  float bb_max_z;
 
   std::string mesh_file;
   std::string mesh_part;

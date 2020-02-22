@@ -68,9 +68,20 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
     : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true),
       map_loaded(false), layer_loader("mesh_map", "mesh_map::AbstractLayer"),
       mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
-  private_nh.param<std::string>("server_uri", srv_uri, "");
-  private_nh.param<int>("server_port", srv_port, 8080);
-  private_nh.param<std::string>("server_path", srv_path, "");
+  private_nh.param<std::string>("server_url", srv_url, "");
+  private_nh.param<std::string>("server_username",  srv_username, "");
+  private_nh.param<std::string>("server_password", srv_password, "");
+  private_nh.param<std::string>("mesh_layer", mesh_layer, "mesh0");
+  private_nh.param<float>("min_roughness", min_roughness, 0);
+  private_nh.param<float>("max_roughness", max_roughness, 0);
+  private_nh.param<float>("min_height_diff", min_height_diff, 0);
+  private_nh.param<float>("max_height_diff", max_height_diff, 0);
+  private_nh.param<float>("bb_min_x", bb_min_x, 0);
+  private_nh.param<float>("bb_min_y", bb_min_y, 0);
+  private_nh.param<float>("bb_min_z", bb_min_z, 0);
+  private_nh.param<float>("bb_max_x", bb_max_x, 0);
+  private_nh.param<float>("bb_max_y", bb_max_y, 0);
+  private_nh.param<float>("bb_max_z", bb_max_z, 0);
 
   private_nh.param<std::string>("mesh_file", mesh_file, "");
   private_nh.param<std::string>("mesh_part", mesh_part, "");
@@ -95,19 +106,21 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
 
 bool MeshMap::readMap() {
 
-  ROS_INFO_STREAM("server uri: " << srv_uri << " server path: " << srv_path << " server port: " << srv_port);
+  ROS_INFO_STREAM("server url: " << srv_url);
   bool server = false;
 
-  if(!srv_uri.empty() && !srv_path.empty())
+  if(!srv_url.empty())
   {
     server = true;
 
 
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-        new mesh_client::MeshClient(srv_uri, srv_port, srv_path));
+        new mesh_client::MeshClient(srv_url, srv_username, srv_password, mesh_layer));
     auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
 
-    mesh_client_ptr->setBoundingBox(-10, -10, -10, 10, 10, 10);
+    mesh_client_ptr->setBoundingBox(bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z);
+    mesh_client_ptr->addFilter("roughness", min_roughness, max_roughness);
+    mesh_client_ptr->addFilter("height_diff", min_height_diff, max_height_diff);
   }
   else if(!mesh_file.empty() && !mesh_part.empty())
   {
@@ -122,7 +135,7 @@ bool MeshMap::readMap() {
 
   if(server)
   {
-    ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_uri << srv_path << "', port: "<< srv_port );
+    ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_url);
   }
   else{
     ROS_INFO_STREAM("Start reading the mesh part '"
@@ -131,6 +144,8 @@ bool MeshMap::readMap() {
   }
     
   auto mesh_opt = mesh_io_ptr->getMesh();
+    
+  std::cout << "bla" << std::endl; 
 
   if (mesh_opt) {
     *mesh_ptr = mesh_opt.get();

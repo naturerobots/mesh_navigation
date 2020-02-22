@@ -237,6 +237,11 @@ void InflationLayer::waveCostInflation(
     while (!pq.isEmpty()) {
       lvr2::VertexHandle current_vh = pq.popMin().key();
 
+      if (current_vh.idx() >= mesh.nextVertexIndex())
+      {
+        continue;
+      }
+
       // check if already fixed
       // if(fixed[current_vh]) continue;
       fixed[current_vh] = true;
