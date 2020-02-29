@@ -102,7 +102,7 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
       "vertex_costs", 1, false);
   vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>(
       "vertex_colors", 1, true);
-  vector_field_pub = private_nh.advertise<visualization_msgs::MarkerArray>(
+  vector_field_pub = private_nh.advertise<visualization_msgs::Marker>(
       "vector_field", 1, true);
   reconfigure_server_ptr =
       boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
@@ -753,26 +753,30 @@ void MeshMap::publishVectorField(
   const auto &vertex_costs = vertexCosts();
   const auto &face_normals = faceNormals();
 
-  visualization_msgs::MarkerArray vector_field;
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
-  header.frame_id = mapFrame();
-  geometry_msgs::Vector3 scale;
-  scale.x = 0.07;
-  scale.y = 0.02;
-  scale.z = 0.02;
+  visualization_msgs::Marker vector_field;
 
-  vector_field.markers.reserve(vector_map.numValues());
+  geometry_msgs::Pose pose;
+  pose.position.x = pose.position.y = pose.position.z = 0;
+  pose.orientation.x = pose.orientation.y = pose.orientation.z = 0;
+  pose.orientation.w = 1;
+  vector_field.pose = pose;
+
+  vector_field.type = visualization_msgs::Marker::LINE_LIST;
+  vector_field.header.frame_id = mapFrame();
+  vector_field.header.stamp = ros::Time::now();
+  vector_field.ns = name;
+  vector_field.scale.x = 0.01;
+  vector_field.color.a = 1;
+  vector_field.id = 0;
+
+  vector_field.colors.reserve(2*vector_map.numValues());
+  vector_field.points.reserve(2*vector_map.numValues());
 
   unsigned int cnt = 0;
   unsigned int faces = 0;
-  visualization_msgs::Marker vector;
-  vector.type = visualization_msgs::Marker::ARROW;
-  vector.header = header;
-  vector.ns = name;
-  vector.scale = scale;
 
   lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh.numFaces(), 0);
+  std::set<lvr2::FaceHandle> complete_faces;
 
   for (auto vH : vector_map) {
     const auto& dir_vec = vector_map[vH];
@@ -783,28 +787,39 @@ void MeshMap::publishVectorField(
       continue;
     }
 
-    const float value = cost_function ? cost_function(values[vH]) : values[vH];
-    vector.color = lvr_ros::getRainbowColor(value);
+    /*
     vector.pose = mesh_map::calculatePoseFromDirection(
         mesh.getVertexPosition(vH), dir_vec,
         face_normals[cutting_faces[vH]]);
+    */
 
-    if(!std::isfinite(vector.pose.position.x)
-        || !std::isfinite(vector.pose.position.y)
-        || !std::isfinite(vector.pose.position.z)
-        || !std::isfinite(vector.pose.orientation.x)
-        || !std::isfinite(vector.pose.orientation.y)
-        || !std::isfinite(vector.pose.orientation.z)
-        || !std::isfinite(vector.pose.orientation.w))
+    auto u = mesh.getVertexPosition(vH);
+    auto v = u + dir_vec * 0.1;
+
+    if(!std::isfinite(u.x) || !std::isfinite(u.y) || !std::isfinite(u.z)
+        || !std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z))
+    {
       continue;
+    }
+    vector_field.points.push_back(toPoint(u));
+    vector_field.points.push_back(toPoint(v));
 
-    vector.header.seq = cnt;
-    vector.id = cnt++;
-    vector_field.markers.push_back(vector);
+    const float value = cost_function ? cost_function(values[vH]) : values[vH];
+    std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
+    vector_field.colors.push_back(color);
+    vector_field.colors.push_back(color);
+
+    cnt++;
+    //vector.header.seq = cnt;
+    //vector.id = cnt++;
+    //vector_field.markers.push_back(vector);
     try
     {
       for (auto fH : mesh.getFacesOfVertex(vH)) {
-        if(++vector_field_faces[fH] == 3) faces++;
+        if(++vector_field_faces[fH] == 3){
+          faces++;
+          complete_faces.insert(fH);
+        }
       }
     }
     catch(lvr2::PanicException exception)
@@ -819,17 +834,15 @@ void MeshMap::publishVectorField(
     if(invalid[vH])
       invalid_cnt++;
   }
+
   if(invalid_cnt > 0) {
     ROS_WARN_STREAM("Found " << invalid_cnt << " non manifold vertices!");
   }
   ROS_INFO_STREAM("Found " << faces << " complete vector faces!");
 
-  vector_field.markers.reserve(faces + cnt);
+  vector_field.points.reserve(faces + cnt);
 
-  for (auto fH : vector_field_faces) {
-    if (vector_field_faces[fH] != 3)
-      continue;
-
+  for (auto fH : complete_faces) {
     const auto &vertices = mesh.getVertexPositionsOfFace(fH);
     const auto &vertex_handles = mesh.getVerticesOfFace(fH);
     mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
@@ -842,21 +855,29 @@ void MeshMap::publishVectorField(
       if (dir_opt) {
         const float &cost = costAtPosition(values, vertex_handles, barycentric_coords);
         const float &value = cost_function ? cost_function(cost) : cost;
-        vector.color = lvr_ros::getRainbowColor(value);
-        vector.pose = mesh_map::calculatePoseFromDirection(
-            center, dir_opt.get(), face_normals[fH]);
-        if(!std::isfinite(vector.pose.position.x)
-            || !std::isfinite(vector.pose.position.y)
-            || !std::isfinite(vector.pose.position.z)
-            || !std::isfinite(vector.pose.orientation.x)
-            || !std::isfinite(vector.pose.orientation.y)
-            || !std::isfinite(vector.pose.orientation.z)
-            || !std::isfinite(vector.pose.orientation.w))
-          continue;
 
-        vector.header.seq = cnt;
-        vector.id = cnt++;
-        vector_field.markers.push_back(vector);
+        //vector.color = lvr_ros::getRainbowColor(value);
+        //vector.pose = mesh_map::calculatePoseFromDirection(
+        //    center, dir_opt.get(), face_normals[fH]);
+
+        auto u = center;
+        auto v = u + dir_opt.get() * 0.1;
+
+        if(!std::isfinite(u.x) || !std::isfinite(u.y) || !std::isfinite(u.z)
+            || !std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z))
+        {
+          continue;
+        }
+
+        //vector_field.header.seq = cnt;
+        //vector_field.id = cnt++;
+        vector_field.points.push_back(toPoint(u));
+        vector_field.points.push_back(toPoint(v));
+
+        std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
+        vector_field.colors.push_back(color);
+        vector_field.colors.push_back(color);
+
       }
       else
       {
