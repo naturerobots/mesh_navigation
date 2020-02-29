@@ -44,6 +44,7 @@ void InflationLayer::updateLethal(
     std::set<lvr2::VertexHandle> &removed_lethal) {
   lethal_vertices = added_lethal;
 
+  ROS_INFO_STREAM("Update lethal for inflation layer.");
   waveCostInflation(lethal_vertices, config.inflation_radius,
                     config.inscribed_radius, config.inscribed_value,
                     std::numeric_limits<float>::infinity());
@@ -504,10 +505,10 @@ void InflationLayer::lethalCostInflation(
 }
 
 bool InflationLayer::computeLayer() {
-  waveCostInflation(lethal_vertices, config.inflation_radius,
+  /*waveCostInflation(lethal_vertices, config.inflation_radius,
                       config.inscribed_radius, config.inscribed_value,
                       std::numeric_limits<float>::infinity());
-
+  */
   //lethalCostInflation(lethal_vertices, config.inflation_radius,
   //                    config.inscribed_radius, config.inscribed_value,
   //                    std::numeric_limits<float>::infinity());
@@ -515,12 +516,12 @@ bool InflationLayer::computeLayer() {
 
   return true;
 }
-
 lvr2::VertexMap<float> &InflationLayer::costs() { return riskiness; }
 
 void InflationLayer::reconfigureCallback(
     mesh_layers::InflationLayerConfig &cfg, uint32_t level)
 {
+  bool notify = false;
   ROS_INFO_STREAM("New inflation layer config through dynamic reconfigure.");
   if (first_config) {
     config = cfg;
@@ -533,6 +534,7 @@ void InflationLayer::reconfigureCallback(
     waveCostInflation(lethal_vertices, config.inflation_radius,
                       config.inscribed_radius, config.inscribed_value,
                       std::numeric_limits<float>::infinity());
+    notify = true;
   }
 
   if(config.inscribed_radius != cfg.inscribed_radius
@@ -542,6 +544,7 @@ void InflationLayer::reconfigureCallback(
 
     map_ptr->publishVectorField("inflation", vector_map, cutting_faces,
         distances, std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
+    notify = true;
   }
 
   /*lethalCostInflation(lethal_vertices, cfg.inflation_radius,
@@ -552,10 +555,12 @@ void InflationLayer::reconfigureCallback(
   */
   config = cfg;
 
-  notifyChange();
+  if(notify) notifyChange();
+
 }
 
 bool InflationLayer::initialize(const std::string &name) {
+  first_config = true;
   reconfigure_server_ptr = boost::shared_ptr<
       dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig>>(
       new dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig>(

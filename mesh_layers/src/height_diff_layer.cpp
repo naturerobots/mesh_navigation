@@ -30,11 +30,13 @@ bool HeightDiffLayer::readLayer() {
 
 bool HeightDiffLayer::computeLethals()
 {
+  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold " << config.threshold);
   lethal_vertices.clear();
   for (auto vH : height_diff) {
     if (height_diff[vH] > config.threshold)
       lethal_vertices.insert(vH);
   }
+  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
   return true;
 }
 
@@ -60,6 +62,8 @@ lvr2::VertexMap<float> &HeightDiffLayer::costs() { return height_diff; }
 
 void HeightDiffLayer::reconfigureCallback(
     mesh_layers::HeightDiffLayerConfig &cfg, uint32_t level) {
+
+  bool notify = false;
   ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
 
   if (first_config) {
@@ -71,13 +75,15 @@ void HeightDiffLayer::reconfigureCallback(
   if(config.threshold != cfg.threshold)
   {
     computeLethals();
-    notifyChange();
+    notify = true;
   }
 
   config = cfg;
+  if(notify) notifyChange();
 }
 
 bool HeightDiffLayer::initialize(const std::string &name) {
+  first_config = true;
   reconfigure_server_ptr = boost::shared_ptr<
       dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
       new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(

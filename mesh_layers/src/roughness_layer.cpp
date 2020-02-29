@@ -19,6 +19,7 @@ bool RoughnessLayer::readLayer() {
       mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
           "roughness");
   if (roughness_opt) {
+    ROS_INFO_STREAM("Successfully read roughness from map file.");
     roughness = roughness_opt.get();
     return computeLethals();
   }
@@ -38,11 +39,13 @@ bool RoughnessLayer::writeLayer() {
 
 bool RoughnessLayer::computeLethals()
 {
+  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config.threshold );
   lethal_vertices.clear();
   for (auto vH : roughness) {
     if (roughness[vH] > config.threshold)
       lethal_vertices.insert(vH);
   }
+  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
   return true;
 }
 
@@ -104,8 +107,9 @@ bool RoughnessLayer::computeLayer() {
 
 lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness; }
 
-void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg,
-                                         uint32_t level) {
+void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg, uint32_t level) {
+  bool notify = false;
+
   ROS_INFO_STREAM("New roughness layer config through dynamic reconfigure.");
   if (first_config) {
     config = cfg;
@@ -116,13 +120,16 @@ void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg,
   if(config.threshold != cfg.threshold)
   {
     computeLethals();
-    notifyChange();
+    notify = true;
   }
+
+  if(notify) notifyChange();
 
   config = cfg;
 }
 
 bool RoughnessLayer::initialize(const std::string &name) {
+  first_config = true;
   reconfigure_server_ptr = boost::shared_ptr<
       dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>>(
       new dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>(
