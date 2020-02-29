@@ -32,7 +32,6 @@ include_directories(
 
 add_library(${PROJECT_NAME}
   src/mesh_planner.cpp
-  #src/fast_marching.cpp
 )
 
 add_dependencies(${PROJECT_NAME}
