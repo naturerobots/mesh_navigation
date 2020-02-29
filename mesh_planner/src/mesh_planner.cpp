@@ -65,8 +65,6 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> path;
 
   //mesh_map->combineVertexCosts(); // TODO should be outside the planner
-  ros::WallTime t_start, t_end;
-  t_start = ros::WallTime::now();
 
   ROS_INFO("start wave front propagation.");
 
@@ -74,13 +72,6 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
 
   uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path);
-
-  t_end = ros::WallTime::now();
-
-  double execution_time = (t_end - t_start).toNSec() * 1e-6;
-  ROS_INFO_STREAM("Execution time (ms): " << execution_time << " for "
-                                          << mesh.numVertices()
-                                          << " num vertices in the mesh.");
 
   path.reverse();
 
@@ -172,17 +163,19 @@ void MeshPlanner::computeVectorMap() {
   for (auto v3 : mesh.vertices()) {
     // if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3))
     // continue;
-    if (predecessors[v3] == v3)
-      continue;
+
     const lvr2::VertexHandle &v1 = predecessors[v3];
-    // if not predecessor it is pointing to it self
+
+    // if predecessor is pointing to it self, continue with the next vertex.
     if (v1 == v3)
       continue;
 
     // get the cut face
     const auto &optFh = cutting_faces.get(v3);
+    // if no cut face, continue with the next vertex
     if (!optFh)
       continue;
+
     const lvr2::FaceHandle &fH = optFh.get();
 
     const auto &vec3 = mesh.getVertexPosition(v3);
@@ -191,6 +184,7 @@ void MeshPlanner::computeVectorMap() {
     // compute the direction vector and rotate it by theta, which is stored in
     // the direction vertex map
     const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
+    // store the normalized rotated vector in the vector map
     vector_map.insert(v3, dirVec.normalized());
   }
   mesh_map->setVectorMap(vector_map);
@@ -469,7 +463,6 @@ uint32_t MeshPlanner::waveFrontPropagation(
   ROS_INFO_STREAM("Init wave front propagation.");
 
   const auto &mesh = mesh_map->mesh();
-  const auto &face_normals = mesh_map->faceNormals();
 
   auto & invalid = mesh_map->invalid;
 
@@ -511,6 +504,9 @@ uint32_t MeshPlanner::waveFrontPropagation(
   // clear vector field map
   vector_map.clear();
 
+  ros::WallTime t_start, t_end;
+  t_start = ros::WallTime::now();
+
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
   for (auto const &vH : mesh.vertices()) {
@@ -531,27 +527,11 @@ uint32_t MeshPlanner::waveFrontPropagation(
     pq.insert(vH, dist);
   }
 
-  /*
-  // initialize around seed / start vertex
-  std::vector<lvr2::VertexHandle> neighbours;
-  mesh.getNeighboursOfVertex(start_vertex, neighbours);
-
-  ROS_INFO_STREAM("Number of neighbours " << neighbours.size());
-
-  for(auto n_vh : neighbours)
-  {
-    lvr2::OptionalEdgeHandle edge = mesh.getEdgeBetween(start_vertex, n_vh);
-    distances[n_vh] = edge_weights[edge.unwrap()];
-    predecessors[n_vh] = start_vertex;
-    fixed[n_vh] = true;
-    pq.insert(n_vh, distances[n_vh]);
-  }
-
-  */
+  bool goal_face_fixed = false;
 
   ROS_INFO_STREAM("Start wave front propagation");
 
-  while (!pq.isEmpty() && !cancel_planning) {
+  while (!pq.isEmpty() && !cancel_planning && !goal_face_fixed) {
     lvr2::VertexHandle current_vh = pq.popMin().key();
 
     // check if already fixed
@@ -567,6 +547,10 @@ uint32_t MeshPlanner::waveFrontPropagation(
       continue;
     }
     for(auto nh : neighbours){
+
+      if(goal_face_fixed)
+        break;
+
       if(invalid[nh])
         continue;
 
@@ -587,8 +571,19 @@ uint32_t MeshPlanner::waveFrontPropagation(
         if(invalid[a] || invalid[b] || invalid[c])
           continue;
 
+        // We are looking for a face where exactly
+        // one vertex is not in the fixed set
         if (fixed[a] && fixed[b] && fixed[c]) {
-          //ROS_INFO_STREAM("All fixed!");
+          if(fh == goal_face)
+          {
+            // if all vertices are fixed and we reached the goal face,
+            // stop the wave front propagation.
+            ROS_INFO_STREAM("Wave front reached the goal!");
+            goal_face_fixed = true;
+            break;
+          }
+          // The face's vertices are already optimal
+          // with respect to the distance
           continue;
         }
 
@@ -597,20 +592,16 @@ uint32_t MeshPlanner::waveFrontPropagation(
             // c is free
             if (waveFrontUpdate(distances, edge_weights, a, b, c))
               pq.insert(c, distances[c]);
-            //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
           } else if (fixed[a] && !fixed[b] && fixed[c]) {
             // b is free
             if (waveFrontUpdate(distances, edge_weights, c, a, b))
               pq.insert(b, distances[b]);
-            //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
           } else if (!fixed[a] && fixed[b] && fixed[c]) {
             // a if free
             if (waveFrontUpdate(distances, edge_weights, b, c, a))
               pq.insert(a, distances[a]);
-            //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
           } else {
             // two free vertices -> skip that face
-            //ROS_INFO_STREAM("two vertices are free.");
             continue;
           }
         }
@@ -621,6 +612,12 @@ uint32_t MeshPlanner::waveFrontPropagation(
       }
     }
   }
+
+  t_end = ros::WallTime::now();
+  double execution_time = (t_end - t_start).toNSec() * 1e-6;
+  ROS_INFO_STREAM("Execution time (ms): " << execution_time << " for "
+                                          << mesh.numVertices()
+                                          << " num vertices in the mesh.");
 
   if (cancel_planning) {
     ROS_WARN_STREAM("Wave front propagation has been canceled!");
