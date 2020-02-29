@@ -294,134 +294,68 @@ inline bool MeshPlanner::waveFrontUpdate(
     const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
     const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3) {
   const auto &mesh = mesh_map->mesh();
-  const auto &vertex_costs = mesh_map->vertexCosts();
 
   const double u1 = distances[v1];
   const double u2 = distances[v2];
   const double u3 = distances[v3];
 
   const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
-  const float c = edge_weights[e12h.unwrap()];
-  const float c_sq = c * c;
+  const double c = edge_weights[e12h.unwrap()];
+  const double c_sq = c * c;
 
   const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
-  const float b = edge_weights[e13h.unwrap()];
-  const float b_sq = b * b;
+  const double b = edge_weights[e13h.unwrap()];
+  const double b_sq = b * b;
 
   const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
   const float a = edge_weights[e23h.unwrap()];
   const float a_sq = a * a;
 
-  /*
-  if(a < 0.01 || b < 0.01 || c < 0.01){
-    double T3tmp = T3;
-    if (a < 0.005) T3tmp = T2 + a;
-    if (c < 0.005 || b < 0.005) T3tmp = T1 + b;
+  const float u1sq = u1 * u1;
+  const float u2sq = u2 * u2;
 
-    if (T3tmp < T3)
-    {
-      distances[v3] = static_cast<float>(T3tmp);
-      return true;
-    }
-    return false;
-  }
-  */
-
-  const double u1sq = u1 * u1;
-  const double u2sq = u2 * u2;
-
-
-  const double A = sqrt(std::max<double>(
+  const float A = sqrt(std::max<double>(
       (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
-  const double B = sqrt(std::max<double>(
+  const float B = sqrt(std::max<double>(
       (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
 
   //const double A = std::fabs((-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c));
   //const double B = std::fabs((-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c));
 
-  const double sx = (c_sq + u1sq - u2sq) / (2 * c);
-  const double sx_sq = sx * sx;
+  const float sx = (c_sq + u1sq - u2sq) / (2 * c);
+  // const double sx_sq = sx * sx;
 
-  const double sy = -A / (2 * c);
-  const double sy_sq = sy * sy;
+  const float sy = -A / (2 * c);
+  // const double sy_sq = sy * sy;
 
-  const double p = (-a_sq + b_sq + c_sq) / (2 * c);
-  const double hc = B / (2 * c);
+  const float p = (-a_sq + b_sq + c_sq) / (2 * c);
+  //const double hc = B / (2 * c);
 
-  const double dy = (A + B) / (2 * c);
+  const float dy = (A + B) / (2 * c);
   // const double dx = (u2sq - u1sq + b_sq - a_sq) / (2*c);
-  const double dx = p - sx;
+  const float dx = p - sx;
 
   // const double x = dx != sx ? (A*sx - B*p)/((A + B)*c) : dx/c;
   // const double dy = hc-sy;
 
   const double u3tmp_sq = dx * dx + dy * dy;
-  const double u3tmp = sqrt(u3tmp_sq);
+  double u3tmp = sqrt(u3tmp_sq);
 
-  if (std::isfinite(u3tmp) && u3tmp < u3) {
-    distances[v3] = static_cast<float>(u3tmp);
+  if (!std::isfinite(u3tmp)){
+    ROS_ERROR_STREAM("u3 tmp is not finite!");
+  }
+  if(u3tmp < u3) {
+    const double u3_sq = u3tmp * u3tmp;
+    const double u2_sq = u2 * u2;
+    const double u1_sq = u1 * u1;
 
-    /**
-     * compute cutting face
-     */
+    const double t0a = (a_sq + b_sq - c_sq) / (2*a*b);
+    const double t1a = (u3_sq + b_sq - u1_sq) / (2*u3tmp*b);
+    const double t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3tmp);
 
-    // left face check
-
-    double S = 0;
-    double gamma = 0;
-    const lvr2::FaceHandle f0 = mesh.getFaceBetween(v1, v2, v3).unwrap();
-    if (distances[v1] < distances[v2]) {
-      predecessors[v3] = v1;
-      S = sy * p - sx * hc;
-      gamma = -acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2 * u3tmp * b));
-    } else // right face check
-    {
-      predecessors[v3] = v2;
-      S = sx * hc - hc * c + sy * c - sy * p;
-      gamma = acos((a_sq + u3tmp_sq + 2 * sx * c - sx_sq - c_sq - sy_sq) /
-                   (2 * a * u3tmp));
-    }
-
-    auto faces =
-        mesh.getFacesOfEdge(mesh.getEdgeBetween(predecessors[v3], v3).unwrap());
-    lvr2::OptionalFaceHandle f1;
-
-    direction[v3] = static_cast<float>(gamma);
-
-    if (!faces[0] ||
-        !faces[1]) { // if contour face, cutting face is the current one
-      f1 = f0;
-      direction[v3] = 0; // direction lies on g1 or a of the triangle
-    } else if (faces[0].unwrap() != f0) {
-      f1 = faces[0]; // since faces[0] must be f1, set it as cutting face
-    } else if (faces[1].unwrap() != f0) {
-      f1 = faces[1];
-    }
-
-    if (S > 0) {
-      cutting_faces.insert(v3, f1.unwrap());
-    } else if (S < 0) {
-      cutting_faces.insert(v3, f0);
-      direction[v3] *= -1;
-    } else {
-      cutting_faces.insert(v3, f0);
-      direction[v3] = 0; // direction lies on g1 or g2
-    }
-/*
-    const float u3_sq = u3tmp * u3tmp;
-    const float u2_sq = u2 * u2;
-    const float u1_sq = u1 * u1;
-
-    float t0a = (a_sq + b_sq - c_sq) / (2*a*b);
-    float t1a = (u3_sq + b_sq - u1_sq) / (2*u3*b);
-    float t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3);
-
-    bool os2 = std::fabs(t2a) > 1;
-    bool os1 = std::fabs(t1a) > 1;
-
-    float theta0 = acos(t0a);
-    float theta1 = acos(t1a);
-    float theta2 = acos(t2a);
+    const double theta0 = acos(t0a);
+    const double theta1 = acos(t1a);
+    const double theta2 = acos(t2a);
 
     if(!std::isfinite(theta0 + theta1 + theta2)){
       ROS_ERROR_STREAM("------------------");
@@ -436,24 +370,70 @@ inline bool MeshPlanner::waveFrontUpdate(
       if(std::fabs(t2a) > 1) ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
       if(std::fabs(t1a) > 1) ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
     }
-    bool left = theta2 > theta0;
-    bool right = theta1 > theta0;
+
+    /*
+    const bool left = theta2 > theta0;
+    const bool right = theta1 > theta0;
 
     if(left && theta2 < theta1) ROS_ERROR_STREAM("theta2 smaller than theta1");
     if(right && theta1 < theta2) ROS_ERROR_STREAM("theta1 smaller than theta2");
-
-    if (distances[v1] < distances[v2]) {
-      predecessors[v3] = v1;
-      direction[v3] = !left? theta1 : -theta1;
-    }
-    else // right face check
-    {
-      predecessors[v3] = v2;
-      direction[v3] = !right? -theta2 : theta2;
-    }
     */
 
-    return vertex_costs[v3] <= config.cost_limit;
+    if(theta1 + theta2 < theta0)
+    {
+      //ROS_INFO_STREAM("v3s cuts face" << fH);
+      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+      cutting_faces.insert(v3, fH);
+      distances[v3] = static_cast<float>(u3tmp);
+      if (theta1 < theta2) {
+        predecessors[v3] = v1;
+        direction[v3] = theta1;
+        return true;
+      }
+      else
+      {
+        predecessors[v3] = v2;
+        direction[v3] = -theta2;
+        return true;
+      }
+    }
+    else if (theta1 < theta2)
+    {
+      //ROS_INFO_STREAM("v3s not cuts face -> left of triangle");
+      distances[v3] = static_cast<float>(u3tmp);
+      //u3tmp = distances[v1] + b;
+      if(u3tmp < u3)
+      {
+        cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
+        predecessors[v3] = v1;
+        distances[v3] = static_cast<float>(u3tmp);
+        direction[v3] = 0;
+        return true;
+      }
+      /*else
+      {
+        return false;
+      }
+       */
+    }
+    else
+    {
+      //ROS_INFO_STREAM("v3s not cuts face -> right if triangle");
+      distances[v3] = static_cast<float>(u3tmp);
+      //u3tmp = distances[v2] + a;
+      if(u3tmp < u3)
+      {
+        cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
+        predecessors[v3] = v2;
+        distances[v2] = static_cast<float>(u3tmp);
+        direction[v2] = 0;
+        return true;
+      }
+      else
+      {
+        return false;
+      }
+    }
   }
   return false;
 }
@@ -470,6 +450,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   ROS_INFO_STREAM("Init wave front propagation.");
 
   const auto &mesh = mesh_map->mesh();
+
+  const auto &vertex_costs = mesh_map->vertexCosts();
 
   auto & invalid = mesh_map->invalid;
 
@@ -551,6 +533,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
     }
     catch (lvr2::PanicException exception)
     {
+      ROS_ERROR_STREAM("Found non manifold vertex!");
       continue;
     }
     for(auto nh : neighbours){
@@ -566,6 +549,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
         mesh.getFacesOfVertex(nh, faces);
       }
       catch(lvr2::PanicException exception){
+        ROS_ERROR_STREAM("Found non manifold vertex!");
         continue;
       }
 
@@ -575,8 +559,10 @@ uint32_t MeshPlanner::waveFrontPropagation(
         const lvr2::VertexHandle &b = vertices[1];
         const lvr2::VertexHandle &c = vertices[2];
 
-        if(invalid[a] || invalid[b] || invalid[c])
+        if(invalid[a] || invalid[b] || invalid[c]){
+          ROS_ERROR_STREAM("Found non manifold vertex!");
           continue;
+        }
 
         // We are looking for a face where exactly
         // one vertex is not in the fixed set
@@ -597,14 +583,20 @@ uint32_t MeshPlanner::waveFrontPropagation(
         try{
           if (fixed[a] && fixed[b] && !fixed[c]) {
             // c is free
+            //if(vertex_costs[c] >= config.cost_limit)
+            //  continue;
             if (waveFrontUpdate(distances, edge_weights, a, b, c))
               pq.insert(c, distances[c]);
           } else if (fixed[a] && !fixed[b] && fixed[c]) {
             // b is free
+            //if(vertex_costs[b] >= config.cost_limit)
+            //  continue;
             if (waveFrontUpdate(distances, edge_weights, c, a, b))
               pq.insert(b, distances[b]);
           } else if (!fixed[a] && fixed[b] && fixed[c]) {
             // a if free
+            //if(vertex_costs[a] >= config.cost_limit)
+            //  continue;
             if (waveFrontUpdate(distances, edge_weights, b, c, a))
               pq.insert(a, distances[a]);
           } else {
@@ -614,6 +606,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
         }
         catch(lvr2::PanicException exception)
         {
+          ROS_ERROR_STREAM("Found non manifold vertex!");
           continue;
         }
       }
@@ -637,6 +630,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
    * Sampling the path by backtracking the vector field
    */
 
+  ROS_INFO_STREAM("Compute vector map");
   computeVectorMap();
 
   bool path_exists = false;
