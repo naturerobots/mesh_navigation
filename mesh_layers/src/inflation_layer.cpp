@@ -242,15 +242,34 @@ void InflationLayer::waveCostInflation(
         continue;
       }
 
+      if (map_ptr->invalid[current_vh])
+        continue;
+
       // check if already fixed
       // if(fixed[current_vh]) continue;
       fixed[current_vh] = true;
 
       std::vector<lvr2::VertexHandle> neighbours;
-      mesh.getNeighboursOfVertex(current_vh, neighbours);
+      try {
+        mesh.getNeighboursOfVertex(current_vh, neighbours);
+      }
+      catch (lvr2::PanicException exception)
+      {
+        map_ptr->invalid.insert(current_vh, true);
+        continue;
+      }
+
       for(auto nh : neighbours){
         std::vector<lvr2::FaceHandle> faces;
-        mesh.getFacesOfVertex(nh, faces);
+        try
+        {
+          mesh.getFacesOfVertex(nh, faces);
+        }
+        catch (lvr2::PanicException exception)
+        {
+          map_ptr->invalid.insert(nh, true);
+          continue;
+        }
 
         for (auto fh : faces) {
           const auto vertices = mesh.getVerticesOfFace(fh);
@@ -258,35 +277,41 @@ void InflationLayer::waveCostInflation(
           const lvr2::VertexHandle &b = vertices[1];
           const lvr2::VertexHandle &c = vertices[2];
 
-          if (fixed[a] && fixed[b] && fixed[c]) {
-            //ROS_INFO_STREAM("All fixed!");
-            continue;
+          try{
+            if (fixed[a] && fixed[b] && fixed[c]) {
+              //ROS_INFO_STREAM("All fixed!");
+              continue;
+            }
+            else if (fixed[a] && fixed[b] && !fixed[c]) {
+              // c is free
+              if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b, c))
+              {
+                pq.insert(c, distances[c]);
+              }
+              //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
+            } else if (fixed[a] && !fixed[b] && fixed[c]) {
+              // b is free
+              if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a, b))
+              {
+                pq.insert(b, distances[b]);
+              }
+              //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
+            } else if (!fixed[a] && fixed[b] && fixed[c]) {
+              // a if free
+              if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c, a))
+              {
+                pq.insert(a, distances[a]);
+              }
+              //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
+            } else {
+              // two free vertices -> skip that face
+              //ROS_INFO_STREAM("two vertices are free.");
+              continue;
+            }
           }
-          else if (fixed[a] && fixed[b] && !fixed[c]) {
-            // c is free
-            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b, c))
-            {
-              pq.insert(c, distances[c]);
-            }
-            //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
-          } else if (fixed[a] && !fixed[b] && fixed[c]) {
-            // b is free
-            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a, b))
-            {
-              pq.insert(b, distances[b]);
-            }
-            //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
-          } else if (!fixed[a] && fixed[b] && fixed[c]) {
-            // a if free
-            if (waveFrontUpdate(distances, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c, a))
-            {
-              pq.insert(a, distances[a]);
-            }
-            //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
-          } else {
-            // two free vertices -> skip that face
-            //ROS_INFO_STREAM("two vertices are free.");
-            continue;
+          catch (lvr2::PanicException exception)
+          {
+            map_ptr->invalid.insert(nh, true);
           }
         }
 

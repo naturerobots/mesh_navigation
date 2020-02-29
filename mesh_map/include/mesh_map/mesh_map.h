@@ -46,6 +46,7 @@
 #include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/abstract_layer.h>
 #include <mesh_msgs/MeshVertexCosts.h>
+#include <mesh_msgs/MeshVertexColors.h>
 #include <mutex>
 #include <pluginlib/class_loader.h>
 #include <std_msgs/ColorRGBA.h>
@@ -94,6 +95,8 @@ public:
 
   void publishVertexCosts(const lvr2::VertexMap<float> &costs,
                           const std::string &name);
+
+  void publishVertexColors();
 
   void publishCostLayers();
 
@@ -208,7 +211,8 @@ public:
   
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
-  
+
+  lvr2::DenseVertexMap<bool> invalid;
 private:
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -257,6 +261,7 @@ private:
   lvr2::DenseVertexMap<Normal> vertex_normals;
 
   ros::Publisher vertex_costs_pub;
+  ros::Publisher vertex_colors_pub;
   ros::Publisher mesh_geometry_pub;
   ros::Publisher marker_pub;
   ros::Publisher vector_field_pub;

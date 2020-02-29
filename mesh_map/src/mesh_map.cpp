@@ -52,7 +52,7 @@ using namespace std;
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <lvr2/io/HDF5IO.hpp>
+#include <lvr2/io/hdf5/MeshIO.hpp>
 #include <lvr_ros/colors.h>
 #include <lvr_ros/conversions.h>
 #include <mesh_map/mesh_map.h>
@@ -63,6 +63,12 @@ using namespace std;
 #include <visualization_msgs/Marker.h>
 
 namespace mesh_map {
+
+using HDF5MeshIO = lvr2::Hdf5IO<
+    lvr2::hdf5features::ArrayIO,
+    lvr2::hdf5features::ChannelIO,
+    lvr2::hdf5features::VariantChannelIO,
+    lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
     : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true),
@@ -94,6 +100,8 @@ MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
       private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
   vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>(
       "vertex_costs", 1, false);
+  vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>(
+      "vertex_colors", 1, true);
   vector_field_pub = private_nh.advertise<visualization_msgs::MarkerArray>(
       "vector_field", 1, true);
   reconfigure_server_ptr =
@@ -113,7 +121,6 @@ bool MeshMap::readMap() {
   {
     server = true;
 
-
     mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
         new mesh_client::MeshClient(srv_url, srv_username, srv_password, mesh_layer));
     auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
@@ -124,8 +131,11 @@ bool MeshMap::readMap() {
   }
   else if(!mesh_file.empty() && !mesh_part.empty())
   {
-    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-        new lvr2::HDF5IO(mesh_file, mesh_part, HighFive::File::ReadWrite));
+    ROS_INFO_STREAM("Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"..." );
+    HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
+    hdf_5_mesh_io->open(mesh_file);
+    hdf_5_mesh_io->setMeshName(mesh_part);
+    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
   }
   else
   {
@@ -145,8 +155,6 @@ bool MeshMap::readMap() {
     
   auto mesh_opt = mesh_io_ptr->getMesh();
     
-  std::cout << "bla" << std::endl; 
-
   if (mesh_opt) {
     *mesh_ptr = mesh_opt.get();
     ROS_INFO_STREAM("The mesh has been loaded successfully with "
@@ -163,6 +171,7 @@ bool MeshMap::readMap() {
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
   edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
+  invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
 
   // TODO read and write uuid
   boost::uuids::random_generator gen;
@@ -245,6 +254,7 @@ bool MeshMap::readMap() {
 
   combineVertexCosts();
   publishCostLayers();
+  publishVertexColors();
 
   map_loaded = true;
   return true;
@@ -791,11 +801,27 @@ void MeshMap::publishVectorField(
     vector.header.seq = cnt;
     vector.id = cnt++;
     vector_field.markers.push_back(vector);
-    for (auto fH : mesh.getFacesOfVertex(vH)) {
-      if(++vector_field_faces[fH] == 3) faces++;
+    try
+    {
+      for (auto fH : mesh.getFacesOfVertex(vH)) {
+        if(++vector_field_faces[fH] == 3) faces++;
+      }
+    }
+    catch(lvr2::PanicException exception)
+    {
+      invalid.insert(vH, true);
     }
   }
 
+  size_t invalid_cnt = 0;
+  for(auto vH : invalid)
+  {
+    if(invalid[vH])
+      invalid_cnt++;
+  }
+  if(invalid_cnt > 0) {
+    ROS_WARN_STREAM("Found " << invalid_cnt << " non manifold vertices!");
+  }
   ROS_INFO_STREAM("Found " << faces << " complete vector faces!");
 
   vector_field.markers.reserve(faces + cnt);
@@ -1082,8 +1108,8 @@ bool MeshMap::resetLayers() {
   return true; // TODO implement
 }
 
-void MeshMap::publishCostLayers() {
-
+void MeshMap::publishCostLayers()
+{
   for (auto &layer : layers) {
     vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
         layer.second->costs(), mesh_ptr->numVertices(),
@@ -1094,9 +1120,38 @@ void MeshMap::publishCostLayers() {
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float> &costs,
-                                 const std::string &name) {
+                                 const std::string &name)
+{
   vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(
       costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
+}
+
+void MeshMap::publishVertexColors()
+{
+  using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
+  using VertexColorMap = lvr2::DenseVertexMap <std::array<uint8_t, 3>>;
+  VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->
+      getDenseAttributeMap<VertexColorMap>("vertex_colors");
+  if (vertex_colors_opt)
+  {
+    const VertexColorMap colors = vertex_colors_opt.get();
+    mesh_msgs::MeshVertexColorsStamped msg;
+    msg.header.frame_id = mapFrame();
+    msg.header.stamp = ros::Time::now();
+    msg.uuid = uuid_str;
+    msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
+    for(auto vH : colors)
+    {
+      std_msgs::ColorRGBA color_rgba;
+      const auto& color_array = colors[vH];
+      color_rgba.a = 1;
+      color_rgba.r = color_array[0] / 255.0;
+      color_rgba.g = color_array[1] / 255.0;
+      color_rgba.b = color_array[2] / 255.0;
+      msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
+    }
+    this->vertex_colors_pub.publish(msg);
+  }
 }
 
 void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg,
@@ -1121,6 +1176,9 @@ void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg,
   }
 }
 
-const std::string MeshMap::getGlobalFrameID() { return global_frame; }
+const std::string MeshMap::getGlobalFrameID()
+{
+  return global_frame;
+}
 
 } /* namespace mesh_map */

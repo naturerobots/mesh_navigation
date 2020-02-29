@@ -471,6 +471,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   const auto &mesh = mesh_map->mesh();
   const auto &face_normals = mesh_map->faceNormals();
 
+  auto & invalid = mesh_map->invalid;
+
   //mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
   //mesh_map->publishDebugPoint(original_goal, mesh_map::color(1, 0, 0), "goal_point");
 
@@ -557,10 +559,24 @@ uint32_t MeshPlanner::waveFrontPropagation(
     fixed[current_vh] = true;
 
     std::vector<lvr2::VertexHandle> neighbours;
-    mesh.getNeighboursOfVertex(current_vh, neighbours);
+    try{
+      mesh.getNeighboursOfVertex(current_vh, neighbours);
+    }
+    catch (lvr2::PanicException exception)
+    {
+      continue;
+    }
     for(auto nh : neighbours){
+      if(invalid[nh])
+        continue;
+
       std::vector<lvr2::FaceHandle> faces;
-      mesh.getFacesOfVertex(nh, faces);
+      try{
+        mesh.getFacesOfVertex(nh, faces);
+      }
+      catch(lvr2::PanicException exception){
+        continue;
+      }
 
       for (auto fh : faces) {
         const auto vertices = mesh.getVerticesOfFace(fh);
@@ -568,32 +584,41 @@ uint32_t MeshPlanner::waveFrontPropagation(
         const lvr2::VertexHandle &b = vertices[1];
         const lvr2::VertexHandle &c = vertices[2];
 
+        if(invalid[a] || invalid[b] || invalid[c])
+          continue;
+
         if (fixed[a] && fixed[b] && fixed[c]) {
           //ROS_INFO_STREAM("All fixed!");
           continue;
         }
-        else if (fixed[a] && fixed[b] && !fixed[c]) {
-          // c is free
-          if (waveFrontUpdate(distances, edge_weights, a, b, c))
-            pq.insert(c, distances[c]);
-          if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
-        } else if (fixed[a] && !fixed[b] && fixed[c]) {
-          // b is free
-          if (waveFrontUpdate(distances, edge_weights, c, a, b))
-            pq.insert(b, distances[b]);
-          if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
-        } else if (!fixed[a] && fixed[b] && fixed[c]) {
-          // a if free
-          if (waveFrontUpdate(distances, edge_weights, b, c, a))
-            pq.insert(a, distances[a]);
-          if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
-        } else {
-          // two free vertices -> skip that face
-          //ROS_INFO_STREAM("two vertices are free.");
+
+        try{
+          if (fixed[a] && fixed[b] && !fixed[c]) {
+            // c is free
+            if (waveFrontUpdate(distances, edge_weights, a, b, c))
+              pq.insert(c, distances[c]);
+            //if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
+          } else if (fixed[a] && !fixed[b] && fixed[c]) {
+            // b is free
+            if (waveFrontUpdate(distances, edge_weights, c, a, b))
+              pq.insert(b, distances[b]);
+            //if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
+          } else if (!fixed[a] && fixed[b] && fixed[c]) {
+            // a if free
+            if (waveFrontUpdate(distances, edge_weights, b, c, a))
+              pq.insert(a, distances[a]);
+            //if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
+          } else {
+            // two free vertices -> skip that face
+            //ROS_INFO_STREAM("two vertices are free.");
+            continue;
+          }
+        }
+        catch(lvr2::PanicException exception)
+        {
           continue;
         }
       }
-
     }
   }
 
