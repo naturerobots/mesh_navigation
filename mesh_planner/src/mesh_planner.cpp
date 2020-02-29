@@ -105,8 +105,11 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   path_pub.publish(path_msg);
   mesh_map->publishVertexCosts(potential, "Potential");
 
-  // computeVectorMap();
-  mesh_map->publishVectorField("vector_field", vector_map, cutting_faces);
+  if(publish_vector_field)
+  {
+    mesh_map->publishVectorField(
+        "vector_field", vector_map, cutting_faces, publish_face_vectors);
+  }
 
   return outcome;
 }
@@ -123,6 +126,10 @@ bool MeshPlanner::initialize(
   name = plugin_name;
   map_frame = mesh_map->mapFrame();
   private_nh = ros::NodeHandle("~/" + name);
+
+  private_nh.param("publish_vector_field", publish_vector_field, false);
+  private_nh.param("publish_face_vectors", publish_face_vectors, false);
+
   path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
   const auto &mesh = mesh_map->mesh();
   direction = lvr2::DenseVertexMap<float>(mesh.nextVertexIndex(), 0);

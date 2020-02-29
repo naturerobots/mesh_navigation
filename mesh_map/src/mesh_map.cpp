@@ -688,9 +688,10 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
 void MeshMap::publishVectorField(
     const std::string& name,
     const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces)
+    const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+    const bool publish_face_vectors)
 {
-  publishVectorField(name, vector_map, cutting_faces, vertex_costs);
+  publishVectorField(name, vector_map, cutting_faces, vertex_costs, {}, publish_face_vectors);
 }
 
 void MeshMap::publishCombinedVectorField()
@@ -746,7 +747,8 @@ void MeshMap::publishVectorField(
     const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
     const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
     const lvr2::DenseVertexMap<float>& values,
-    const std::function<float (float)>& cost_function)
+    const std::function<float (float)>& cost_function,
+    const bool publish_face_vectors)
 {
 
   const auto &mesh = this->mesh();
@@ -840,53 +842,53 @@ void MeshMap::publishVectorField(
   }
   ROS_INFO_STREAM("Found " << faces << " complete vector faces!");
 
-  vector_field.points.reserve(faces + cnt);
+  if(publish_face_vectors) {
+    vector_field.points.reserve(faces + cnt);
 
-  for (auto fH : complete_faces) {
-    const auto &vertices = mesh.getVertexPositionsOfFace(fH);
-    const auto &vertex_handles = mesh.getVerticesOfFace(fH);
-    mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
-    std::array<float, 3> barycentric_coords;
-    float dist;
-    if (mesh_map::projectedBarycentricCoords(center, vertices,
-                                             barycentric_coords, dist)) {
-      boost::optional<mesh_map::Vector> dir_opt =
-          directionAtPosition(vector_map, vertex_handles, barycentric_coords);
-      if (dir_opt) {
-        const float &cost = costAtPosition(values, vertex_handles, barycentric_coords);
-        const float &value = cost_function ? cost_function(cost) : cost;
+    for (auto fH : complete_faces) {
+      const auto &vertices = mesh.getVertexPositionsOfFace(fH);
+      const auto &vertex_handles = mesh.getVerticesOfFace(fH);
+      mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      if (mesh_map::projectedBarycentricCoords(center, vertices,
+                                               barycentric_coords, dist)) {
+        boost::optional<mesh_map::Vector> dir_opt =
+            directionAtPosition(vector_map, vertex_handles, barycentric_coords);
+        if (dir_opt) {
+          const float &cost =
+              costAtPosition(values, vertex_handles, barycentric_coords);
+          const float &value = cost_function ? cost_function(cost) : cost;
 
-        //vector.color = lvr_ros::getRainbowColor(value);
-        //vector.pose = mesh_map::calculatePoseFromDirection(
-        //    center, dir_opt.get(), face_normals[fH]);
+          // vector.color = lvr_ros::getRainbowColor(value);
+          // vector.pose = mesh_map::calculatePoseFromDirection(
+          //    center, dir_opt.get(), face_normals[fH]);
 
-        auto u = center;
-        auto v = u + dir_opt.get() * 0.1;
+          auto u = center;
+          auto v = u + dir_opt.get() * 0.1;
 
-        if(!std::isfinite(u.x) || !std::isfinite(u.y) || !std::isfinite(u.z)
-            || !std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z))
-        {
-          continue;
+          if (!std::isfinite(u.x) || !std::isfinite(u.y) ||
+              !std::isfinite(u.z) || !std::isfinite(v.x) ||
+              !std::isfinite(v.y) || !std::isfinite(v.z)) {
+            continue;
+          }
+
+          // vector_field.header.seq = cnt;
+          // vector_field.id = cnt++;
+          vector_field.points.push_back(toPoint(u));
+          vector_field.points.push_back(toPoint(v));
+
+          std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
+          vector_field.colors.push_back(color);
+          vector_field.colors.push_back(color);
+
+        } else {
+          ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the direction!");
         }
-
-        //vector_field.header.seq = cnt;
-        //vector_field.id = cnt++;
-        vector_field.points.push_back(toPoint(u));
-        vector_field.points.push_back(toPoint(v));
-
-        std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
-        vector_field.colors.push_back(color);
-        vector_field.colors.push_back(color);
-
+      } else {
+        ROS_ERROR_STREAM_THROTTLE(0.3,
+                                  "Could not compute the barycentric coords!");
       }
-      else
-      {
-        ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the direction!");
-      }
-    }
-    else
-    {
-      ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the barycentric coords!");
     }
   }
   vector_field_pub.publish(vector_field);

@@ -140,7 +140,8 @@ private:
   ros::NodeHandle private_nh;
   std::atomic_bool cancel_planning;
   ros::Publisher path_pub;
-
+  bool publish_vector_field;
+  bool publish_face_vectors;
   std::string map_frame;
 
   // Server for Reconfiguration

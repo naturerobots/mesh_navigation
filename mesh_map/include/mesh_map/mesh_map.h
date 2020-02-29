@@ -196,14 +196,16 @@ public:
   void publishVectorField(
       const std::string& name,
       const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces);
+      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+      const bool publish_face_vectors = false);
 
   void publishVectorField(
       const std::string& name,
       const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
       const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
       const lvr2::DenseVertexMap<float>& values,
-      const std::function<float (float)>& cost_function = {});
+      const std::function<float (float)>& cost_function = {},
+      const bool publish_face_vectors = false);
 
   void publishCombinedVectorField();
 
