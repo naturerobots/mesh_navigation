@@ -381,27 +381,23 @@ inline bool MeshPlanner::waveFrontUpdate(
 
     if(theta1 + theta2 < theta0)
     {
-      //ROS_INFO_STREAM("v3s cuts face" << fH);
       auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
       cutting_faces.insert(v3, fH);
       distances[v3] = static_cast<float>(u3tmp);
       if (theta1 < theta2) {
         predecessors[v3] = v1;
         direction[v3] = theta1;
-        return true;
       }
-      else
+      thetelse
       {
         predecessors[v3] = v2;
         direction[v3] = -theta2;
-        return true;
       }
+      return true;
     }
     else if (theta1 < theta2)
     {
-      //ROS_INFO_STREAM("v3s not cuts face -> left of triangle");
-      distances[v3] = static_cast<float>(u3tmp);
-      //u3tmp = distances[v1] + b;
+      u3tmp = distances[v1] + b;
       if(u3tmp < u3)
       {
         cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
@@ -410,29 +406,20 @@ inline bool MeshPlanner::waveFrontUpdate(
         direction[v3] = 0;
         return true;
       }
-      /*else
-      {
-        return false;
-      }
-       */
+      return false;
     }
     else
     {
-      //ROS_INFO_STREAM("v3s not cuts face -> right if triangle");
-      distances[v3] = static_cast<float>(u3tmp);
-      //u3tmp = distances[v2] + a;
+      u3tmp = distances[v2] + a;
       if(u3tmp < u3)
       {
         cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
         predecessors[v3] = v2;
-        distances[v2] = static_cast<float>(u3tmp);
-        direction[v2] = 0;
+        distances[v3] = static_cast<float>(u3tmp);
+        direction[v3] = 0;
         return true;
       }
-      else
-      {
-        return false;
-      }
+      return false;
     }
   }
   return false;
