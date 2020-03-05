@@ -128,7 +128,7 @@ private:
   bool publish_vector_field;
   bool publish_face_vectors;
   std::string map_frame;
-
+  float goal_dist_offset;
   // Server for Reconfiguration
   boost::shared_ptr<
       dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>
