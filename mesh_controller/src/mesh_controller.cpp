@@ -148,7 +148,7 @@ uint32_t MeshController::computeVelocityCommands(
 
       }
 
-      ROS_INFO_STREAM("Supposed heading:" << supposed_heading);
+      ROS_DEBUG_STREAM("Supposed heading:" << supposed_heading);
     } else {
       map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0),
                                 "no_directions");
@@ -630,9 +630,6 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
     // the step size that is later used therefore the look ahead will be as far
     // as the maximum travelled distance
     steps = (int)(max_travelled_dist / 0.03);
-    ROS_ERROR_STREAM("2 Steps:" << steps << "max travel dist:" << max_travelled_dist);
-    ROS_ERROR_STREAM("velocity:" << velocity);
-    ROS_ERROR_STREAM("time delta:" << time_delta.toSec());
   }
 
   if (steps == 0) {
@@ -774,9 +771,6 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
   // angle will never be negative and smaller or equal to pi
   angle = angleBetweenVectors(dir_vec, supposed_dir);
 
-  ROS_INFO_STREAM("dir vec:" << dir_vec);
-  ROS_INFO_STREAM("sup vec:" << supposed_dir);
-
   // output: angle publishing
   std_msgs::Float32 angle32;
   angle32.data = angle * 180 / M_PI;
@@ -791,11 +785,8 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
       leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
   // LINEAR movement
-  ROS_ERROR_STREAM("angle: "<< angle);
   float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
   float final_lin_vel;
-
-  ROS_ERROR_STREAM("lin value by angle: "<< lin_vel_by_ang);
 
   // check the size of the angle. If it is not more than about 35 degrees,
   // integrate position costs to linear velocity
@@ -816,8 +807,6 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
     }
   }
   final_lin_vel = lin_vel_by_ang;
-  ROS_ERROR_STREAM("Final lin velocity: "<< final_lin_vel);
-
 
   // ADDITIONAL factors
   // look ahead

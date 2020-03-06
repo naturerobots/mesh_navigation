@@ -128,6 +128,7 @@ bool DijkstraMeshPlanner::initialize(
 
   private_nh.param("publish_vector_field", publish_vector_field, false);
   private_nh.param("publish_face_vectors", publish_face_vectors, false);
+  private_nh.param("goal_dist_offset", goal_dist_offset, 0.3f);
 
   path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
   const auto &mesh = mesh_map->mesh();
@@ -198,11 +199,12 @@ uint32_t DijkstraMeshPlanner::dijkstra(
   ROS_INFO_STREAM("Init wave front propagation.");
 
   const auto &mesh = mesh_map->mesh();
+  const auto &vertex_costs = mesh_map->vertexCosts();
 
   auto & invalid = mesh_map->invalid;
 
-  //mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
-  //mesh_map->publishDebugPoint(original_goal, mesh_map::color(1, 0, 0), "goal_point");
+  mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
+  mesh_map->publishDebugPoint(original_goal, mesh_map::color(0, 0, 1), "goal_point");
 
   // Find the closest vertex handle of start and goal
   const auto &start_opt = mesh_map->getNearestVertexHandle(original_start);
@@ -217,9 +219,6 @@ uint32_t DijkstraMeshPlanner::dijkstra(
 
   const auto &start_vertex = start_opt.unwrap();
   const auto &goal_vertex = goal_opt.unwrap();
-
-  //mesh_map->publishDebugFace(goal_face, mesh_map::color(1, 0, 0), "goal_face");
-  //mesh_map->publishDebugFace(start_face, mesh_map::color(0, 1, 0), "start_face");
 
   path.clear();
   distances.clear();
@@ -251,16 +250,25 @@ uint32_t DijkstraMeshPlanner::dijkstra(
   distances[start_vertex] = 0;
   pq.insert(start_vertex, 0);
 
+  float goal_dist = std::numeric_limits<float>::infinity();
+
   ROS_INFO_STREAM("Start Dijkstra");
 
   while (!pq.isEmpty() && !cancel_planning) {
     lvr2::VertexHandle current_vh = pq.popMin().key();
     fixed[current_vh] = true;
+
     if(current_vh == goal_vertex)
     {
       ROS_INFO_STREAM("Dijkstra reached the goal.");
-      break;
+      goal_dist = distances[current_vh] + goal_dist_offset;
     }
+
+    if(distances[current_vh] > goal_dist)
+      continue;
+
+    if(vertex_costs[current_vh] > config.cost_limit)
+      continue;
 
     std::vector<lvr2::EdgeHandle> edges;
     try{
@@ -268,6 +276,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(
     }
     catch (lvr2::PanicException exception)
     {
+      invalid.insert(current_vh, true);
       continue;
     }
     for(auto eH : edges){
@@ -320,6 +329,8 @@ uint32_t DijkstraMeshPlanner::dijkstra(
   ROS_INFO_STREAM("Execution time (ms): " << execution_time << " for "
                                           << mesh.numVertices()
                                           << " num vertices in the mesh.");
+
+  computeVectorMap();
 
   if (cancel_planning) {
     ROS_WARN_STREAM("Dijkstra has been canceled!");

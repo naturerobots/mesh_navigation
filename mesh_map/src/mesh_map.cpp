@@ -241,10 +241,13 @@ bool MeshMap::readMap() {
     }
   }
 
+  ROS_INFO_STREAM("Load layer plugins...");
   if (!loadLayerPlugins()) {
     ROS_FATAL_STREAM("Could not load any layer plugin!");
     return false;
   }
+
+  ROS_INFO_STREAM("Initialize layer plugins...");
   if (!initLayerPlugins()) {
     ROS_FATAL_STREAM("Could not initialize plugins!");
     return false;
@@ -732,10 +735,12 @@ void MeshMap::publishCombinedVectorField()
                                                barycentric_coords, dist)) {
 
         auto opt_val = face_vectors.get(fH);
-        face_vectors.insert(
-            fH, opt_val ? opt_val.get() + layer->vectorAt(vertex_handles,
-                                                          barycentric_coords)
-                        : layer->vectorAt(vertex_handles, barycentric_coords));
+        auto vec_at = layer->vectorAt(vertex_handles, barycentric_coords);
+        if(vec_at != Vector())
+        {
+          face_vectors.insert(
+              fH, opt_val ? opt_val.get() + vec_at : vec_at);
+        }
       }
     }
   }
@@ -980,23 +985,31 @@ bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
     const auto &opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face),
                                               barycentric_coords);
 
-    // TODO iter over all available vector fields
-    const auto lethal_vec = layer_names["inflation"]->vectorAt(vertices, barycentric_coords);
-
     if (opt_dir) {
-      pos += (opt_dir.get().normalized() + lethal_vec).normalized() * step_size;
+      Vector dir = opt_dir.get().normalized();
+      // iter over all layer vector fields
+      for(auto layer : layers)
+      {
+        dir += layer.second->vectorAt(vertices, barycentric_coords);
+      }
+      dir.normalize();
+      pos += dir * step_size;
       return true;
     }
   }
   return false;
 }
 
-lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector &position,
+lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector &pos,
                                                     const float &max_dist) {
   std::array<float, 3> bary_coords;
   lvr2::OptionalFaceHandle face_handle;
-  if (searchContainingFace(position, face_handle, bary_coords, max_dist))
-    return face_handle;
+  if (!searchContainingFace(pos, face_handle, bary_coords, max_dist)){
+    ROS_ERROR_STREAM("Could not find a containing face for (" << pos.x << ", "
+      << pos.y << ", " << pos.z << ") and the maximum distance to the face of "
+      << max_dist);
+  }
+  return face_handle;
 }
 
 bool MeshMap::searchContainingFace(Vector &position,
@@ -1006,10 +1019,10 @@ bool MeshMap::searchContainingFace(Vector &position,
   std::array<float, 3> bary_coords;
   for (auto face : mesh_ptr->faces()) {
     const auto &vertices = mesh_ptr->getVertexPositionsOfFace(face);
-    float dist;
+    float dist = 0;
     if (mesh_map::projectedBarycentricCoords(position, vertices, bary_coords,
                                              dist) &&
-        dist < max_dist) {
+        std::fabs(dist) < max_dist) {
       face_handle = face;
       barycentric_coords = bary_coords;
       position = vertices[0] * bary_coords[0] + vertices[1] * bary_coords[1] +

@@ -90,13 +90,21 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
     for (auto &next : path) {
       geometry_msgs::PoseStamped pose;
       pose.header = header;
-      pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first,
-                                                      face_normals[fH]);
+      pose.pose = mesh_map::calculatePoseFromPosition(
+          vec, next.first, face_normals[fH]);
       vec = next.first;
       fH = next.second;
       plan.push_back(pose);
     }
+
+    geometry_msgs::PoseStamped pose;
+    pose.header = header;
+    pose.pose = mesh_map::calculatePoseFromPosition(
+        vec, goal_vec, face_normals[fH]);
+    plan.push_back(pose);
+
   }
+
 
   nav_msgs::Path path_msg;
   path_msg.poses = plan;
@@ -129,6 +137,7 @@ bool MeshPlanner::initialize(
 
   private_nh.param("publish_vector_field", publish_vector_field, false);
   private_nh.param("publish_face_vectors", publish_face_vectors, false);
+  private_nh.param("goal_dist_offset", goal_dist_offset, 0.3f);
 
   path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
   const auto &mesh = mesh_map->mesh();
@@ -388,7 +397,7 @@ inline bool MeshPlanner::waveFrontUpdate(
         predecessors[v3] = v1;
         direction[v3] = theta1;
       }
-      thetelse
+      else
       {
         predecessors[v3] = v2;
         direction[v3] = -theta2;
@@ -442,15 +451,15 @@ uint32_t MeshPlanner::waveFrontPropagation(
 
   auto & invalid = mesh_map->invalid;
 
-  //mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
-  //mesh_map->publishDebugPoint(original_goal, mesh_map::color(1, 0, 0), "goal_point");
+  mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
+  mesh_map->publishDebugPoint(original_goal, mesh_map::color(0, 0, 1), "goal_point");
 
   mesh_map::Vector start = original_start;
   mesh_map::Vector goal = original_goal;
 
   // Find the containing faces of start and goal
-  const auto &start_opt = mesh_map->getContainingFace(start, 0.2);
-  const auto &goal_opt = mesh_map->getContainingFace(goal, 0.2);
+  const auto &start_opt = mesh_map->getContainingFace(start, 0.4);
+  const auto &goal_opt = mesh_map->getContainingFace(goal, 0.4);
 
   // reset cancel planning
   cancel_planning = false;
@@ -463,8 +472,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   const auto &start_face = start_opt.unwrap();
   const auto &goal_face = goal_opt.unwrap();
 
-  //mesh_map->publishDebugFace(goal_face, mesh_map::color(1, 0, 0), "goal_face");
-  //mesh_map->publishDebugFace(start_face, mesh_map::color(0, 1, 0), "start_face");
+  mesh_map->publishDebugFace(start_face, mesh_map::color(0, 0, 1), "start_face");
+  mesh_map->publishDebugFace(goal_face, mesh_map::color(0, 1, 0), "goal_face");
 
   path.clear();
   distances.clear();
@@ -472,7 +481,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
 
   // TODO in face planning for a single face
   if (goal_face == start_face) {
-    return true;
+    return mbf_msgs::GetPathResult::SUCCESS;
   }
 
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
@@ -480,8 +489,6 @@ uint32_t MeshPlanner::waveFrontPropagation(
   // clear vector field map
   vector_map.clear();
 
-  ros::WallTime t_start, t_end;
-  t_start = ros::WallTime::now();
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
@@ -503,100 +510,107 @@ uint32_t MeshPlanner::waveFrontPropagation(
     pq.insert(vH, dist);
   }
 
-  bool goal_face_fixed = false;
+  std::array<lvr2::VertexHandle, 3> goal_vertices = mesh.getVerticesOfFace(goal_face);
+  ROS_INFO_STREAM("The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z
+    << ") at the face (" << goal_vertices[0] << ", " << goal_vertices[1] << ", " << goal_vertices[2] << ")");
+  mesh_map->publishDebugPoint(mesh.getVertexPosition(goal_vertices[0]), mesh_map::color(0, 0, 1), "goal_face_v1");
+  mesh_map->publishDebugPoint(mesh.getVertexPosition(goal_vertices[1]), mesh_map::color(0, 0, 1), "goal_face_v2");
+  mesh_map->publishDebugPoint(mesh.getVertexPosition(goal_vertices[2]), mesh_map::color(0, 0, 1), "goal_face_v3");
 
-  ROS_INFO_STREAM("Start wave front propagation");
+  float goal_dist = std::numeric_limits<float>::infinity();
 
-  while (!pq.isEmpty() && !cancel_planning && !goal_face_fixed) {
+  ROS_INFO_STREAM("Start wave front propagation...");
+
+  ros::WallTime t_start, t_end;
+  t_start = ros::WallTime::now();
+
+  while (!pq.isEmpty() && !cancel_planning) {
     lvr2::VertexHandle current_vh = pq.popMin().key();
 
     // check if already fixed
     // if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
 
+    if(distances[current_vh] > goal_dist)
+      break;
+
+    if(current_vh == goal_vertices[0] ||
+       current_vh == goal_vertices[1] ||
+       current_vh == goal_vertices[2])
+    {
+      if(goal_dist == std::numeric_limits<float>::infinity()
+          && fixed[goal_vertices[0]]
+          && fixed[goal_vertices[1]]
+          && fixed[goal_vertices[2]])
+      {
+        ROS_INFO_STREAM("Wave front reached the goal!");
+        goal_dist = distances[current_vh] + goal_dist_offset;
+      }
+    }
+
+
+    if(invalid[current_vh])
+    {
+      continue;
+    }
+
     std::vector<lvr2::VertexHandle> neighbours;
     try{
       mesh.getNeighboursOfVertex(current_vh, neighbours);
-    }
-    catch (lvr2::PanicException exception)
-    {
-      ROS_ERROR_STREAM("Found non manifold vertex!");
-      continue;
-    }
-    for(auto nh : neighbours){
+      for(auto nh : neighbours){
 
-      if(goal_face_fixed)
-        break;
+        if(invalid[nh])
+          continue;
 
-      if(invalid[nh])
-        continue;
-
-      std::vector<lvr2::FaceHandle> faces;
-      try{
+        std::vector<lvr2::FaceHandle> faces;
         mesh.getFacesOfVertex(nh, faces);
-      }
-      catch(lvr2::PanicException exception){
-        ROS_ERROR_STREAM("Found non manifold vertex!");
-        continue;
-      }
 
-      for (auto fh : faces) {
-        const auto vertices = mesh.getVerticesOfFace(fh);
-        const lvr2::VertexHandle &a = vertices[0];
-        const lvr2::VertexHandle &b = vertices[1];
-        const lvr2::VertexHandle &c = vertices[2];
+        for (auto fh : faces) {
+          const auto vertices = mesh.getVerticesOfFace(fh);
+          const lvr2::VertexHandle &a = vertices[0];
+          const lvr2::VertexHandle &b = vertices[1];
+          const lvr2::VertexHandle &c = vertices[2];
 
-        if(invalid[a] || invalid[b] || invalid[c]){
-          ROS_ERROR_STREAM("Found non manifold vertex!");
-          continue;
-        }
+          if(invalid[a] || invalid[b] || invalid[c])
+            continue;
 
-        // We are looking for a face where exactly
-        // one vertex is not in the fixed set
-        if (fixed[a] && fixed[b] && fixed[c]) {
-          if(fh == goal_face)
-          {
-            // if all vertices are fixed and we reached the goal face,
-            // stop the wave front propagation.
-            ROS_INFO_STREAM("Wave front reached the goal!");
-            goal_face_fixed = true;
-            break;
+          // We are looking for a face where exactly
+          // one vertex is not in the fixed set
+          if (fixed[a] && fixed[b] && fixed[c]) {
+            // The face's vertices are already optimal
+            // with respect to the distance
+            continue;
           }
-          // The face's vertices are already optimal
-          // with respect to the distance
-          continue;
-        }
-
-        try{
-          if (fixed[a] && fixed[b] && !fixed[c]) {
+          else if (fixed[a] && fixed[b] && !fixed[c])
+          {
             // c is free
-            //if(vertex_costs[c] >= config.cost_limit)
-            //  continue;
             if (waveFrontUpdate(distances, edge_weights, a, b, c))
               pq.insert(c, distances[c]);
-          } else if (fixed[a] && !fixed[b] && fixed[c]) {
+          }
+          else if (fixed[a] && !fixed[b] && fixed[c])
+          {
             // b is free
-            //if(vertex_costs[b] >= config.cost_limit)
-            //  continue;
             if (waveFrontUpdate(distances, edge_weights, c, a, b))
               pq.insert(b, distances[b]);
-          } else if (!fixed[a] && fixed[b] && fixed[c]) {
+          }
+          else if (!fixed[a] && fixed[b] && fixed[c])
+          {
             // a if free
-            //if(vertex_costs[a] >= config.cost_limit)
-            //  continue;
             if (waveFrontUpdate(distances, edge_weights, b, c, a))
               pq.insert(a, distances[a]);
-          } else {
+          }
+          else
+          {
             // two free vertices -> skip that face
             continue;
           }
         }
-        catch(lvr2::PanicException exception)
-        {
-          ROS_ERROR_STREAM("Found non manifold vertex!");
-          continue;
-        }
       }
+    }
+    catch(lvr2::PanicException exception){
+      invalid.insert(current_vh, true);
+      ROS_ERROR_STREAM("Found invalid vertex!");
+      continue;
     }
   }
 
@@ -612,17 +626,11 @@ uint32_t MeshPlanner::waveFrontPropagation(
   }
 
   ROS_INFO_STREAM("Finished wave front propagation.");
-
-  /*
-   * Sampling the path by backtracking the vector field
-   */
-
-  ROS_INFO_STREAM("Compute vector map");
+  ROS_INFO_STREAM("Computing the vector map...");
   computeVectorMap();
 
   bool path_exists = false;
-
-  for (auto goal_vertex : mesh.getVerticesOfFace(goal_face)) {
+  for (auto goal_vertex : goal_vertices) {
     if (goal_vertex != predecessors[goal_vertex]) {
       path_exists = true;
       break;
@@ -635,7 +643,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
   }
 
   ROS_INFO_STREAM("Start vector field back tracking!");
-  constexpr float step_width = 0.03; // step width of 3 cm
+  constexpr float step_width = 0.6; // step width of 3 cm
 
   lvr2::FaceHandle current_face = goal_face;
   mesh_map::Vector current_pos = goal;
@@ -663,31 +671,8 @@ uint32_t MeshPlanner::waveFrontPropagation(
   }
 
   ROS_INFO_STREAM("Successfully finished vector field back tracking!");
-
   return mbf_msgs::GetPathResult::SUCCESS;
-
-  /*
-  lvr2::VertexHandle prev = predecessors[goal_vertex];
-
-  if(prev == goal_vertex)
-  {
-    ROS_WARN("Predecessor of goal not set!");
-    return false;
-  }
-
-  while(prev != start_vertex)
-  {
-    path.push_front(prev);
-    if(predecessors[prev] == prev){
-      ROS_WARN_STREAM("No path found!");
-      return false;
-    }
-    prev = predecessors[prev];
-  }
-  path.push_front(start_vertex);
-*/
 }
-
 
 } /* namespace mesh_planner */
 
