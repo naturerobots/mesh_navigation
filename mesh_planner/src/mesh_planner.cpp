@@ -47,6 +47,7 @@ using namespace std;
 #include <pluginlib/class_list_macros.h>
 
 #include <mesh_planner/mesh_planner.h>
+//#define DEBUG
 
 PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -354,18 +355,14 @@ inline bool MeshPlanner::waveFrontUpdate(
     ROS_ERROR_STREAM("u3 tmp is not finite!");
   }
   if(u3tmp < u3) {
-    const double u3_sq = u3tmp * u3tmp;
     const double u2_sq = u2 * u2;
     const double u1_sq = u1 * u1;
 
     const double t0a = (a_sq + b_sq - c_sq) / (2*a*b);
-    const double t1a = (u3_sq + b_sq - u1_sq) / (2*u3tmp*b);
-    const double t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3tmp);
+    const double t1a = (u3tmp_sq + b_sq - u1_sq) / (2*u3tmp*b);
+    const double t2a = (a_sq + u3tmp_sq - u2_sq) / (2*a*u3tmp);
 
-    const double theta0 = acos(t0a);
-    const double theta1 = acos(t1a);
-    const double theta2 = acos(t2a);
-
+    #ifdef DEBUG
     if(!std::isfinite(theta0 + theta1 + theta2)){
       ROS_ERROR_STREAM("------------------");
       if(std::isnan(theta0)) ROS_ERROR_STREAM("Theta0 is NaN!");
@@ -376,40 +373,27 @@ inline bool MeshPlanner::waveFrontUpdate(
       if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
       if(std::isnan(t1a)) ROS_ERROR_STREAM("t1a is NaN!");
       if(std::isnan(t2a)) ROS_ERROR_STREAM("t2a is NaN!");
-      if(std::fabs(t2a) > 1) ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
-      if(std::fabs(t1a) > 1) ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
-    }
-
-    /*
-    const bool left = theta2 > theta0;
-    const bool right = theta1 > theta0;
-
-    if(left && theta2 < theta1) ROS_ERROR_STREAM("theta2 smaller than theta1");
-    if(right && theta1 < theta2) ROS_ERROR_STREAM("theta1 smaller than theta2");
-    */
-
-    if(theta1 + theta2 < theta0)
-    {
-      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
-      cutting_faces.insert(v3, fH);
-      distances[v3] = static_cast<float>(u3tmp);
-      if (theta1 < theta2) {
-        predecessors[v3] = v1;
-        direction[v3] = theta1;
-      }
-      else
+      if(std::fabs(t2a) > 1)
       {
-        predecessors[v3] = v2;
-        direction[v3] = -theta2;
+        ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
+        ROS_INFO_STREAM("a: " << a << ", u3: " << u3tmp << ", u2: " << u2 << ", a+u2: " << a+u2);
       }
-      return true;
+      if(std::fabs(t1a) > 1)
+      {
+        ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
+        ROS_INFO_STREAM("b: " << b << ", u3: " << u3tmp << ", u1: " << u1 << ", b+u1: " << b+u1);
+      }
     }
-    else if (theta1 < theta2)
+    #endif
+
+    // corner case: side b + u1 ~= u3
+    if(std::fabs(t1a) > 1)
     {
-      u3tmp = distances[v1] + b;
+      u3tmp = u1 + b;
       if(u3tmp < u3)
       {
-        cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
         predecessors[v3] = v1;
         distances[v3] = static_cast<float>(u3tmp);
         direction[v3] = 0;
@@ -417,14 +401,77 @@ inline bool MeshPlanner::waveFrontUpdate(
       }
       return false;
     }
-    else
+      // corner case: side a + u2 ~= u3
+    else if (std::fabs(t2a) >1)
     {
-      u3tmp = distances[v2] + a;
+      u3tmp = u2 + a;
       if(u3tmp < u3)
       {
-        cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
         predecessors[v3] = v2;
         distances[v3] = static_cast<float>(u3tmp);
+        direction[v3] = 0;
+        return true;
+      }
+      return false;
+    }
+
+    const double theta0 = acos(t0a);
+    const double theta1 = acos(t1a);
+    const double theta2 = acos(t2a);
+
+    if(theta1 < theta0 && theta2 < theta0)
+    {
+      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+      cutting_faces.insert(v3, fH);
+      distances[v3] = static_cast<float>(u3tmp);
+      if (theta1 < theta2) {
+        predecessors[v3] = v1;
+        direction[v3] = theta1;
+        #ifdef DEBUG
+        mesh_map->publishDebugVector(v3, v1,  v2, theta1, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        #endif
+      }
+      else
+      {
+        predecessors[v3] = v2;
+        direction[v3] = -theta2;
+        #ifdef DEBUG
+        mesh_map->publishDebugVector(v3, v2, v1, theta2, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        #endif
+      }
+      return true;
+    }
+    else if (theta1 < theta2)
+    {
+      u3tmp = u1 + b;
+      if(u3tmp < u3)
+      {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v1;
+        distances[v3] = static_cast<float>(u3tmp);
+        #ifdef DEBUG
+        mesh_map->publishDebugVector(v3, v1,  v2, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        #endif
+        direction[v3] = 0;
+        return true;
+      }
+      return false;
+    }
+    else
+    {
+      u3tmp = u2 + a;
+      if(u3tmp < u3)
+      {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v2;
+        distances[v3] = static_cast<float>(u3tmp);
+        #ifdef DEBUG
+        mesh_map->publishDebugVector(v3, v2, v1, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        #endif
         direction[v3] = 0;
         return true;
       }
@@ -524,6 +571,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
   ros::WallTime t_start, t_end;
   t_start = ros::WallTime::now();
 
+  size_t fixed_cnt = 0;
   while (!pq.isEmpty() && !cancel_planning) {
     lvr2::VertexHandle current_vh = pq.popMin().key();
 
@@ -532,7 +580,13 @@ uint32_t MeshPlanner::waveFrontPropagation(
     fixed[current_vh] = true;
 
     if(distances[current_vh] > goal_dist)
-      break;
+      continue;
+
+    if(vertex_costs[current_vh] > config.cost_limit)
+      continue;
+
+    if(invalid[current_vh])
+      continue;
 
     if(current_vh == goal_vertices[0] ||
        current_vh == goal_vertices[1] ||
@@ -548,62 +602,69 @@ uint32_t MeshPlanner::waveFrontPropagation(
       }
     }
 
-
-    if(invalid[current_vh])
-    {
-      continue;
-    }
-
-    std::vector<lvr2::VertexHandle> neighbours;
     try{
-      mesh.getNeighboursOfVertex(current_vh, neighbours);
-      for(auto nh : neighbours){
+      std::vector<lvr2::FaceHandle> faces;
+      mesh.getFacesOfVertex(current_vh, faces);
 
-        if(invalid[nh])
+      for (auto fh : faces) {
+        const auto vertices = mesh.getVerticesOfFace(fh);
+        const lvr2::VertexHandle &a = vertices[0];
+        const lvr2::VertexHandle &b = vertices[1];
+        const lvr2::VertexHandle &c = vertices[2];
+
+        if(invalid[a] || invalid[b] || invalid[c])
           continue;
 
-        std::vector<lvr2::FaceHandle> faces;
-        mesh.getFacesOfVertex(nh, faces);
-
-        for (auto fh : faces) {
-          const auto vertices = mesh.getVerticesOfFace(fh);
-          const lvr2::VertexHandle &a = vertices[0];
-          const lvr2::VertexHandle &b = vertices[1];
-          const lvr2::VertexHandle &c = vertices[2];
-
-          if(invalid[a] || invalid[b] || invalid[c])
-            continue;
-
-          // We are looking for a face where exactly
-          // one vertex is not in the fixed set
-          if (fixed[a] && fixed[b] && fixed[c]) {
-            // The face's vertices are already optimal
-            // with respect to the distance
-            continue;
-          }
-          else if (fixed[a] && fixed[b] && !fixed[c])
+        // We are looking for a face where exactly
+        // one vertex is not in the fixed set
+        if (fixed[a] && fixed[b] && fixed[c]) {
+          // The face's vertices are already optimal
+          // with respect to the distance
+          #ifdef DEBUG
+          mesh_map->publishDebugFace(fh, mesh_map::color(1, 0, 0), "fmm_fixed_" + fixed_cnt++);
+          #endif
+          continue;
+        }
+        else if (fixed[a] && fixed[b] && !fixed[c])
+        {
+          // c is free
+          if (waveFrontUpdate(distances, edge_weights, a, b, c))
           {
-            // c is free
-            if (waveFrontUpdate(distances, edge_weights, a, b, c))
-              pq.insert(c, distances[c]);
+            pq.insert(c, distances[c]);
+            #ifdef DEBUG
+            mesh_map->publishDebugFace(fh, mesh_map::color(0, 1, 1), "fmm_update");
+            sleep(2);
+            #endif
           }
-          else if (fixed[a] && !fixed[b] && fixed[c])
+        }
+        else if (fixed[a] && !fixed[b] && fixed[c])
+        {
+          // b is free
+          if (waveFrontUpdate(distances, edge_weights, c, a, b))
           {
-            // b is free
-            if (waveFrontUpdate(distances, edge_weights, c, a, b))
-              pq.insert(b, distances[b]);
+            pq.insert(b, distances[b]);
+            #ifdef DEBUG
+            mesh_map->publishDebugFace(fh, mesh_map::color(0, 1, 1), "fmm_update");
+            sleep(2);
+            #endif
           }
-          else if (!fixed[a] && fixed[b] && fixed[c])
+        }
+        else if (!fixed[a] && fixed[b] && fixed[c])
+        {
+          // a if free
+          if (waveFrontUpdate(distances, edge_weights, b, c, a))
           {
-            // a if free
-            if (waveFrontUpdate(distances, edge_weights, b, c, a))
-              pq.insert(a, distances[a]);
+            pq.insert(a, distances[a]);
+            #ifdef DEBUG
+            mesh_map->publishDebugFace(fh, mesh_map::color(0, 1, 1), "fmm_update");
+            sleep(2);
+            #endif
           }
-          else
-          {
-            // two free vertices -> skip that face
-            continue;
-          }
+        }
+        else
+        {
+          // two free vertices -> skip that face
+          continue;
         }
       }
     }
@@ -650,6 +711,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
   path.push_front(
       std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
 
+  // move from the goal position towards the start position
   while (current_pos.distance2(start) > step_width && !cancel_planning) {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
