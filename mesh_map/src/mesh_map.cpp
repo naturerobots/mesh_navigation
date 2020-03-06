@@ -688,6 +688,38 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
   marker_pub.publish(marker);
 }
 
+void MeshMap::publishDebugVector(
+    const lvr2::VertexHandle &a, const lvr2::VertexHandle &b,
+    const lvr2::VertexHandle &c, const double angle,
+    const std_msgs::ColorRGBA &color, const std::string &name)
+{
+
+  auto vec_a = mesh_ptr->getVertexPosition(a);
+  auto vec_b = mesh_ptr->getVertexPosition(b);
+  auto vec_c = mesh_ptr->getVertexPosition(c);
+  auto vec_d = vec_b - vec_a;
+  auto vec_e = vec_c - vec_a;
+  auto normal = vec_d.cross(vec_e).normalized();
+  auto dir = (vec_b - vec_a).rotated(normal, angle);
+
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = mapFrame();
+  marker.header.stamp = ros::Time();
+  marker.ns = name;
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::ARROW;
+  marker.action = visualization_msgs::Marker::ADD;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.1;
+  scale.y = 0.02;
+  scale.z = 0.02;
+  marker.scale = scale;
+  marker.color = color;
+  marker.pose = mesh_map::calculatePoseFromDirection(vec_a, dir, normal);
+  marker_pub.publish(marker);
+}
+
+
 void MeshMap::publishVectorField(
     const std::string& name,
     const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
@@ -802,6 +834,9 @@ void MeshMap::publishVectorField(
 
     auto u = mesh.getVertexPosition(vH);
     auto v = u + dir_vec * 0.1;
+
+    u.z = u.z + 0.01;
+    v.z = v.z + 0.01;
 
     if(!std::isfinite(u.x) || !std::isfinite(u.y) || !std::isfinite(u.z)
         || !std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z))
@@ -943,7 +978,7 @@ bool MeshMap::searchNeighbourFaces(Vector &pos, lvr2::FaceHandle &face,
     float dist;
     if (mesh_map::projectedBarycentricCoords(pos, vertices_positions,
                                              bary_coords, dist) &&
-        dist < max_dist) {
+        std::fabs(dist) < max_dist) {
       // update current face, barycentric coords, and the projected position
       face = *face_iter;
       barycentric_coords = bary_coords;
@@ -978,10 +1013,9 @@ bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
   const auto &vertices = mesh_ptr->getVerticesOfFace(face);
   std::array<float, 3> barycentric_coords;
   float dist;
-  if (mesh_map::projectedBarycentricCoords(
-          pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords,
-          dist) ||
-      searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4)) {
+  if (mesh_map::projectedBarycentricCoords(pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords, dist) ||
+      searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4))
+  {
     const auto &opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face),
                                               barycentric_coords);
 

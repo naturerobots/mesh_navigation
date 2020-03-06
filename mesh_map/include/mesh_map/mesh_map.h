@@ -189,7 +189,11 @@ public:
   void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA &color,
                          const std::string &name);
 
-  void publishDebugFace(const lvr2::FaceHandle &face_handle,
+  void publishDebugVector(
+      const lvr2::VertexHandle &a, const lvr2::VertexHandle &b, const lvr2::VertexHandle &c,
+      const double angle, const std_msgs::ColorRGBA &color, const std::string &name);
+
+    void publishDebugFace(const lvr2::FaceHandle &face_handle,
                         const std_msgs::ColorRGBA &color,
                         const std::string &name);
 
