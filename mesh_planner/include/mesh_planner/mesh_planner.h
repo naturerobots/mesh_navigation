@@ -114,14 +114,10 @@ protected:
       lvr2::DenseVertexMap<float> &distances,
       lvr2::DenseVertexMap<lvr2::VertexHandle> &predecessors);
 
-  /*
-  inline bool waveFrontUpdate2(lvr2::DenseVertexMap<float> &distances,
-                              const lvr2::DenseEdgeMap<float> &edge_weights,
-                              const lvr2::VertexHandle &v1,
-                              const lvr2::VertexHandle &v2,
-                              const lvr2::VertexHandle &v3);
-
-   */
+  inline bool waveFrontUpdateWithS(
+      lvr2::DenseVertexMap<float> &distances,
+      const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
+      const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3);
 
   inline bool waveFrontUpdate(lvr2::DenseVertexMap<float> &distances,
                               const lvr2::DenseEdgeMap<float> &edge_weights,

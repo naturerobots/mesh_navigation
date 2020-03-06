@@ -215,89 +215,101 @@ uint32_t MeshPlanner::waveFrontPropagation(
                               predecessors);
 }
 
-/*
-inline bool MeshPlanner::waveFrontUpdate2(
+inline bool MeshPlanner::waveFrontUpdateWithS(
     lvr2::DenseVertexMap<float> &distances,
     const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
     const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3) {
   const auto &mesh = mesh_map->mesh();
-  const auto &vertex_costs = mesh_map->vertexCosts();
 
   const double u1 = distances[v1];
   const double u2 = distances[v2];
-  double u3 = distances[v3]; // new
+  const double u3 = distances[v3];
 
   const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
-  const float c = edge_weights[e12h.unwrap()];
-  const float c_sq = c * c;
+  const double c = edge_weights[e12h.unwrap()];
+  const double c_sq = c * c;
 
   const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
-  const float b = edge_weights[e13h.unwrap()];
-  const float b_sq = b * b;
+  const double b = edge_weights[e13h.unwrap()];
+  const double b_sq = b * b;
 
   const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
-  const float a = edge_weights[e23h.unwrap()];
-  const float a_sq = a * a;
+  const double a = edge_weights[e23h.unwrap()];
+  const double a_sq = a * a;
 
-  float dot = (a_sq + b_sq - c_sq) / (2 * a * b);
-  float cost = vertex_costs[v3] > config.cost_limit ? config.cost_limit : vertex_costs[v3];
-  float weight = 1 + cost/config.cost_limit;
+  const double u1sq = u1 * u1;
+  const double u2sq = u2 * u2;
 
-  float u3tmp = mesh_map::computeUpdateSethianMethod(u1, u2, a, b, dot, 1.0);
+  const double A = sqrt(std::max<double>(
+      (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
+  const double B = sqrt(std::max<double>(
+      (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
+  const double sx = (c_sq + u1sq - u2sq) / (2 * c);
+  const double sy = -A / (2 * c);
+  const double p = (-a_sq + b_sq + c_sq) / (2 * c);
+  const double hc = B / (2 * c);
+  const double dy = hc-sy;
+  // const double dy = (A + B) / (2 * c);
+  // const double dx = (u2sq - u1sq + b_sq - a_sq) / (2*c);
+  const double dx = p - sx;
 
-  if (u3tmp < u3) {
-    u3 = distances[v3] = u3tmp;
+  const double u3tmp_sq = dx * dx + dy * dy;
+  double u3tmp = sqrt(u3tmp_sq);
 
-    float u1_sq = u1*u1;
-    float u2_sq = u2*u2;
-    float u3_sq = u3*u3;
-
-    float t1a = (u3_sq + b_sq - u1_sq) / (2*u3*b);
-    float t2a = (a_sq + u3_sq - u2_sq) / (2*a*u3);
-
-    bool os2 = std::fabs(t2a) > 1;
-    bool os1 = std::fabs(t1a) > 1;
-
-    float theta0 = acos(dot);
-    float theta1 = acos(t1a);
-    float theta2 = acos(t2a);
-
-    if(!std::isfinite(theta0 + theta1 + theta2)){
-      ROS_ERROR_STREAM("------------------");
-      if(std::isnan(theta0)) ROS_ERROR_STREAM("Theta0 is NaN!");
-      if(std::isnan(theta1)) ROS_ERROR_STREAM("Theta1 is NaN!");
-      if(std::isnan(theta2)) ROS_ERROR_STREAM("Theta2 is NaN!");
-      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
-      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
-      if(std::isinf(theta2)) ROS_ERROR_STREAM("Theta2 is inf!");
-      if(std::isnan(t1a)) ROS_ERROR_STREAM("t1a is NaN!");
-      if(std::isnan(t2a)) ROS_ERROR_STREAM("t2a is NaN!");
-      if(std::fabs(t2a) > 1) ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
-      if(std::fabs(t1a) > 1) ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
-    }
-    bool left = theta2 > theta0;
-    bool right = theta1 > theta0;
-
-    if(left && theta2 < theta1) ROS_ERROR_STREAM("theta2 smaller than theta1");
-    if(right && theta1 < theta2) ROS_ERROR_STREAM("theta1 smaller than theta2");
+  if(u3tmp < u3) {
+    const double sx_sq = sx * sx;
+    const double sy_sq = sy * sy;
 
     if (distances[v1] < distances[v2]) {
       predecessors[v3] = v1;
-      direction[v3] = !left? theta1 : -theta1;
-    }
-    else // right face check
-    {
+      const double S = sy * p - sx * hc;
+      if (S <= 0) {
+        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        const double theta =
+            acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2 * u3tmp * b));
+        direction[v3] = static_cast<float>(theta);
+        distances[v3] = static_cast<float>(u3tmp);
+        cutting_faces.insert(v3, fh);
+        return true;
+      } else {
+        u3tmp = u1 + b;
+        if (u3tmp < u3) {
+          direction[v3] = 0;
+          distances[v3] = u3tmp;
+          const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+          cutting_faces.insert(v3, fh);
+          return true;
+        }
+        return false;
+      }
+    } else {
       predecessors[v3] = v2;
-      direction[v3] = !right? -theta2 : theta2;
+      const double S = sx * hc - hc * c + sy * c - sy * p;
+      if (S <= 0) {
+        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        const double theta =
+            -acos((a_sq + u3tmp_sq + 2 * sx * c - sx_sq - c_sq - sy_sq) /
+                  (2 * a * u3tmp));
+        direction[v3] = static_cast<float>(theta);
+        distances[v3] = static_cast<float>(u3tmp);
+        cutting_faces.insert(v3, fh);
+        return true;
+      } else {
+        u3tmp = u2 + a;
+        if (u3tmp < u3) {
+          direction[v3] = 0;
+          distances[v3] = u3tmp;
+          const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+          cutting_faces.insert(v3, fh);
+          return true;
+        }
+        return false;
+      }
     }
-
-    cutting_faces.insert(v3, mesh.getFaceBetween(v1, v2, v3).unwrap());
-    return vertex_costs[v3] <= config.cost_limit;
   }
-  else return false;
+  return false;
 }
 
-*/
 
 inline bool MeshPlanner::waveFrontUpdate(
     lvr2::DenseVertexMap<float> &distances,
@@ -318,35 +330,24 @@ inline bool MeshPlanner::waveFrontUpdate(
   const double b_sq = b * b;
 
   const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
-  const float a = edge_weights[e23h.unwrap()];
-  const float a_sq = a * a;
+  const double a = edge_weights[e23h.unwrap()];
+  const double a_sq = a * a;
 
-  const float u1sq = u1 * u1;
-  const float u2sq = u2 * u2;
+  const double u1sq = u1 * u1;
+  const double u2sq = u2 * u2;
 
-  const float A = sqrt(std::max<double>(
+  const double A = sqrt(std::max<double>(
       (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
-  const float B = sqrt(std::max<double>(
+  const double B = sqrt(std::max<double>(
       (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
-
-  //const double A = std::fabs((-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c));
-  //const double B = std::fabs((-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c));
-
-  const float sx = (c_sq + u1sq - u2sq) / (2 * c);
-  // const double sx_sq = sx * sx;
-
-  const float sy = -A / (2 * c);
-  // const double sy_sq = sy * sy;
-
-  const float p = (-a_sq + b_sq + c_sq) / (2 * c);
-  //const double hc = B / (2 * c);
-
-  const float dy = (A + B) / (2 * c);
-  // const double dx = (u2sq - u1sq + b_sq - a_sq) / (2*c);
-  const float dx = p - sx;
-
-  // const double x = dx != sx ? (A*sx - B*p)/((A + B)*c) : dx/c;
-  // const double dy = hc-sy;
+  const double sx = (c_sq + u1sq - u2sq) / (2 * c);
+  // const float sy = -A / (2 * c);
+  const double p = (-a_sq + b_sq + c_sq) / (2 * c);
+  // const float hc = B / (2 * c);
+  // const float dy = hc-sy;
+  const double dy = (A + B) / (2 * c);
+  const double dx = (u2sq - u1sq + b_sq - a_sq) / (2 * c);
+  //const float dx = p - sx;
 
   const double u3tmp_sq = dx * dx + dy * dy;
   double u3tmp = sqrt(u3tmp_sq);
