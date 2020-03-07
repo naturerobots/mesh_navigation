@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019, Sebastian Pütz
+ *  Copyright 2020, Sebastian Pütz
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -48,6 +48,7 @@ using namespace std;
 
 #include <mesh_planner/mesh_planner.h>
 //#define DEBUG
+#define USE_UPDATE_WITH_S
 
 PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -175,7 +176,7 @@ void MeshPlanner::reconfigureCallback(mesh_planner::MeshPlannerConfig &cfg,
 void MeshPlanner::computeVectorMap() {
   const auto &mesh = mesh_map->mesh();
   const auto &face_normals = mesh_map->faceNormals();
-
+  const auto &vertex_normals = mesh_map->vertexNormals();
 
   for (auto v3 : mesh.vertices()) {
     // if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3))
@@ -200,7 +201,7 @@ void MeshPlanner::computeVectorMap() {
 
     // compute the direction vector and rotate it by theta, which is stored in
     // the direction vertex map
-    const auto dirVec = (vec1 - vec3).rotated(face_normals[fH], direction[v3]);
+    const auto dirVec = (vec1 - vec3).rotated(vertex_normals[v3], direction[v3]);
     // store the normalized rotated vector in the vector map
     vector_map.insert(v3, dirVec.normalized());
   }
@@ -237,70 +238,88 @@ inline bool MeshPlanner::waveFrontUpdateWithS(
   const double a = edge_weights[e23h.unwrap()];
   const double a_sq = a * a;
 
-  const double u1sq = u1 * u1;
-  const double u2sq = u2 * u2;
+  const double u1_sq = u1 * u1;
+  const double u2_sq = u2 * u2;
 
   const double A = sqrt(std::max<double>(
       (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
   const double B = sqrt(std::max<double>(
       (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
-  const double sx = (c_sq + u1sq - u2sq) / (2 * c);
+  const double sx = (c_sq + u1_sq - u2_sq) / (2 * c);
   const double sy = -A / (2 * c);
   const double p = (-a_sq + b_sq + c_sq) / (2 * c);
   const double hc = B / (2 * c);
   const double dy = hc-sy;
   // const double dy = (A + B) / (2 * c);
-  // const double dx = (u2sq - u1sq + b_sq - a_sq) / (2*c);
+  // const double dx = (u2_sq - u1_sq + b_sq - a_sq) / (2*c);
   const double dx = p - sx;
 
   const double u3tmp_sq = dx * dx + dy * dy;
   double u3tmp = sqrt(u3tmp_sq);
 
   if(u3tmp < u3) {
-    const double sx_sq = sx * sx;
-    const double sy_sq = sy * sy;
-
     if (distances[v1] < distances[v2]) {
-      predecessors[v3] = v1;
       const double S = sy * p - sx * hc;
-      if (S <= 0) {
-        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
-        const double theta =
-            acos((u3tmp_sq + b_sq - sx_sq - sy_sq) / (2 * u3tmp * b));
+      const double t1cos = (u3tmp_sq + b_sq - u1_sq) / (2 * u3tmp * b);
+      if (S <= 0 && std::fabs(t1cos) <= 1)
+      {
+        const double theta = acos(t1cos);
+        predecessors[v3] = v1;
         direction[v3] = static_cast<float>(theta);
         distances[v3] = static_cast<float>(u3tmp);
+        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces.insert(v3, fh);
+        #ifdef DEBUG
+          mesh_map->publishDebugVector(v3, v1, fh, theta, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+        #endif
         return true;
-      } else {
+      }
+      else
+      {
         u3tmp = u1 + b;
         if (u3tmp < u3) {
+          predecessors[v3] = v1;
           direction[v3] = 0;
           distances[v3] = u3tmp;
           const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
           cutting_faces.insert(v3, fh);
+          #ifdef DEBUG
+            mesh_map->publishDebugVector(v3, v1, fh, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+          #endif
           return true;
         }
         return false;
       }
-    } else {
-      predecessors[v3] = v2;
+    }
+    else
+    {
       const double S = sx * hc - hc * c + sy * c - sy * p;
-      if (S <= 0) {
+      const double t2cos = (a_sq + u3tmp_sq - u2_sq) / (2 * a * u3tmp);
+      if (S <= 0 && std::fabs(t2cos) <= 1)
+      {
         const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
-        const double theta =
-            -acos((a_sq + u3tmp_sq + 2 * sx * c - sx_sq - c_sq - sy_sq) /
-                  (2 * a * u3tmp));
+        const double theta = -acos(t2cos);
         direction[v3] = static_cast<float>(theta);
         distances[v3] = static_cast<float>(u3tmp);
+        predecessors[v3] = v2;
         cutting_faces.insert(v3, fh);
+        #ifdef DEBUG
+          mesh_map->publishDebugVector(v3, v2, fh, theta, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+        #endif
         return true;
-      } else {
+      }
+      else
+      {
         u3tmp = u2 + a;
         if (u3tmp < u3) {
           direction[v3] = 0;
           distances[v3] = u3tmp;
+          predecessors[v3] = v2;
           const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
           cutting_faces.insert(v3, fh);
+          #ifdef DEBUG
+            mesh_map->publishDebugVector(v3, v2, fh, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+          #endif
           return true;
         }
         return false;
@@ -333,20 +352,20 @@ inline bool MeshPlanner::waveFrontUpdate(
   const double a = edge_weights[e23h.unwrap()];
   const double a_sq = a * a;
 
-  const double u1sq = u1 * u1;
-  const double u2sq = u2 * u2;
+  const double u1_sq = u1 * u1;
+  const double u2_sq = u2 * u2;
 
   const double A = sqrt(std::max<double>(
       (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
   const double B = sqrt(std::max<double>(
       (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
-  const double sx = (c_sq + u1sq - u2sq) / (2 * c);
+  const double sx = (c_sq + u1_sq - u2_sq) / (2 * c);
   // const float sy = -A / (2 * c);
   const double p = (-a_sq + b_sq + c_sq) / (2 * c);
   // const float hc = B / (2 * c);
   // const float dy = hc-sy;
   const double dy = (A + B) / (2 * c);
-  const double dx = (u2sq - u1sq + b_sq - a_sq) / (2 * c);
+  const double dx = (u2_sq - u1_sq + b_sq - a_sq) / (2 * c);
   //const float dx = p - sx;
 
   const double u3tmp_sq = dx * dx + dy * dy;
@@ -356,12 +375,50 @@ inline bool MeshPlanner::waveFrontUpdate(
     ROS_ERROR_STREAM("u3 tmp is not finite!");
   }
   if(u3tmp < u3) {
-    const double u2_sq = u2 * u2;
-    const double u1_sq = u1 * u1;
-
     const double t0a = (a_sq + b_sq - c_sq) / (2*a*b);
     const double t1a = (u3tmp_sq + b_sq - u1_sq) / (2*u3tmp*b);
     const double t2a = (a_sq + u3tmp_sq - u2_sq) / (2*a*u3tmp);
+
+    // corner case: side b + u1 ~= u3
+    if(std::fabs(t1a) > 1)
+    {
+      u3tmp = u1 + b;
+      if(u3tmp < u3)
+      {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v1;
+        #ifdef DEBUG
+          mesh_map->publishDebugVector(v3, v1,  fH, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+        #endif
+        distances[v3] = static_cast<float>(u3tmp);
+        direction[v3] = 0;
+        return true;
+      }
+      return false;
+    }
+      // corner case: side a + u2 ~= u3
+    else if (std::fabs(t2a) >1)
+    {
+      u3tmp = u2 + a;
+      if(u3tmp < u3)
+      {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v2;
+        #ifdef DEBUG
+          mesh_map->publishDebugVector(v3, v2,  fH, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
+        #endif
+        distances[v3] = static_cast<float>(u3tmp);
+        direction[v3] = 0;
+        return true;
+      }
+      return false;
+    }
+
+    const double theta0 = acos(t0a);
+    const double theta1 = acos(t1a);
+    const double theta2 = acos(t2a);
 
     #ifdef DEBUG
     if(!std::isfinite(theta0 + theta1 + theta2)){
@@ -387,41 +444,6 @@ inline bool MeshPlanner::waveFrontUpdate(
     }
     #endif
 
-    // corner case: side b + u1 ~= u3
-    if(std::fabs(t1a) > 1)
-    {
-      u3tmp = u1 + b;
-      if(u3tmp < u3)
-      {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
-        cutting_faces.insert(v3, fH);
-        predecessors[v3] = v1;
-        distances[v3] = static_cast<float>(u3tmp);
-        direction[v3] = 0;
-        return true;
-      }
-      return false;
-    }
-      // corner case: side a + u2 ~= u3
-    else if (std::fabs(t2a) >1)
-    {
-      u3tmp = u2 + a;
-      if(u3tmp < u3)
-      {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
-        cutting_faces.insert(v3, fH);
-        predecessors[v3] = v2;
-        distances[v3] = static_cast<float>(u3tmp);
-        direction[v3] = 0;
-        return true;
-      }
-      return false;
-    }
-
-    const double theta0 = acos(t0a);
-    const double theta1 = acos(t1a);
-    const double theta2 = acos(t2a);
-
     if(theta1 < theta0 && theta2 < theta0)
     {
       auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
@@ -431,7 +453,7 @@ inline bool MeshPlanner::waveFrontUpdate(
         predecessors[v3] = v1;
         direction[v3] = theta1;
         #ifdef DEBUG
-        mesh_map->publishDebugVector(v3, v1,  v2, theta1, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        mesh_map->publishDebugVector(v3, v1,  fH, theta1, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
         #endif
       }
       else
@@ -439,7 +461,7 @@ inline bool MeshPlanner::waveFrontUpdate(
         predecessors[v3] = v2;
         direction[v3] = -theta2;
         #ifdef DEBUG
-        mesh_map->publishDebugVector(v3, v2, v1, theta2, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        mesh_map->publishDebugVector(v3, v2, fH, -theta2, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
         #endif
       }
       return true;
@@ -454,7 +476,7 @@ inline bool MeshPlanner::waveFrontUpdate(
         predecessors[v3] = v1;
         distances[v3] = static_cast<float>(u3tmp);
         #ifdef DEBUG
-        mesh_map->publishDebugVector(v3, v1,  v2, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        mesh_map->publishDebugVector(v3, v1,  fH, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
         #endif
         direction[v3] = 0;
         return true;
@@ -471,7 +493,7 @@ inline bool MeshPlanner::waveFrontUpdate(
         predecessors[v3] = v2;
         distances[v3] = static_cast<float>(u3tmp);
         #ifdef DEBUG
-        mesh_map->publishDebugVector(v3, v2, v1, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec");
+        mesh_map->publishDebugVector(v3, v2, fH, 0, mesh_map::color(0.9, 0.9, 0.2), "dir_vec" + std::to_string(v3.idx()));
         #endif
         direction[v3] = 0;
         return true;
@@ -536,7 +558,6 @@ uint32_t MeshPlanner::waveFrontPropagation(
 
   // clear vector field map
   vector_map.clear();
-
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
@@ -622,14 +643,18 @@ uint32_t MeshPlanner::waveFrontPropagation(
           // The face's vertices are already optimal
           // with respect to the distance
           #ifdef DEBUG
-          mesh_map->publishDebugFace(fh, mesh_map::color(1, 0, 0), "fmm_fixed_" + fixed_cnt++);
+          mesh_map->publishDebugFace(fh, mesh_map::color(1, 0, 0), "fmm_fixed_" + std::to_string(fixed_cnt++));
           #endif
           continue;
         }
         else if (fixed[a] && fixed[b] && !fixed[c])
         {
           // c is free
+#ifdef USE_UPDATE_WITH_S
+          if (waveFrontUpdateWithS(distances, edge_weights, a, b, c))
+#else
           if (waveFrontUpdate(distances, edge_weights, a, b, c))
+#endif
           {
             pq.insert(c, distances[c]);
             #ifdef DEBUG
@@ -641,7 +666,11 @@ uint32_t MeshPlanner::waveFrontPropagation(
         else if (fixed[a] && !fixed[b] && fixed[c])
         {
           // b is free
+#ifdef USE_UPDATE_WITH_S
+          if (waveFrontUpdateWithS(distances, edge_weights, c, a, b))
+#else
           if (waveFrontUpdate(distances, edge_weights, c, a, b))
+#endif
           {
             pq.insert(b, distances[b]);
             #ifdef DEBUG
@@ -653,7 +682,11 @@ uint32_t MeshPlanner::waveFrontPropagation(
         else if (!fixed[a] && fixed[b] && fixed[c])
         {
           // a if free
+#ifdef USE_UPDATE_WITH_S
+          if (waveFrontUpdateWithS(distances, edge_weights, b, c, a))
+#else
           if (waveFrontUpdate(distances, edge_weights, b, c, a))
+#endif
           {
             pq.insert(a, distances[a]);
             #ifdef DEBUG

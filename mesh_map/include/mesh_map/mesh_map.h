@@ -190,7 +190,7 @@ public:
                          const std::string &name);
 
   void publishDebugVector(
-      const lvr2::VertexHandle &a, const lvr2::VertexHandle &b, const lvr2::VertexHandle &c,
+      const lvr2::VertexHandle &a, const lvr2::VertexHandle &b, const lvr2::FaceHandle &fh,
       const double angle, const std_msgs::ColorRGBA &color, const std::string &name);
 
     void publishDebugFace(const lvr2::FaceHandle &face_handle,

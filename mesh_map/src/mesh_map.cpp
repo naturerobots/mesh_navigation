@@ -690,16 +690,15 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle &face_handle,
 
 void MeshMap::publishDebugVector(
     const lvr2::VertexHandle &a, const lvr2::VertexHandle &b,
-    const lvr2::VertexHandle &c, const double angle,
+    const lvr2::FaceHandle &fh, const double angle,
     const std_msgs::ColorRGBA &color, const std::string &name)
 {
 
   auto vec_a = mesh_ptr->getVertexPosition(a);
   auto vec_b = mesh_ptr->getVertexPosition(b);
-  auto vec_c = mesh_ptr->getVertexPosition(c);
-  auto vec_d = vec_b - vec_a;
-  auto vec_e = vec_c - vec_a;
-  auto normal = vec_d.cross(vec_e).normalized();
+
+  auto normal = vertex_normals[a].normalized();
+  //auto normal = face_normals[fh];
   auto dir = (vec_b - vec_a).rotated(normal, angle);
 
   visualization_msgs::Marker marker;
