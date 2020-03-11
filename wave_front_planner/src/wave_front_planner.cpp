@@ -46,19 +46,19 @@ using namespace std;
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.h>
 
-#include <mesh_planner/mesh_planner.h>
+#include <wave_front_planner/wave_front_planner.h>
 //#define DEBUG
 #define USE_UPDATE_WITH_S
 
-PLUGINLIB_EXPORT_CLASS(mesh_planner::MeshPlanner, mbf_mesh_core::MeshPlanner);
+PLUGINLIB_EXPORT_CLASS(wave_front_planner::WaveFrontPlanner, mbf_mesh_core::MeshPlanner);
 
-namespace mesh_planner {
+namespace wave_front_planner {
 
-MeshPlanner::MeshPlanner() {}
+WaveFrontPlanner::WaveFrontPlanner() {}
 
-MeshPlanner::~MeshPlanner() {}
+WaveFrontPlanner::~WaveFrontPlanner() {}
 
-uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
+uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped &start,
                                const geometry_msgs::PoseStamped &goal,
                                double tolerance,
                                std::vector<geometry_msgs::PoseStamped> &plan,
@@ -124,12 +124,12 @@ uint32_t MeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   return outcome;
 }
 
-bool MeshPlanner::cancel() {
+bool WaveFrontPlanner::cancel() {
   cancel_planning = true;
   return true;
 }
 
-bool MeshPlanner::initialize(
+bool WaveFrontPlanner::initialize(
     const std::string &plugin_name,
     const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr) {
   mesh_map = mesh_map_ptr;
@@ -147,22 +147,22 @@ bool MeshPlanner::initialize(
   // TODO check all map dependencies! (loaded layers etc...)
 
   reconfigure_server_ptr = boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig>>(
-      new dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig>(
+      dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>>(
+      new dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>(
           private_nh));
 
   config_callback =
-      boost::bind(&MeshPlanner::reconfigureCallback, this, _1, _2);
+      boost::bind(&WaveFrontPlanner::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
 
   return true;
 }
 
-lvr2::DenseVertexMap<mesh_map::Vector> MeshPlanner::getVectorMap() {
+lvr2::DenseVertexMap<mesh_map::Vector> WaveFrontPlanner::getVectorMap() {
   return vector_map;
 }
 
-void MeshPlanner::reconfigureCallback(mesh_planner::MeshPlannerConfig &cfg,
+void WaveFrontPlanner::reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig &cfg,
                                       uint32_t level) {
   ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
   if (first_config) {
@@ -173,7 +173,7 @@ void MeshPlanner::reconfigureCallback(mesh_planner::MeshPlannerConfig &cfg,
   config = cfg;
 }
 
-void MeshPlanner::computeVectorMap() {
+void WaveFrontPlanner::computeVectorMap() {
   const auto &mesh = mesh_map->mesh();
   const auto &face_normals = mesh_map->faceNormals();
   const auto &vertex_normals = mesh_map->vertexNormals();
@@ -208,7 +208,7 @@ void MeshPlanner::computeVectorMap() {
   mesh_map->setVectorMap(vector_map);
 }
 
-uint32_t MeshPlanner::waveFrontPropagation(
+uint32_t WaveFrontPlanner::waveFrontPropagation(
     const mesh_map::Vector &start, const mesh_map::Vector &goal,
     std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path){
   return waveFrontPropagation(start, goal, mesh_map->edgeDistances(),
@@ -216,7 +216,7 @@ uint32_t MeshPlanner::waveFrontPropagation(
                               predecessors);
 }
 
-inline bool MeshPlanner::waveFrontUpdateWithS(
+inline bool WaveFrontPlanner::waveFrontUpdateWithS(
     lvr2::DenseVertexMap<float> &distances,
     const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
     const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3) {
@@ -330,7 +330,7 @@ inline bool MeshPlanner::waveFrontUpdateWithS(
 }
 
 
-inline bool MeshPlanner::waveFrontUpdate(
+inline bool WaveFrontPlanner::waveFrontUpdate(
     lvr2::DenseVertexMap<float> &distances,
     const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
     const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3) {
@@ -505,7 +505,7 @@ inline bool MeshPlanner::waveFrontUpdate(
 }
 
 
-uint32_t MeshPlanner::waveFrontPropagation(
+uint32_t WaveFrontPlanner::waveFrontPropagation(
     const mesh_map::Vector &original_start,
     const mesh_map::Vector &original_goal,
     const lvr2::DenseEdgeMap<float> &edge_weights,
@@ -770,5 +770,5 @@ uint32_t MeshPlanner::waveFrontPropagation(
   return mbf_msgs::GetPathResult::SUCCESS;
 }
 
-} /* namespace mesh_planner */
+} /* namespace wave_front_planner */
 

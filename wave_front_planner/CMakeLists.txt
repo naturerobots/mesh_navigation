@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(mesh_planner)
+project(wave_front_planner)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,7 +16,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
 generate_dynamic_reconfigure_options(
-  cfg/MeshPlanner.cfg
+  cfg/WaveFrontPlanner.cfg
 )
 
 catkin_package(
@@ -31,7 +31,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-  src/mesh_planner.cpp
+  src/wave_front_planner.cpp
 )
 
 add_dependencies(${PROJECT_NAME}

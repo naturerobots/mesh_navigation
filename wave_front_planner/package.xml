@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-    <name>mesh_planner</name>
-    <version>0.1.0</version>
-    <description>The mesh_planner package</description>
+    <name>wave_front_planner</name>
+    <version>0.1.1</version>
+    <description>The wave_front_planner package</description>
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
     <license>BSD 3-Clause</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
@@ -16,6 +16,6 @@
     <depend>lvr_ros</depend>
 
     <export>
-        <mbf_mesh_core plugin="${prefix}/mesh_planner.xml"/>
+        <mbf_mesh_core plugin="${prefix}/wave_front_planner.xml"/>
     </export>
 </package>

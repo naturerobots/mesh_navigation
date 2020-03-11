@@ -41,22 +41,22 @@
 #include <mbf_mesh_core/mesh_planner.h>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/mesh_map.h>
-#include <mesh_planner/MeshPlannerConfig.h>
+#include <wave_front_planner/WaveFrontPlannerConfig.h>
 #include <nav_msgs/Path.h>
 
-namespace mesh_planner {
+namespace wave_front_planner {
 
-class MeshPlanner : public mbf_mesh_core::MeshPlanner {
+class WaveFrontPlanner : public mbf_mesh_core::MeshPlanner {
 
 public:
-  typedef boost::shared_ptr<mesh_planner::MeshPlanner> Ptr;
+  typedef boost::shared_ptr<wave_front_planner::WaveFrontPlanner> Ptr;
 
-  MeshPlanner();
+  WaveFrontPlanner();
 
   /**
    * @brief Destructor
    */
-  virtual ~MeshPlanner();
+  virtual ~WaveFrontPlanner();
 
   /**
    * @brief Given a goal pose in the world, compute a plan
@@ -127,7 +127,7 @@ protected:
 
   void computeVectorMap();
 
-  void reconfigureCallback(mesh_planner::MeshPlannerConfig &cfg,
+  void reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig &cfg,
                            uint32_t level);
 
 private:
@@ -144,12 +144,12 @@ private:
 
   // Server for Reconfiguration
   boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig>>
+      dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>>
       reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_planner::MeshPlannerConfig>::CallbackType
+  dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>::CallbackType
       config_callback;
   bool first_config;
-  MeshPlannerConfig config;
+  WaveFrontPlannerConfig config;
 
   // theta angles to the source of the wave front propagation vertices
   lvr2::DenseVertexMap<float> direction;
@@ -164,6 +164,6 @@ private:
   lvr2::DenseVertexMap<float> potential;
 };
 
-} // namespace mesh_planner
+} // namespace wave_front_planner
 
-#endif // MESH_NAVIGATION__MESH_PLANNER_H
+#endif // MESH_NAVIGATION__WAVE_FRONT_PLANNER_H
