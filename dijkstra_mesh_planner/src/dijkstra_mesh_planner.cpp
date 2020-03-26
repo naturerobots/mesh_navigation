@@ -142,7 +142,7 @@ bool DijkstraMeshPlanner::initialize(
       boost::bind(&DijkstraMeshPlanner::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
 
-  return true;
+  return false;
 }
 
 lvr2::DenseVertexMap<mesh_map::Vector> DijkstraMeshPlanner::getVectorMap() {

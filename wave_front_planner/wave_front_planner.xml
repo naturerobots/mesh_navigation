@@ -1,4 +1,4 @@
-<library path="lib/libmesh_planner">
+<library path="lib/libwave_front_planner">
     <class name="wave_front_planner/WaveFrontPlanner" type="wave_front_planner::WaveFrontPlanner"
            base_class_type="mbf_mesh_core::MeshPlanner">
         <description>

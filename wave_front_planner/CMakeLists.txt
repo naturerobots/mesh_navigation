@@ -51,7 +51,7 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(FILES mesh_planner.xml
+install(FILES wave_front_planner.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
