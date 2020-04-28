@@ -79,7 +79,17 @@ geometry_msgs::Pose calculatePoseFromDirection(const Vector &position,
 geometry_msgs::Pose calculatePoseFromPosition(const Vector &current,
                                               const Vector &next,
                                               const Normal &normal) {
-  return calculatePoseFromDirection(current, next - current, normal);
+  float cost = 0;
+  return calculatePoseFromPosition(current, next, normal, cost);
+}
+
+geometry_msgs::Pose calculatePoseFromPosition(const Vector &current,
+                                              const Vector &next,
+                                              const Normal &normal,
+                                              float &cost) {
+  const Vector direction = next - current;
+  cost = direction.length();
+  return calculatePoseFromDirection(current, direction, normal);
 }
 
 bool inTriangle(const Vector &p, const Vector &v0, const Vector &v1,

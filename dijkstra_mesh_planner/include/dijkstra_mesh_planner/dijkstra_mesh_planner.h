@@ -95,9 +95,8 @@ public:
    */
   virtual bool cancel();
 
-  virtual bool
-  initialize(const std::string &name,
-             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr);
+  virtual bool initialize(const std::string &name,
+      const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr);
 
   lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
 

@@ -72,6 +72,11 @@ geometry_msgs::Pose calculatePoseFromPosition(const Vector &current,
                                               const Vector &next,
                                               const Normal &normal);
 
+geometry_msgs::Pose calculatePoseFromPosition(const Vector &current,
+                                              const Vector &next,
+                                              const Normal &normal,
+                                              float &cost);
+
 bool projectedBarycentricCoords(const Vector &p,
                                 const std::array<Vector, 3> &vertices,
                                 std::array<float, 3> &barycentric_coords,

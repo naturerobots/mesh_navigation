@@ -68,6 +68,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
   mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
   mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
 
+  // call dijkstra with the goal pose as seed / start vertex
   uint32_t outcome = dijkstra(goal_vec, start_vec, path);
 
   path.reverse();
@@ -78,23 +79,29 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::PoseStamped &start,
 
   cost = 0;
   if (!path.empty()) {
-    mesh_map::Vector vec = mesh.getVertexPosition(path.front());
+    mesh_map::Vector &vec = start_vec;
     const auto &vertex_normals = mesh_map->vertexNormals();
     mesh_map::Normal normal = vertex_normals[path.front()];
-    path.pop_front();
+
+    float dir_length;
+    geometry_msgs::PoseStamped pose;
+    pose.header = header;
 
     while(!path.empty()) {
-      lvr2::VertexHandle vH = path.front();
+      // get next position
+      const lvr2::VertexHandle &vH = path.front();
       mesh_map::Vector next = mesh.getVertexPosition(vH);
-      path.pop_front();
 
-      geometry_msgs::PoseStamped pose;
-      pose.header = header;
-      pose.pose = mesh_map::calculatePoseFromPosition(vec, next, normal);
+      pose.pose = mesh_map::calculatePoseFromPosition(vec, next, normal, dir_length);
+      cost += dir_length;
       vec = next;
       normal = vertex_normals[vH];
       plan.push_back(pose);
+      path.pop_front();
     }
+    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, normal, dir_length);
+    cost += dir_length;
+    plan.push_back(pose);
   }
 
   nav_msgs::Path path_msg;
@@ -142,7 +149,7 @@ bool DijkstraMeshPlanner::initialize(
       boost::bind(&DijkstraMeshPlanner::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
 
-  return false;
+  return true;
 }
 
 lvr2::DenseVertexMap<mesh_map::Vector> DijkstraMeshPlanner::getVectorMap() {
@@ -260,7 +267,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(
 
     if(current_vh == goal_vertex)
     {
-      ROS_INFO_STREAM("Dijkstra reached the goal.");
+      ROS_INFO_STREAM("The Dijkstra Mesh Planner reached the goal.");
       goal_dist = distances[current_vh] + goal_dist_offset;
     }
 
@@ -307,18 +314,16 @@ uint32_t DijkstraMeshPlanner::dijkstra(
     return mbf_msgs::GetPathResult::CANCELED;
   }
 
-  ROS_INFO_STREAM("Finished Dijkstra.");
+  ROS_INFO_STREAM("The Dijkstra Mesh Planner finished the propagation.");
 
-  bool path_exists = goal_vertex != predecessors[goal_vertex];
-
-  if (!path_exists) {
+  if (goal_vertex == predecessors[goal_vertex]) {
     ROS_WARN("Predecessor of the goal is not set! No path found!");
     return mbf_msgs::GetPathResult::NO_PATH_FOUND;
   }
 
   auto vH = goal_vertex;
 
-  while(vH != start_vertex && !cancel_planning)
+  while (vH != start_vertex && !cancel_planning)
   {
     vH = predecessors[vH];
     path.push_front(vH);
