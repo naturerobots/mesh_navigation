@@ -549,7 +549,6 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(
   distances.clear();
   predecessors.clear();
 
-  // TODO in face planning for a single face
   if (goal_face == start_face) {
     return mbf_msgs::GetPathResult::SUCCESS;
   }

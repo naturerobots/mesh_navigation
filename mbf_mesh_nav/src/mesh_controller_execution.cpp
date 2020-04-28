@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019, Sebastian Pütz
+ *  Copyright 2020, Sebastian Pütz
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
