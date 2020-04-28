@@ -140,10 +140,7 @@ bool MeshNavigationServer::initializePlannerPlugin(
     ROS_FATAL_STREAM("The mesh pointer has not been initialized!");
     return false;
   }
-
-  mesh_planner_ptr->initialize(name, mesh_ptr_);
-  ROS_DEBUG("Planner plugin initialized.");
-  return true;
+  return mesh_planner_ptr->initialize(name, mesh_ptr_);
 }
 
 mbf_abstract_core::AbstractController::Ptr
