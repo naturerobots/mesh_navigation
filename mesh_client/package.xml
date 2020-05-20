@@ -13,6 +13,7 @@
   <depend>eigen</depend>
   <depend>libjsoncpp-dev</depend>
   <depend>lvr2</depend>
+  <depend>roscpp</depend>
 
   <buildtool_depend>catkin</buildtool_depend>
 

@@ -4,7 +4,7 @@ project(mesh_client)
 set(CMAKE_CXX_STANDARD 14)
 find_package(CURL REQUIRED)
 
-find_package(catkin REQUIRED)
+find_package(catkin REQUIRED COMPONENTS roscpp)
 find_package(CURL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(LVR2 REQUIRED)
@@ -19,6 +19,7 @@ catkin_package(
 
 include_directories(
   include
+  ${catkin_INCLUDE_DIRS}
   ${LVR_INCLUDE_DIRS}
   ${JSONCPP_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
