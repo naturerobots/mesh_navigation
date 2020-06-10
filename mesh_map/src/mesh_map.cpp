@@ -595,17 +595,24 @@ MeshMap::directionAtPosition(
   const auto &b = vector_map.get(vertices[1]);
   const auto &c = vector_map.get(vertices[2]);
 
-  if (a && b && c) {
-    auto vec = a.get() * barycentric_coords[0]
-      + b.get() * barycentric_coords[1]
-      + c.get() * barycentric_coords[2];
+  if (a || b || c) {
+    lvr2::BaseVector<float> vec; 
+    if (a) {
+      vec += a.get() * barycentric_coords[0];
+    }
+    if (b) {
+      vec += b.get() * barycentric_coords[1];
+    }
+    if (c) {
+      vec += c.get() * barycentric_coords[2];
+    }
     if(std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z))
       return vec;
     else
       ROS_ERROR_THROTTLE(0.3, "vector map contains invalid vectors!");
   }
   else{
-    ROS_ERROR_THROTTLE(0.3, "vector map does not contain the corresponding vectors");
+    ROS_ERROR_THROTTLE(0.3, "vector map does not contain any of the corresponding vectors");
   }
   return boost::none;
 }
@@ -1017,7 +1024,6 @@ bool MeshMap::meshAhead(mesh_map::Vector &pos, lvr2::FaceHandle &face,
   {
     const auto &opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face),
                                               barycentric_coords);
-
     if (opt_dir) {
       Vector dir = opt_dir.get().normalized();
       // iter over all layer vector fields
