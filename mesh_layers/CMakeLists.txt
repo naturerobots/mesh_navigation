@@ -15,6 +15,7 @@ generate_dynamic_reconfigure_options(
   cfg/HeightDiffLayer.cfg
   cfg/InflationLayer.cfg
   cfg/RoughnessLayer.cfg
+  cfg/SteepnessLayer.cfg
 )
 
 catkin_package(
@@ -32,6 +33,7 @@ add_library(${PROJECT_NAME}
   src/roughness_layer.cpp
   src/height_diff_layer.cpp
   src/inflation_layer.cpp
+  src/steepness_layer.cpp
   )
 
 add_dependencies(${PROJECT_NAME}

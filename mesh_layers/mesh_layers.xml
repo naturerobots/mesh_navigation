@@ -21,5 +21,12 @@
                 A inflation mesh layer, computing the inflation of the surface as cost layer.
             </description>
         </class>
+        <class name="mesh_layers/SteepnessLayer"
+               type="mesh_layers::SteepnessLayer"
+               base_class_type="mesh_map::AbstractLayer">
+            <description>
+                Calculated the steepness of the surface as a cost layer.
+            </description>
+        </class>
     </library>
 </class_libraries>
