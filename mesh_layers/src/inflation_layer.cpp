@@ -296,6 +296,11 @@ void InflationLayer::waveCostInflation(
         map_ptr->invalid.insert(current_vh, true);
         continue;
       }
+      catch (lvr2::VertexLoopException exception)
+      {
+        map_ptr->invalid.insert(current_vh, true);
+        continue;
+      }
 
       for(auto nh : neighbours){
         std::vector<lvr2::FaceHandle> faces;
@@ -348,6 +353,10 @@ void InflationLayer::waveCostInflation(
             }
           }
           catch (lvr2::PanicException exception)
+          {
+            map_ptr->invalid.insert(nh, true);
+          }
+          catch (lvr2::VertexLoopException exception)
           {
             map_ptr->invalid.insert(nh, true);
           }
