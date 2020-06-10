@@ -286,6 +286,11 @@ uint32_t DijkstraMeshPlanner::dijkstra(
       invalid.insert(current_vh, true);
       continue;
     }
+    catch (lvr2::VertexLoopException exception)
+    {
+      invalid.insert(current_vh, true);
+      continue;
+    }
     for(auto eH : edges){
       try{
         std::array<lvr2::VertexHandle, 2> vertices = mesh.getVerticesOfEdge(eH);
@@ -304,6 +309,10 @@ uint32_t DijkstraMeshPlanner::dijkstra(
         }
       }
       catch(lvr2::PanicException exception){
+        continue;
+      }
+      catch (lvr2::VertexLoopException exception)
+      {
         continue;
       }
     }

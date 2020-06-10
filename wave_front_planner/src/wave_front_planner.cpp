@@ -706,6 +706,11 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(
       ROS_ERROR_STREAM("Found invalid vertex!");
       continue;
     }
+    catch(lvr2::VertexLoopException exception){
+      invalid.insert(current_vh, true);
+      ROS_ERROR_STREAM("Found invalid vertex!");
+      continue;
+    }
   }
 
   t_end = ros::WallTime::now();
@@ -748,12 +753,18 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(
   while (current_pos.distance2(start) > step_width && !cancel_planning) {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
+    try {
     if (mesh_map->meshAhead(current_pos, current_face, step_width)) {
       path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(
           current_pos, current_face));
     } else {
       ROS_WARN_STREAM(
           "Could not find a valid path, while back-tracking from the goal");
+      return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+    }
+    } catch (lvr2::PanicException exception) {
+      ROS_ERROR_STREAM(
+          "Could not find a valid path, while back-tracking from the goal: HalfEdgeMesh panicked!");
       return mbf_msgs::GetPathResult::NO_PATH_FOUND;
     }
   }
