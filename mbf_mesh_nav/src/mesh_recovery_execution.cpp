@@ -36,21 +36,22 @@
  */
 #include "mbf_mesh_nav/mesh_recovery_execution.h"
 
-namespace mbf_mesh_nav {
+namespace mbf_mesh_nav
+{
+MeshRecoveryExecution::MeshRecoveryExecution(const std::string name,
+                                             const mbf_mesh_core::MeshRecovery::Ptr& recovery_ptr,
+                                             const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr,
+                                             const MoveBaseFlexConfig& config)
+  : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config)), mesh_ptr_(mesh_ptr)
+{
+}
 
-MeshRecoveryExecution::MeshRecoveryExecution(
-    const std::string name,
-    const mbf_mesh_core::MeshRecovery::Ptr &recovery_ptr,
-    const TFPtr &tf_listener_ptr, const MeshPtr &mesh_ptr,
-    const MoveBaseFlexConfig &config)
-    : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr,
-                                toAbstract(config)),
-      mesh_ptr_(mesh_ptr) {}
+MeshRecoveryExecution::~MeshRecoveryExecution()
+{
+}
 
-MeshRecoveryExecution::~MeshRecoveryExecution() {}
-
-mbf_abstract_nav::MoveBaseFlexConfig
-MeshRecoveryExecution::toAbstract(const MoveBaseFlexConfig &config) {
+mbf_abstract_nav::MoveBaseFlexConfig MeshRecoveryExecution::toAbstract(const MoveBaseFlexConfig& config)
+{
   // copy the recovery-related abstract configuration common to all MBF-based
   // navigation
   mbf_abstract_nav::MoveBaseFlexConfig abstract_config;

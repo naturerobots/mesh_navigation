@@ -45,10 +45,10 @@
 #include <string>
 #include <vector>
 
-namespace mbf_mesh_core {
-
-class MeshPlanner : public mbf_abstract_core::AbstractPlanner {
-
+namespace mbf_mesh_core
+{
+class MeshPlanner : public mbf_abstract_core::AbstractPlanner
+{
 public:
   typedef boost::shared_ptr<mbf_mesh_core::MeshPlanner> Ptr;
 
@@ -68,11 +68,9 @@ public:
    * @param message Optional more detailed outcome as a string
    * @return Result code as described on GetPath action result. (see GetPath.action)
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped &start,
-                            const geometry_msgs::PoseStamped &goal,
-                            double tolerance,
-                            std::vector<geometry_msgs::PoseStamped> &plan,
-                            double &cost, std::string &message) = 0;
+  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
+                            std::string& message) = 0;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -81,9 +79,7 @@ public:
    */
   virtual bool cancel() = 0;
 
-  virtual bool
-  initialize(const std::string &name,
-             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr) = 0;
+  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
 
 protected:
   /**

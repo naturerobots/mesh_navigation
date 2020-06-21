@@ -44,10 +44,10 @@
 #include <dijkstra_mesh_planner/DijkstraMeshPlannerConfig.h>
 #include <nav_msgs/Path.h>
 
-namespace dijkstra_mesh_planner {
-
-class DijkstraMeshPlanner : public mbf_mesh_core::MeshPlanner {
-
+namespace dijkstra_mesh_planner
+{
+class DijkstraMeshPlanner : public mbf_mesh_core::MeshPlanner
+{
 public:
   typedef boost::shared_ptr<dijkstra_mesh_planner::DijkstraMeshPlanner> Ptr;
 
@@ -82,11 +82,9 @@ public:
    *         INTERNAL_ERROR  = 60
    *         71..99 are reserved as plugin specific errors
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped &start,
-                            const geometry_msgs::PoseStamped &goal,
-                            double tolerance,
-                            std::vector<geometry_msgs::PoseStamped> &plan,
-                            double &cost, std::string &message);
+  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
+                            std::string& message);
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -95,28 +93,21 @@ public:
    */
   virtual bool cancel();
 
-  virtual bool initialize(const std::string &name,
-      const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr);
+  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
   lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
 
 protected:
-  uint32_t dijkstra(
-      const mesh_map::Vector &start, const mesh_map::Vector &goal,
-      std::list<lvr2::VertexHandle> &path);
+  uint32_t dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal, std::list<lvr2::VertexHandle>& path);
 
-  uint32_t dijkstra(
-      const mesh_map::Vector &start, const mesh_map::Vector &goal,
-      const lvr2::DenseEdgeMap<float> &edge_weights,
-      const lvr2::DenseVertexMap<float> &costs,
-      std::list<lvr2::VertexHandle> &path,
-      lvr2::DenseVertexMap<float> &distances,
-      lvr2::DenseVertexMap<lvr2::VertexHandle> &predecessors);
+  uint32_t dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal,
+                    const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::DenseVertexMap<float>& costs,
+                    std::list<lvr2::VertexHandle>& path, lvr2::DenseVertexMap<float>& distances,
+                    lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
   void computeVectorMap();
 
-  void reconfigureCallback(dijkstra_mesh_planner::DijkstraMeshPlannerConfig &cfg,
-                           uint32_t level);
+  void reconfigureCallback(dijkstra_mesh_planner::DijkstraMeshPlannerConfig& cfg, uint32_t level);
 
 private:
   mesh_map::MeshMap::Ptr mesh_map;
@@ -129,11 +120,9 @@ private:
   std::string map_frame;
   float goal_dist_offset;
   // Server for Reconfiguration
-  boost::shared_ptr<
-      dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>
+  boost::shared_ptr<dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>
       reconfigure_server_ptr;
-  dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>::CallbackType
-      config_callback;
+  dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>::CallbackType config_callback;
   bool first_config;
   DijkstraMeshPlannerConfig config;
 
@@ -148,6 +137,6 @@ private:
   lvr2::DenseVertexMap<float> potential;
 };
 
-} // namespace dijkstra_mesh_planner
+}  // namespace dijkstra_mesh_planner
 
-#endif // MESH_NAVIGATION__DIJKSTRA_MESH_PLANNER_H
+#endif  // MESH_NAVIGATION__DIJKSTRA_MESH_PLANNER_H

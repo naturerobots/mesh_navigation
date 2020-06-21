@@ -45,10 +45,10 @@
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
 
-namespace mesh_controller {
-
-class MeshController : public mbf_mesh_core::MeshController {
-
+namespace mesh_controller
+{
+class MeshController : public mbf_mesh_core::MeshController
+{
 public:
   typedef boost::shared_ptr<mesh_controller::MeshController> Ptr;
 
@@ -86,11 +86,9 @@ public:
    *         INTERNAL_ERROR  = 114
    *         121..149 are reserved as plugin specific errors
    */
-  virtual uint32_t
-  computeVelocityCommands(const geometry_msgs::PoseStamped &pose,
-                          const geometry_msgs::TwistStamped &velocity,
-                          geometry_msgs::TwistStamped &cmd_vel,
-                          std::string &message);
+  virtual uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
+                                           const geometry_msgs::TwistStamped& velocity,
+                                           geometry_msgs::TwistStamped& cmd_vel, std::string& message);
 
   /**
    * @brief Check if the goal pose has been achieved by the local planner
@@ -108,7 +106,7 @@ public:
    * @param plan The plan to pass to the local planner
    * @return True if the plan was updated successfully, false otherwise
    */
-  virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped> &plan);
+  virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -124,22 +122,21 @@ public:
    * @return factor by which to multiply the linear velocity for smooth start
    * and end
    */
-  float fadingFactor(const geometry_msgs::PoseStamped &pose);
+  float fadingFactor(const geometry_msgs::PoseStamped& pose);
 
   /**
    * Transforms a PoseStamped into a direction mesh_map Vector
    * @param pose      any geometry_msgs PoseStamped
    * @return          direction mesh_map Vector
    */
-  mesh_map::Vector
-  poseToDirectionVector(const geometry_msgs::PoseStamped &pose);
+  mesh_map::Vector poseToDirectionVector(const geometry_msgs::PoseStamped& pose);
 
   /**
    * Transforms a PoseStamped into a position vector
    * @param pose      any geometry_msgs PoseStamped
    * @return          position mesh_map Vector
    */
-  mesh_map::Vector poseToPositionVector(const geometry_msgs::PoseStamped &pose);
+  mesh_map::Vector poseToPositionVector(const geometry_msgs::PoseStamped& pose);
 
   /**
    * Calculates the (smaller) angle between two vectors
@@ -179,15 +176,14 @@ public:
    * @param supposed      supposed heading of the robot
    * @return              -1 for left turn, 1 else
    */
-  float direction(mesh_map::Vector &robot_heading,
-                  mesh_map::Vector &planned_heading);
+  float direction(mesh_map::Vector& robot_heading, mesh_map::Vector& planned_heading);
 
   /**
    * Checks if the robot has driven too far of the plan
    * @param robot_pose    current pose of the robot
    * @return              true, if the robot is too far off, false otherwise
    */
-  bool offPlan(const geometry_msgs::PoseStamped &robot_pose);
+  bool offPlan(const geometry_msgs::PoseStamped& robot_pose);
 
   /**
    * returns the euclidean distance between two poses
@@ -195,10 +191,9 @@ public:
    * @param plan_position     second pose
    * @return                  distance as float
    */
-  float euclideanDistance(const geometry_msgs::PoseStamped &pose);
+  float euclideanDistance(const geometry_msgs::PoseStamped& pose);
 
-  float euclideanDistance(lvr2::BaseVector<float> &current,
-                          lvr2::BaseVector<float> &planned);
+  float euclideanDistance(lvr2::BaseVector<float>& current, lvr2::BaseVector<float>& planned);
 
   /**
    * Calculates the Euclidean Distance between the current robot pose and the
@@ -206,8 +201,7 @@ public:
    * @param pose      current position of the robot
    * @param velocity  current velocity of the robot
    */
-  uint32_t updatePlanPos(const geometry_msgs::PoseStamped &pose,
-                         float velocity);
+  uint32_t updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity);
 
   /**
    * FOR PLANNED PATH NAVIGATION
@@ -219,8 +213,7 @@ public:
    * and linear} velocity between 0 and 1 returns infinity for linear and
    * angular value for the first call as no velocity is available
    */
-  std::vector<float> lookAhead(const geometry_msgs::PoseStamped &pose,
-                               float velocity);
+  std::vector<float> lookAhead(const geometry_msgs::PoseStamped& pose, float velocity);
 
   /**
    * Combines angle difference, look ahead etc. to determine angular and linear
@@ -232,17 +225,13 @@ public:
    * @return              vector with new angular velocity and new linear
    * velocity
    */
-  std::vector<float> naiveControl(const geometry_msgs::PoseStamped &pose,
-                                  mesh_map::Vector supposed_dir,
-                                  const float &cost);
+  std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
+                                  const float& cost);
 
-  void reconfigureCallback(mesh_controller::MeshControllerConfig &cfg,
-                           uint32_t level);
+  void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
-  virtual bool
-  initialize(const std::string &plugin_name,
-             const boost::shared_ptr<tf2_ros::Buffer> &tf_ptr,
-             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr);
+  virtual bool initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
 protected:
 private:
@@ -286,11 +275,8 @@ private:
   // Server for Reconfiguration
   std::string name;
   ros::NodeHandle private_nh;
-  boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>>
-      reconfigure_server_ptr;
-  dynamic_reconfigure::Server<
-      mesh_controller::MeshControllerConfig>::CallbackType config_callback;
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>> reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>::CallbackType config_callback;
   bool first_config;
   MeshControllerConfig config;
 

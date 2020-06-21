@@ -44,10 +44,10 @@
 #include <wave_front_planner/WaveFrontPlannerConfig.h>
 #include <nav_msgs/Path.h>
 
-namespace wave_front_planner {
-
-class WaveFrontPlanner : public mbf_mesh_core::MeshPlanner {
-
+namespace wave_front_planner
+{
+class WaveFrontPlanner : public mbf_mesh_core::MeshPlanner
+{
 public:
   typedef boost::shared_ptr<wave_front_planner::WaveFrontPlanner> Ptr;
 
@@ -82,11 +82,9 @@ public:
    *         INTERNAL_ERROR  = 60
    *         71..99 are reserved as plugin specific errors
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped &start,
-                            const geometry_msgs::PoseStamped &goal,
-                            double tolerance,
-                            std::vector<geometry_msgs::PoseStamped> &plan,
-                            double &cost, std::string &message);
+  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
+                            std::string& message);
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -95,40 +93,30 @@ public:
    */
   virtual bool cancel();
 
-  virtual bool
-  initialize(const std::string &name,
-             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr);
+  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
   lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
 
 protected:
-  uint32_t waveFrontPropagation(
-      const mesh_map::Vector &start, const mesh_map::Vector &goal,
-      std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path);
+  uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
+                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path);
 
-  uint32_t waveFrontPropagation(
-      const mesh_map::Vector &start, const mesh_map::Vector &goal,
-      const lvr2::DenseEdgeMap<float> &edge_weights,
-      const lvr2::DenseVertexMap<float> &costs,
-      std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> &path,
-      lvr2::DenseVertexMap<float> &distances,
-      lvr2::DenseVertexMap<lvr2::VertexHandle> &predecessors);
+  uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
+                                const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::DenseVertexMap<float>& costs,
+                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+                                lvr2::DenseVertexMap<float>& distances,
+                                lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
-  inline bool waveFrontUpdateWithS(
-      lvr2::DenseVertexMap<float> &distances,
-      const lvr2::DenseEdgeMap<float> &edge_weights, const lvr2::VertexHandle &v1,
-      const lvr2::VertexHandle &v2, const lvr2::VertexHandle &v3);
+  inline bool waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& distances,
+                                   const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::VertexHandle& v1,
+                                   const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
 
-  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float> &distances,
-                              const lvr2::DenseEdgeMap<float> &edge_weights,
-                              const lvr2::VertexHandle &v1,
-                              const lvr2::VertexHandle &v2,
-                              const lvr2::VertexHandle &v3);
+  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float>& distances, const lvr2::DenseEdgeMap<float>& edge_weights,
+                              const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
 
   void computeVectorMap();
 
-  void reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig &cfg,
-                           uint32_t level);
+  void reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig& cfg, uint32_t level);
 
 private:
   mesh_map::MeshMap::Ptr mesh_map;
@@ -143,11 +131,8 @@ private:
   float goal_dist_offset;
 
   // Server for Reconfiguration
-  boost::shared_ptr<
-      dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>>
-      reconfigure_server_ptr;
-  dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>::CallbackType
-      config_callback;
+  boost::shared_ptr<dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>> reconfigure_server_ptr;
+  dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>::CallbackType config_callback;
   bool first_config;
   WaveFrontPlannerConfig config;
 
@@ -164,6 +149,6 @@ private:
   lvr2::DenseVertexMap<float> potential;
 };
 
-} // namespace wave_front_planner
+}  // namespace wave_front_planner
 
-#endif // MESH_NAVIGATION__WAVE_FRONT_PLANNER_H
+#endif  // MESH_NAVIGATION__WAVE_FRONT_PLANNER_H

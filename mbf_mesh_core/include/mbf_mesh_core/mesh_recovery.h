@@ -43,14 +43,16 @@
 #include <stdint.h>
 #include <string>
 
-namespace mbf_mesh_core {
+namespace mbf_mesh_core
+{
 /**
  * @class MeshRecovery
  * @brief Provides an interface for recovery behaviors used in navigation.
  * All recovery behaviors written as plugins for the navigation stack must
  * adhere to this interface.
  */
-class MeshRecovery : public mbf_abstract_core::AbstractRecovery {
+class MeshRecovery : public mbf_abstract_core::AbstractRecovery
+{
 public:
   typedef boost::shared_ptr<::mbf_mesh_core::MeshRecovery> Ptr;
 
@@ -60,12 +62,14 @@ public:
    * correspond to the return value
    * @return An outcome which will be hand over to the action result.
    */
-  virtual uint32_t runBehavior(std::string &message) = 0;
+  virtual uint32_t runBehavior(std::string& message) = 0;
 
   /**
    * @brief Virtual destructor for the interface
    */
-  virtual ~MeshRecovery() {}
+  virtual ~MeshRecovery()
+  {
+  }
 
   /**
    * @brief Requests the recovery behavior to cancel, e.g. if it takes too much
@@ -75,10 +79,8 @@ public:
    */
   virtual bool cancel() = 0;
 
-  virtual bool
-  initialize(const std::string &name,
-             const boost::shared_ptr<tf2_ros::Buffer> &tf_ptr,
-             const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr) = 0;
+  virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
 
 protected:
   /**

@@ -52,114 +52,122 @@
 #include <std_msgs/ColorRGBA.h>
 #include <tf2_ros/buffer.h>
 
-namespace mesh_map{
-
-class MeshMap {
+namespace mesh_map
+{
+class MeshMap
+{
 public:
   typedef boost::shared_ptr<MeshMap> Ptr;
 
-  MeshMap(tf2_ros::Buffer &tf);
+  MeshMap(tf2_ros::Buffer& tf);
 
   bool readMap();
 
-  bool readMap(const std::string &uri);
+  bool readMap(const std::string& uri);
 
-  bool readMap(const std::string &mesh_map, const std::string &mesh_part);
+  bool readMap(const std::string& mesh_map, const std::string& mesh_part);
 
   bool loadLayerPlugins();
 
   bool initLayerPlugins();
 
-  lvr2::OptionalVertexHandle getNearestVertexHandle(const mesh_map::Vector &pos);
+  lvr2::OptionalVertexHandle getNearestVertexHandle(const mesh_map::Vector& pos);
 
-  bool inTriangle(const Vector &pos, const lvr2::FaceHandle &face,
-                  const float &dist);
+  bool inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const float& dist);
 
-  lvr2::OptionalFaceHandle getContainingFace(Vector &position,
-                                             const float &max_dist);
+  lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
 
-  bool searchContainingFace(Vector &pos, lvr2::OptionalFaceHandle &face_handle,
-                            std::array<float, 3> &barycentric_coords,
-                            const float &max_dist);
+  bool searchContainingFace(Vector& pos, lvr2::OptionalFaceHandle& face_handle,
+                            std::array<float, 3>& barycentric_coords, const float& max_dist);
 
-  void reconfigureCallback(mesh_map::MeshMapConfig &config, uint32_t level);
+  void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
   void combineVertexCosts();
 
-  void findLethalAreas(const int min_contour_size,
-                       const float height_diff_threshold,
-                       const float roughness_threshold);
+  void findLethalAreas(const int min_contour_size, const float height_diff_threshold, const float roughness_threshold);
 
-  void findContours(std::vector<std::vector<lvr2::VertexHandle>> &contours,
-                    int min_contour_size);
+  void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
 
-  void publishVertexCosts(const lvr2::VertexMap<float> &costs,
-                          const std::string &name);
+  void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name);
 
   void publishVertexColors();
 
   void publishCostLayers();
 
-  bool projectedBarycentricCoords(const Vector &p,
-                                  const lvr2::FaceHandle &triangle,
-                                  std::array<float, 3> &barycentric_coords,
-                                  float &dist);
+  bool projectedBarycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle,
+                                  std::array<float, 3>& barycentric_coords, float& dist);
 
-  bool barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle,
-                         float &u, float &v, float &w);
+  bool barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w);
 
-  void layerChanged(const std::string &layer_name);
+  void layerChanged(const std::string& layer_name);
 
-  void findLethalByContours(const int &min_contour_size,
-                            std::set<lvr2::VertexHandle> &lethals);
+  void findLethalByContours(const int& min_contour_size, std::set<lvr2::VertexHandle>& lethals);
 
   const std::string getGlobalFrameID();
 
-  inline bool isLethal(const lvr2::VertexHandle &vH);
+  inline bool isLethal(const lvr2::VertexHandle& vH);
 
-  inline const geometry_msgs::Point toPoint(const Vector &vec);
+  inline const geometry_msgs::Point toPoint(const Vector& vec);
 
-  boost::optional<Vector>
-  directionAtPosition(
-      const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
-      const std::array<lvr2::VertexHandle, 3> &vertices,
-      const std::array<float, 3> &barycentric_coords);
+  boost::optional<Vector> directionAtPosition(const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+                                              const std::array<lvr2::VertexHandle, 3>& vertices,
+                                              const std::array<float, 3>& barycentric_coords);
 
-  float costAtPosition(
-      const lvr2::DenseVertexMap<float>& costs,
-      const std::array<lvr2::VertexHandle, 3> &vertices,
-      const std::array<float, 3> &barycentric_coords);
+  float costAtPosition(const lvr2::DenseVertexMap<float>& costs, const std::array<lvr2::VertexHandle, 3>& vertices,
+                       const std::array<float, 3>& barycentric_coords);
 
-  float costAtPosition(
-      const std::array<lvr2::VertexHandle, 3> &vertices,
-      const std::array<float, 3> &barycentric_coords);
+  float costAtPosition(const std::array<lvr2::VertexHandle, 3>& vertices,
+                       const std::array<float, 3>& barycentric_coords);
 
-  bool rayTriangleIntersect(const Vector &orig, const Vector &dir,
-                            const Vector &v0, const Vector &v1,
-                            const Vector &v2, float &t, float &u, float &v,
-                            Vector &p);
+  bool rayTriangleIntersect(const Vector& orig, const Vector& dir, const Vector& v0, const Vector& v1, const Vector& v2,
+                            float& t, float& u, float& v, Vector& p);
 
   bool resetLayers();
 
-  const lvr2::DenseVertexMap<mesh_map::Vector> &getVectorMap() {
+  const lvr2::DenseVertexMap<mesh_map::Vector>& getVectorMap()
+  {
     return vector_map;
   };
 
-  const lvr2::HalfEdgeMesh<Vector> &mesh() { return *mesh_ptr; }
+  const lvr2::HalfEdgeMesh<Vector>& mesh()
+  {
+    return *mesh_ptr;
+  }
 
-  const lvr2::DenseVertexMap<float> &vertexCosts() { return vertex_costs; }
+  const lvr2::DenseVertexMap<float>& vertexCosts()
+  {
+    return vertex_costs;
+  }
 
-  const lvr2::DenseVertexMap<float> &getPotential() { return potential; }
+  const lvr2::DenseVertexMap<float>& getPotential()
+  {
+    return potential;
+  }
 
-  const std::string &mapFrame() { return global_frame; }
+  const std::string& mapFrame()
+  {
+    return global_frame;
+  }
 
-  const lvr2::DenseFaceMap<Normal> &faceNormals() { return face_normals; }
+  const lvr2::DenseFaceMap<Normal>& faceNormals()
+  {
+    return face_normals;
+  }
 
-  const lvr2::DenseVertexMap<Normal> &vertexNormals() { return vertex_normals; }
+  const lvr2::DenseVertexMap<Normal>& vertexNormals()
+  {
+    return vertex_normals;
+  }
 
-  const lvr2::DenseEdgeMap<float> &edgeWeights() { return edge_weights; }
+  const lvr2::DenseEdgeMap<float>& edgeWeights()
+  {
+    return edge_weights;
+  }
 
-  const lvr2::DenseEdgeMap<float> &edgeDistances() { return edge_distances; }
+  const lvr2::DenseEdgeMap<float>& edgeDistances()
+  {
+    return edge_distances;
+  }
 
   /**
    * Searches in the sourrounding triangles for the triangle in which the given
@@ -170,9 +178,8 @@ public:
    * @return          Face handle of the position - empty optional face handle
    * if position could not be found
    */
-  bool searchNeighbourFaces(Vector &pos, lvr2::FaceHandle &face,
-                            std::array<float, 3> &barycentric_coords,
-                            const float &max_radius, const float &max_dist);
+  bool searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::array<float, 3>& barycentric_coords,
+                            const float& max_radius, const float& max_dist);
 
   /**
    * Finds the next position given a position vector and its corresponding face
@@ -182,43 +189,36 @@ public:
    * @return      new vector (also updates the ahead_face handle to correspond
    * to the new vector)
    */
-  bool meshAhead(Vector &vec, lvr2::FaceHandle &face, const float &step_width);
+  bool meshAhead(Vector& vec, lvr2::FaceHandle& face, const float& step_width);
 
-  void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector> &vector_map);
+  void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
 
-  void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA &color,
-                         const std::string &name);
+  void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name);
 
-  void publishDebugVector(
-      const lvr2::VertexHandle &a, const lvr2::VertexHandle &b, const lvr2::FaceHandle &fh,
-      const double angle, const std_msgs::ColorRGBA &color, const std::string &name);
+  void publishDebugVector(const lvr2::VertexHandle& a, const lvr2::VertexHandle& b, const lvr2::FaceHandle& fh,
+                          const double angle, const std_msgs::ColorRGBA& color, const std::string& name);
 
-    void publishDebugFace(const lvr2::FaceHandle &face_handle,
-                        const std_msgs::ColorRGBA &color,
-                        const std::string &name);
+  void publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::ColorRGBA& color, const std::string& name);
 
-  void publishVectorField(
-      const std::string& name,
-      const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
-      const bool publish_face_vectors = false);
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+                          const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+                          const bool publish_face_vectors = false);
 
-  void publishVectorField(
-      const std::string& name,
-      const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-      const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
-      const lvr2::DenseVertexMap<float>& values,
-      const std::function<float (float)>& cost_function = {},
-      const bool publish_face_vectors = false);
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+                          const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
+                          const lvr2::DenseVertexMap<float>& values,
+                          const std::function<float(float)>& cost_function = {},
+                          const bool publish_face_vectors = false);
 
   void publishCombinedVectorField();
 
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
-  
+
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 
   lvr2::DenseVertexMap<bool> invalid;
+
 private:
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -273,17 +273,15 @@ private:
   ros::Publisher vector_field_pub;
 
   // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>
-      reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType
-      config_callback;
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>> reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
   bool first_config;
   bool map_loaded;
   MeshMapConfig config;
 
   ros::NodeHandle private_nh;
 
-  tf2_ros::Buffer &tf_buffer;
+  tf2_ros::Buffer& tf_buffer;
 
   std::string uuid_str;
 
@@ -292,4 +290,4 @@ private:
 
 } /* namespace mesh_map */
 
-#endif // MESH_NAVIGATION__MESH_MAP_H
+#endif  // MESH_NAVIGATION__MESH_MAP_H

@@ -51,14 +51,14 @@
 
 #include <pluginlib/class_loader.h>
 
-namespace mbf_mesh_nav {
+namespace mbf_mesh_nav
+{
 /**
  * @defgroup move_base_server Move Base Server
  * @brief Classes belonging to the Move Base Server level.
  */
 
-typedef boost::shared_ptr<
-    dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>
+typedef boost::shared_ptr<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>
     DynamicReconfigureServerMeshNav;
 
 /**
@@ -70,7 +70,8 @@ typedef boost::shared_ptr<
  *
  * @ingroup navigation_server move_base_server
  */
-class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer {
+class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
+{
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
@@ -80,7 +81,7 @@ public:
    * @brief Constructor
    * @param tf_listener_ptr Shared pointer to a common TransformListener
    */
-  MeshNavigationServer(const TFPtr &tf_listener_ptr);
+  MeshNavigationServer(const TFPtr& tf_listener_ptr);
 
   /**
    * @brief Destructor
@@ -92,27 +93,22 @@ public:
 private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
-  newPlannerExecution(const std::string name,
-                      const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
+  newPlannerExecution(const std::string name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref controller_execution "ControllerExecution"
   virtual mbf_abstract_nav::AbstractControllerExecution::Ptr
-  newControllerExecution(
-      const std::string name,
-      const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
+  newControllerExecution(const std::string name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref recovery_execution "RecoveryExecution"
-  virtual mbf_abstract_nav::AbstractRecoveryExecution::Ptr newRecoveryExecution(
-      const std::string name,
-      const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
+  virtual mbf_abstract_nav::AbstractRecoveryExecution::Ptr
+  newRecoveryExecution(const std::string name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
 
   /**
    * @brief Loads the plugin associated with the given planner_type parameter.
    * @param planner_type The type of the planner plugin to load.
    * @return true, if the local planner plugin was successfully loaded.
    */
-  virtual mbf_abstract_core::AbstractPlanner::Ptr
-  loadPlannerPlugin(const std::string &planner_type);
+  virtual mbf_abstract_core::AbstractPlanner::Ptr loadPlannerPlugin(const std::string& planner_type);
 
   /**
    * @brief Initializes the controller plugin with its name and pointer to the
@@ -122,9 +118,8 @@ private:
    * name param
    * @return true if init succeeded, false otherwise
    */
-  virtual bool initializePlannerPlugin(
-      const std::string &name,
-      const mbf_abstract_core::AbstractPlanner::Ptr &planner_ptr);
+  virtual bool initializePlannerPlugin(const std::string& name,
+                                       const mbf_abstract_core::AbstractPlanner::Ptr& planner_ptr);
 
   /**
    * @brief Loads the plugin associated with the given controller type parameter
@@ -132,8 +127,7 @@ private:
    * @return A shared pointer to a new loaded controller, if the controller
    * plugin was loaded successfully, an empty pointer otherwise.
    */
-  virtual mbf_abstract_core::AbstractController::Ptr
-  loadControllerPlugin(const std::string &controller_type);
+  virtual mbf_abstract_core::AbstractController::Ptr loadControllerPlugin(const std::string& controller_type);
 
   /**
    * @brief Initializes the controller plugin with its name, a pointer to the
@@ -143,9 +137,8 @@ private:
    * the name param
    * @return true if init succeeded, false otherwise
    */
-  virtual bool initializeControllerPlugin(
-      const std::string &name,
-      const mbf_abstract_core::AbstractController::Ptr &controller_ptr);
+  virtual bool initializeControllerPlugin(const std::string& name,
+                                          const mbf_abstract_core::AbstractController::Ptr& controller_ptr);
 
   /**
    * @brief Loads a Recovery plugin associated with given recovery type
@@ -154,8 +147,7 @@ private:
    * @return A shared pointer to a Recovery plugin, if the plugin was loaded
    * successfully, an empty pointer otherwise.
    */
-  virtual mbf_abstract_core::AbstractRecovery::Ptr
-  loadRecoveryPlugin(const std::string &recovery_type);
+  virtual mbf_abstract_core::AbstractRecovery::Ptr loadRecoveryPlugin(const std::string& recovery_type);
 
   /**
    * @brief Initializes a recovery behavior plugin with its name and pointers to
@@ -165,9 +157,8 @@ private:
    * corresponds to the name param
    * @return true if init succeeded, false otherwise
    */
-  virtual bool initializeRecoveryPlugin(
-      const std::string &name,
-      const mbf_abstract_core::AbstractRecovery::Ptr &behavior_ptr);
+  virtual bool initializeRecoveryPlugin(const std::string& name,
+                                        const mbf_abstract_core::AbstractRecovery::Ptr& behavior_ptr);
 
   /**
    * @brief Callback method for the check_pose_cost service
@@ -177,8 +168,7 @@ private:
    * definition file.
    * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceCheckPoseCost(mbf_msgs::CheckPose::Request &request,
-                                mbf_msgs::CheckPose::Response &response);
+  bool callServiceCheckPoseCost(mbf_msgs::CheckPose::Request& request, mbf_msgs::CheckPose::Response& response);
 
   /**
    * @brief Callback method for the check_path_cost service
@@ -188,8 +178,7 @@ private:
    * definition file.
    * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceCheckPathCost(mbf_msgs::CheckPath::Request &request,
-                                mbf_msgs::CheckPath::Response &response);
+  bool callServiceCheckPathCost(mbf_msgs::CheckPath::Request& request, mbf_msgs::CheckPath::Response& response);
 
   /**
    * @brief Callback method for the make_plan service
@@ -197,8 +186,7 @@ private:
    * @param response Empty response object.
    * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceClearMesh(std_srvs::Empty::Request &request,
-                            std_srvs::Empty::Response &response);
+  bool callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
   /**
    * @brief Reconfiguration method called by dynamic reconfigure.
@@ -206,11 +194,10 @@ private:
    * definition.
    * @param level bit mask, which parameters are set.
    */
-  void reconfigure(mbf_mesh_nav::MoveBaseFlexConfig &config, uint32_t level);
+  void reconfigure(mbf_mesh_nav::MoveBaseFlexConfig& config, uint32_t level);
 
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
-  pluginlib::ClassLoader<mbf_mesh_core::MeshController>
-      controller_plugin_loader_;
+  pluginlib::ClassLoader<mbf_mesh_core::MeshController> controller_plugin_loader_;
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
 
   //! Dynamic reconfigure server for the mbf_mesh2d_specific part
