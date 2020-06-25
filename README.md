@@ -11,14 +11,15 @@ If you want to install the mesh navigation stack from source please follow the i
 [pluto_robot](https://github.com/uos/pluto_robot) repository, since we use the robot Pluto as exemplary
 robot to perform mesh navigation in simulation but also in the real world.
 
-Otherwise use `sudo apt install ros-medlod-mesh-navigation`
+Otherwise use `sudo apt install ros-melodic-mesh-navigation`
 
 ## Pluto in Simulation
 You can use Pluto in an outdoor simulation environment. We provides several datasets and the corresponding environments
 for the Gazebo simulation. For navigation purposes the corresponding navigation launch file should be started, too. 
 The following simulation environments are currently available:
 - Botanical Garden at Osnabrück University: `roslaunch pluto_gazebo pluto_botanical_garden.launch`
-- Stone Pit in the Forest in Brockum: `roslaunch pluto_gazebo pluto_stone_pit.launch`
+- Stone Quarry in the Forest in Brockum: `roslaunch pluto_gazebo pluto_stone_quarry.launch`
+- Physics building at Osnabrück University: `roslaunch pluto_gazebo pluto_physics.launch`
 
 ## Mesh Navigation Stack
 This [mesh_navigation](https://github.com/uos/mesh_navigation) stack provides a navigation server for 
@@ -46,6 +47,7 @@ The mesh layers can be configured for the robots abilities and needs. Currently 
   - HeightDiffLayer - `mesh_layers/height_diff_layer.h`
   - RoughnessLayer - `mesh_layers/roughness_layer.h`
   - InflationLayer - `mesh_layers/inflation_layer.h`
+  - SteepnessLayer - `mesh_layers/steepness_layer.h`
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm.
 It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed 
 vertex to the goal pose can be computed. This leads in a sub-optimal potential field, which highly depends on the mesh 
@@ -99,8 +101,16 @@ roslaunch pluto_navigation pluto_botanical_garden.launch
 - Stone Pit in the Forest in Brockum: 
 ```
 roscore
-roslaunch pluto_gazebo pluto_stone_pit.launch
-roslaunch pluto_navigation pluto_stone_pit.launch
+roslaunch pluto_gazebo pluto_stone_quarry.launch
+roslaunch pluto_navigation pluto_stone_quarry.launch
+```
+
+- Physics Building at Osnabrück University: 
+```
+roscore
+roslaunch pluto_gazebo pluto_physics.launch
+roslaunch pluto_navigation pluto_physics.launch
+roslaunch pluto_navigation navigation_goals.launch goal:=physics1
 ```
 
 ### Path Planning and Motion Control
