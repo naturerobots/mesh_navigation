@@ -194,15 +194,16 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
   {
     const auto& v1 = mesh_ptr->getVertexPosition(v1h);
     const auto& v2 = mesh_ptr->getVertexPosition(v2h);
+    const auto& v3 = mesh_ptr->getVertexPosition(v3h);
+    const auto& dir = ((v3 - v2) + (v3 - v1)).normalized();
     const auto& face_normals = map_ptr->faceNormals();
-    const auto& dir = (v2 - v1).normalized().rotated(normal, M_PI_2);
     cutting_faces.insert(v1h, fh);
     cutting_faces.insert(v2h, fh);
     cutting_faces.insert(v3h, fh);
     vector_map[v1h] = (vector_map[v1h] + dir).normalized();
     vector_map[v2h] = (vector_map[v2h] + dir).normalized();
-    vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
-    // vector_map[v3h] = (vector_map[v3h] + dir).normalized();
+    //vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
+    vector_map[v3h] = (vector_map[v3h] + dir).normalized();
   }
 
   if (u3tmp < u3)

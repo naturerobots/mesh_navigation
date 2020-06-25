@@ -1013,14 +1013,20 @@ bool MeshMap::searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::arr
       {
         if (center.distance2(mesh_ptr->getVertexPosition(vertex)) < max_radius_sq)
         {
-          const auto& nn_faces = mesh_ptr->getFacesOfVertex(vertex);
-          for (auto nn_face : nn_faces)
+          try
           {
-            if (!in_list_map.containsKey(nn_face))
+            const auto& nn_faces = mesh_ptr->getFacesOfVertex(vertex);
+            for (auto nn_face : nn_faces)
             {
-              possible_faces.push_back(nn_face);
-              in_list_map.insert(nn_face, true);
+              if (!in_list_map.containsKey(nn_face))
+              {
+                possible_faces.push_back(nn_face);
+                in_list_map.insert(nn_face, true);
+              }
             }
+          }
+          catch (lvr2::PanicException exception)
+          {
           }
         }
       }
