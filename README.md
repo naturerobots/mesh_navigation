@@ -93,7 +93,7 @@ rviz -d rviz/mesh_navigation.rviz
 
 - Botanical Garden at Osnabrück University: 
 ```
-rosocre
+roscore
 roslaunch pluto_gazebo pluto_botanical_garden.launch
 roslaunch pluto_navigation pluto_botanical_garden.launch
 ```
