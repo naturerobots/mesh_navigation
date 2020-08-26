@@ -35,10 +35,10 @@
  *
  */
 
-#include <lvr2/geometry/BaseVector.hpp>
 using namespace std;
 #include "mesh_layers/ridge_layer.h"
 
+#include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/io/Timestamp.hpp>
 
@@ -157,22 +157,29 @@ bool RidgeLayer::computeLayer()
     auto vH = lvr2::VertexHandle(i);
     if (!mesh_ptr->containsVertex(vH))
     {
+      ridge.insert(vH, config.threshold + 0.1);
       continue;
     }
 
     std::set<lvr2::VertexHandle> invalid;
-    double radius = 0.3;
 
     float value = 0.0;
     int num_neighbours = 0;
     lvr2::BaseVector<float> reference = mesh_ptr->getVertexPosition(vH) + vertex_normals[vH];
-    visitLocalVertexNeighborhood(*mesh_ptr.get(), invalid, vH, radius, [&](auto vertex) {
-            lvr2::BaseVector<float> current_point = mesh_ptr->getVertexPosition(vertex) + vertex_normals[vertex];
-            value += sqrt((current_point.x - reference.x) * (current_point.x - reference.x)
-                + (current_point.y - reference.y) * (current_point.y - reference.y)
-                + (current_point.z - reference.z) * (current_point.z - reference.z));
-            num_neighbours++;
+    visitLocalVertexNeighborhood(*mesh_ptr.get(), invalid, vH, config.radius, [&](auto vertex) {
+      lvr2::BaseVector<float> current_point = mesh_ptr->getVertexPosition(vertex) + vertex_normals[vertex];
+      value += sqrt((current_point.x - reference.x) * (current_point.x - reference.x) +
+                    (current_point.y - reference.y) * (current_point.y - reference.y) +
+                    (current_point.z - reference.z) * (current_point.z - reference.z));
+      num_neighbours++;
     });
+
+    if (num_neighbours == 0)
+    {
+      ridge.insert(vH, config.threshold + 0.1);
+      continue;
+    }
+
     ridge.insert(vH, value / num_neighbours);
   }
 
@@ -199,6 +206,12 @@ void RidgeLayer::reconfigureCallback(mesh_layers::RidgeLayerConfig& cfg, uint32_
   if (config.threshold != cfg.threshold)
   {
     computeLethals();
+    notify = true;
+  }
+
+  if (config.radius != cfg.radius)
+  {
+    computeLayer();
     notify = true;
   }
 
