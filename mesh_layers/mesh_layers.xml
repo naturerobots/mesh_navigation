@@ -25,7 +25,14 @@
                type="mesh_layers::SteepnessLayer"
                base_class_type="mesh_map::AbstractLayer">
             <description>
-                Calculated the steepness of the surface as a cost layer.
+                Calculates the steepness of the surface as a cost layer.
+            </description>
+        </class>
+        <class name="mesh_layers/RidgeLayer"
+               type="mesh_layers::RidgeLayer"
+               base_class_type="mesh_map::AbstractLayer">
+            <description>
+                Calculates an indicator whether or not a vertex is part of a ridge.
             </description>
         </class>
     </library>
