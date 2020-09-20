@@ -48,7 +48,7 @@ using namespace std;
 
 #include <wave_front_planner/wave_front_planner.h>
 //#define DEBUG
-#define USE_UPDATE_WITH_S
+//#define USE_UPDATE_WITH_S
 
 PLUGINLIB_EXPORT_CLASS(wave_front_planner::WaveFrontPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -355,18 +355,14 @@ inline bool WaveFrontPlanner::waveFrontUpdate(
   const double u1_sq = u1 * u1;
   const double u2_sq = u2 * u2;
 
-  const double A = sqrt(std::max<double>(
-      (-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
-  const double B = sqrt(std::max<double>(
-      (-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
   const double sx = (c_sq + u1_sq - u2_sq) / (2 * c);
-  // const float sy = -A / (2 * c);
-  const double p = (-a_sq + b_sq + c_sq) / (2 * c);
-  // const float hc = B / (2 * c);
-  // const float dy = hc-sy;
-  const double dy = (A + B) / (2 * c);
-  const double dx = (u2_sq - u1_sq + b_sq - a_sq) / (2 * c);
-  //const float dx = p - sx;
+  const double sy = -sqrt(u1_sq - sx*sx);
+
+  const double p = (b_sq + c_sq -a_sq) / (2 * c);
+  const double hc = sqrt(b_sq - p*p);
+
+  const double dy = hc - sy;
+  const double dx = p - sx;
 
   const double u3tmp_sq = dx * dx + dy * dy;
   double u3tmp = sqrt(u3tmp_sq);
