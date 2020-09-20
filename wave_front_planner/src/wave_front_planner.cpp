@@ -364,10 +364,10 @@ inline bool WaveFrontPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& dista
   const double u2_sq = u2 * u2;
 
   const double sx = (c_sq + u1_sq - u2_sq) / (2 * c);
-  const double sy = -sqrt(u1_sq - sx*sx);
+  const double sy = -sqrt(std::max(u1_sq - sx*sx, 0.0));
 
   const double p = (b_sq + c_sq -a_sq) / (2 * c);
-  const double hc = sqrt(b_sq - p*p);
+  const double hc = sqrt(std::max(b_sq - p*p, 0.0));
 
   const double dy = hc - sy;
   const double dx = p - sx;
