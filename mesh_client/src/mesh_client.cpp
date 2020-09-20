@@ -37,12 +37,16 @@
 #include "mesh_client/mesh_client.h"
 
 #include <curl/curl.h>
+#include <ros/ros.h>
 
 namespace mesh_client
 {
 MeshClient::MeshClient(const std::string& server_url, const std::string& server_username,
                        const std::string& server_password, const std::string& mesh_layer)
-  : server_url_(server_url), server_username_(server_username), server_password_(server_password), mesh_layer_(mesh_layer)
+  : server_url_(server_url)
+  , server_username_(server_username)
+  , server_password_(server_password)
+  , mesh_layer_(mesh_layer)
 {
 }
 
@@ -99,16 +103,20 @@ std::string MeshClient::buildJson(const std::string& attribute_name)
   return fast_writer.write(request);
 }
 
-bool parseByteDataString(const std::string& string, char& type, unsigned long& size, unsigned long& width, char*& data)
+bool parseByteDataString(std::string string, char& type, unsigned long& size, unsigned long& width, char*& data)
 {
   if (string.length() < 10)
+  {
     return false;
+  }
+
   // parse body
   const char* body = string.c_str();
-  type = body[0];                                             // one byte
-  size = *reinterpret_cast<const unsigned long*>(body + 1);   // eight bytes
-  width = *reinterpret_cast<const unsigned long*>(body + 9);  // eight bytes
-  data = reinterpret_cast<char*>(const_cast<char*>(body + 17));
+  type = body[0];                                                // one byte for type of message
+  size = *reinterpret_cast<const unsigned long*>(body + 1);      // eight bytes for length of message
+  width = *reinterpret_cast<const unsigned long*>(body + 9);     // eight bytes for amount of values per element
+  data = reinterpret_cast<char*>(const_cast<char*>(body + 17));  // raw data
+
   return true;
 }
 
@@ -127,12 +135,9 @@ lvr2::FloatChannelOptional MeshClient::getVertices()
     unsigned long size, width;
     char* data;
 
-    bool ok = parseByteDataString(*str, type, size, width, data) && type == Type::FLOAT;
+    ROS_DEBUG_STREAM("Received vertices channel");
 
-    std::cout << "ok: " << ok << " type: " << (((int)type) & 0xFF) << " size: " << size << " width: " << width
-              << std::endl;
-
-    if (ok)
+    if (parseByteDataString(*str, type, size, width, data) && type == Type::FLOAT)
     {
       float* float_data = reinterpret_cast<float*>(data);
       auto channel = lvr2::FloatChannel(size, width);
@@ -141,7 +146,7 @@ lvr2::FloatChannelOptional MeshClient::getVertices()
       return channel;
     }
   }
-  std::cout << "failed to load vertices!" << std::endl;
+  ROS_ERROR_STREAM("Failed to load vertices channel!");
   return lvr2::FloatChannelOptional();
 }
 
@@ -160,11 +165,9 @@ lvr2::IndexChannelOptional MeshClient::getIndices()
     unsigned long size, width;
     char* data;
 
-    bool ok = parseByteDataString(*str, type, size, width, data) && type == Type::UINT;
-    std::cout << "ok: " << ok << " type: " << (((int)type) & 0xFF) << " size: " << size << " width: " << width
-              << std::endl;
+    ROS_DEBUG_STREAM("Received indices channel");
 
-    if (ok)
+    if (parseByteDataString(*str, type, size, width, data) && type == Type::UINT)
     {
       unsigned int* index_data = reinterpret_cast<unsigned int*>(data);
       auto channel = lvr2::IndexChannel(size, width);
@@ -173,7 +176,7 @@ lvr2::IndexChannelOptional MeshClient::getIndices()
       return channel;
     }
   }
-  std::cout << "failed to load face_indices!" << std::endl;
+  ROS_ERROR_STREAM("Failed to load indices channel!");
   return lvr2::IndexChannelOptional();
 }
 
@@ -206,6 +209,8 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
     unsigned long size, width;
     char* data;
 
+    ROS_DEBUG_STREAM("Received " << name << " channel");
+
     if (parseByteDataString(*str, type, size, width, data) && type == Type::FLOAT)
     {
       float* float_data = reinterpret_cast<float*>(data);
@@ -214,7 +219,7 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
       return true;
     }
   }
-  std::cout << "failed to load " << name << "!" << std::endl;
+  ROS_ERROR_STREAM("Failed to load " << name << " channel!");
   return false;
 }
 
@@ -234,7 +239,9 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
     unsigned long size, width;
     char* data;
 
-    if (!parseByteDataString(*str, type, size, width, data) && type == Type::UINT)
+    ROS_DEBUG_STREAM("Received " << name << " channel");
+
+    if (parseByteDataString(*str, type, size, width, data) && type == Type::UINT)
     {
       unsigned int* index_data = reinterpret_cast<unsigned int*>(data);
       channel = lvr2::IndexChannel(size, width);
@@ -242,7 +249,7 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
       return true;
     }
   }
-  std::cout << "failed to load " << name << "!" << std::endl;
+  ROS_ERROR_STREAM("Failed to load " << name << " channel!");
   return false;
 }
 
@@ -261,6 +268,10 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
     char type;
     unsigned long size, width;
     char* data;
+
+    ROS_DEBUG_STREAM("Received " << name << " channel");
+
+    if (parseByteDataString(*str, type, size, width, data) && type == Type::UINT)
     {
       unsigned char* uchar_data = reinterpret_cast<unsigned char*>(data);
       channel = lvr2::UCharChannel(size, width);
@@ -268,7 +279,7 @@ bool MeshClient::getChannel(const std::string group, const std::string name, lvr
       return true;
     }
   }
-  std::cout << "failed to load " << name << "!" << std::endl;
+  ROS_ERROR_STREAM("Failed to load " << name << " channel!");
   return false;
 }
 

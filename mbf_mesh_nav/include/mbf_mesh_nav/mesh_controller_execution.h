@@ -43,7 +43,8 @@
 #include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 
-namespace mbf_mesh_nav {
+namespace mbf_mesh_nav
+{
 /**
  * @brief The MeshControllerExecution binds a mesh to the
  * AbstractControllerExecution and uses the mbf_mesh_core/MeshController class
@@ -51,8 +52,8 @@ namespace mbf_mesh_nav {
  *
  * @ingroup controller_execution move_base_server
  */
-class MeshControllerExecution
-    : public mbf_abstract_nav::AbstractControllerExecution {
+class MeshControllerExecution : public mbf_abstract_nav::AbstractControllerExecution
+{
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
@@ -71,12 +72,9 @@ public:
    * @param setup_fn            A setup function called before execution
    * @param cleanup_fn          A cleanup function called after execution
    */
-  MeshControllerExecution(
-      const std::string name,
-      const mbf_mesh_core::MeshController::Ptr &controller_ptr,
-      const ros::Publisher &vel_pub, const ros::Publisher &goal_pub,
-      const TFPtr &tf_listener_ptr, const MeshPtr &mesh_ptr,
-      const MoveBaseFlexConfig &config);
+  MeshControllerExecution(const std::string name, const mbf_mesh_core::MeshController::Ptr& controller_ptr,
+                          const ros::Publisher& vel_pub, const ros::Publisher& goal_pub, const TFPtr& tf_listener_ptr,
+                          const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config);
 
   /**
    * @brief Destructor
@@ -95,18 +93,15 @@ protected:
    * @return                   Result code as described in the ExePath action
    * result and plugin's header.
    */
-  virtual uint32_t
-  computeVelocityCmd(const geometry_msgs::PoseStamped &robot_pose,
-                     const geometry_msgs::TwistStamped &robot_velocity,
-                     geometry_msgs::TwistStamped &vel_cmd,
-                     std::string &message);
+  virtual uint32_t computeVelocityCmd(const geometry_msgs::PoseStamped& robot_pose,
+                                      const geometry_msgs::TwistStamped& robot_velocity,
+                                      geometry_msgs::TwistStamped& vel_cmd, std::string& message);
 
 private:
-  mbf_abstract_nav::MoveBaseFlexConfig
-  toAbstract(const MoveBaseFlexConfig &config);
+  mbf_abstract_nav::MoveBaseFlexConfig toAbstract(const MoveBaseFlexConfig& config);
 
   //! mesh for 3d navigation planning
-  const MeshPtr &mesh_ptr_;
+  const MeshPtr& mesh_ptr_;
 
   //! Whether to lock mesh before calling the controller
   bool lock_mesh_;

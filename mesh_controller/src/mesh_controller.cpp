@@ -47,27 +47,32 @@
 #include <tf/transform_listener.h>
 #include <mbf_utility/exe_path_exception.h>
 
-PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController,
-                       mbf_mesh_core::MeshController);
+PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController, mbf_mesh_core::MeshController);
 
-namespace mesh_controller {
+namespace mesh_controller
+{
+MeshController::MeshController()
+{
+}
 
-MeshController::MeshController() {}
+MeshController::~MeshController()
+{
+}
 
-MeshController::~MeshController() {}
-
-uint32_t MeshController::computeVelocityCommands(
-    const geometry_msgs::PoseStamped &pose,
-    const geometry_msgs::TwistStamped &velocity,
-    geometry_msgs::TwistStamped &cmd_vel, std::string &message) {
-
+uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
+                                                 const geometry_msgs::TwistStamped& velocity,
+                                                 geometry_msgs::TwistStamped& cmd_vel, std::string& message)
+{
   current_pose = pose.pose;
   cancel_requested = false;
 
   // check if a path has been calculated and given
-  if (current_plan.empty()) {
+  if (current_plan.empty())
+  {
     return mbf_msgs::GetPathResult::EMPTY_PATH;
-  } else if (!goalSet) {
+  }
+  else if (!goalSet)
+  {
     goal = current_plan.back();
     goalSet = true;
   }
@@ -81,8 +86,8 @@ uint32_t MeshController::computeVelocityCommands(
 
   if (!current_face)
     ROS_WARN_STREAM("Current face not set.");
-  if (!current_face && !map_ptr->searchContainingFace(
-                           position, current_face, barycentric_coords, 0.3)) {
+  if (!current_face && !map_ptr->searchContainingFace(position, current_face, barycentric_coords, 0.3))
+  {
     return mbf_msgs::ExePathResult::OUT_OF_MAP;
   }
 
@@ -92,40 +97,38 @@ uint32_t MeshController::computeVelocityCommands(
   map_ptr->publishDebugPoint(position, mesh_map::color(1, 1, 1), "robot_pose");
 
   if ((mesh_map::projectedBarycentricCoords(
-           position,
-           map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()),
-           barycentric_coords, dist) &&
-       dist < 0.3)) {
-
-    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1),
-                               "current_pos");
-
-  } else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords,
-                                           max_radius_dist, 0.1)) {
+           position, map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()), barycentric_coords, dist) &&
+       dist < 0.3))
+  {
+    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");
+  }
+  else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, max_radius_dist, 0.1))
+  {
     // update current_face
     current_face = face;
-    map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0),
-                              "search_neighbour_face");
-    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1),
-                               "search_neighbour_pos");
-  } else {
+    map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");
+    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "search_neighbour_pos");
+  }
+  else
+  {
     return mbf_msgs::ExePathResult::OUT_OF_MAP;
   }
 
-  const auto &vertex_positions =
-      map_ptr->mesh_ptr->getVertexPositionsOfFace(face);
-  const auto &vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(face);
+  const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(face);
+  const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(face);
 
   // projected position onto the surface.
   // position = mesh_map::linearCombineBarycentricCoords(vertex_positions,
   // barycentric_coords);
 
   // update to which position of the plan the robot is closest
-  if (!config.useMeshGradient) {
+  if (!config.useMeshGradient)
+  {
     // update to which position of the plan the robot is closest
     updatePlanPos(pose, set_linear_velocity);
     // check if the robot is too far off the plan
-    if (offPlan(pose)) {
+    if (offPlan(pose))
+    {
       // TODO see if NOT_INITIALIZED = 112 can be used
       // TODO check if mesh gradient should be used then
       return mbf_msgs::GetPathResult::FAILURE;
@@ -135,23 +138,27 @@ uint32_t MeshController::computeVelocityCommands(
   // variable that contains the planned / supposed orientation of the robot at
   // the current position
   mesh_map::Vector supposed_heading;
-  if (!config.useMeshGradient) {
+  if (!config.useMeshGradient)
+  {
     // use supposed orientation from calculated path
     supposed_heading = poseToDirectionVector(plan_position);
-  } else {
-    const auto &opt_dir =
-        map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
+  }
+  else
+  {
+    const auto& opt_dir = map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
 
-    if (opt_dir) {
+    if (opt_dir)
+    {
       supposed_heading = opt_dir.get().normalized();
-      if(!std::isfinite(supposed_heading.length())){
-
+      if (!std::isfinite(supposed_heading.length()))
+      {
       }
 
       ROS_DEBUG_STREAM("Supposed heading:" << supposed_heading);
-    } else {
-      map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0),
-                                "no_directions");
+    }
+    else
+    {
+      map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");
       ROS_ERROR_STREAM("Could not access vector field for the given face!");
       return mbf_msgs::ExePathResult::FAILURE;
     }
@@ -167,13 +174,14 @@ uint32_t MeshController::computeVelocityCommands(
     // determine values via naive controller
     values = naiveControl(pose, supposed_heading, cost);
   }
-  catch(mbf_utility::ExePathException e)
+  catch (mbf_utility::ExePathException e)
   {
     ROS_ERROR_STREAM("Mbf Exe Path Exception:" << e.what());
     return e.outcome;
   }
 
-  if (values[1] == std::numeric_limits<float>::max()) {
+  if (values[1] == std::numeric_limits<float>::max())
+  {
     ROS_ERROR_STREAM("Mesh controller calculation failed!");
     return mbf_msgs::GetPathResult::FAILURE;
   }
@@ -183,36 +191,33 @@ uint32_t MeshController::computeVelocityCommands(
   cmd_vel.twist.angular.z = values[0] * config.ang_vel_factor;
   cmd_vel.twist.linear.x = values[1] * config.lin_vel_factor;
 
-  if (cancel_requested) {
+  if (cancel_requested)
+  {
     ROS_WARN_STREAM("Mesh controller will be canceled!");
     return mbf_msgs::ExePathResult::CANCELED;
   }
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
-bool MeshController::isGoalReached(double dist_tolerance,
-                                   double angle_tolerance) {
+bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
+{
   // TODO compute the remaining distance on path or vector field
   tf::Pose robot_pose, goal_pose;
   tf::poseMsgToTF(goal.pose, goal_pose);
   tf::poseMsgToTF(current_pose, robot_pose);
   goal_distance = robot_pose.getOrigin().distance(goal_pose.getOrigin());
 
-  return goal_distance <= static_cast<float>(dist_tolerance) &&
-         angle <= static_cast<float>(angle_tolerance);
+  return goal_distance <= static_cast<float>(dist_tolerance) && angle <= static_cast<float>(angle_tolerance);
 }
 
-bool MeshController::setPlan(
-    const std::vector<geometry_msgs::PoseStamped> &plan)
+bool MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
 
 {
   // checks if the given vector contains the plan
-  if (!plan.empty()) {
-
-    map_ptr->publishDebugPoint(poseToPositionVector(plan.front()),
-                               mesh_map::color(0, 1, 0), "plan_start");
-    map_ptr->publishDebugPoint(poseToPositionVector(plan.back()),
-                               mesh_map::color(1, 0, 0), "plan_goal");
+  if (!plan.empty())
+  {
+    map_ptr->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");
+    map_ptr->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");
 
     // assign given plan to current_plan variable to make it usable for
     // navigation
@@ -235,39 +240,46 @@ bool MeshController::setPlan(
     // set the variable vector_map with the current vector map
     vector_map = map_ptr->getVectorMap();
     return true;
-  } else {
+  }
+  else
+  {
     return false;
   }
 }
 
-bool MeshController::cancel() {
+bool MeshController::cancel()
+{
   ROS_INFO_STREAM("The MeshController has been requested to cancel!");
   cancel_requested = true;
   return true;
 }
 
-float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
+float MeshController::fadingFactor(const geometry_msgs::PoseStamped& pose)
+{
   // calculating the fading factor when using the path for naviagation
-  if (!config.useMeshGradient) {
+  if (!config.useMeshGradient)
+  {
     float dist = 0.0;
     // calculate the distance between neighbouring plan positions to get the
     // whole path length
-    if (initial_dist == std::numeric_limits<float>::max()) {
+    if (initial_dist == std::numeric_limits<float>::max())
+    {
       // transform the first pose of plan to a tf position vector
       tf::Vector3 tf_start_vec;
       geometry_msgs::PoseStamped start_pose = current_plan.at(0);
       mesh_map::Vector start_vec = poseToPositionVector(start_pose);
-      tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+      tf_start_vec = { start_vec.x, start_vec.y, start_vec.z };
 
       tf::Vector3 tf_next_vec;
       float update_dist = 0.0;
 
-      for (int i = 1; i < current_plan.size(); i++) {
+      for (int i = 1; i < current_plan.size(); i++)
+      {
         // get the next pose of the plan and transform it to a tf position
         // vector
         geometry_msgs::PoseStamped next_pose = current_plan.at(i);
         mesh_map::Vector next_vec = poseToPositionVector(next_pose);
-        tf_next_vec = {next_vec.x, next_vec.y, next_vec.z};
+        tf_next_vec = { next_vec.x, next_vec.y, next_vec.z };
         // calculate the distance between the two vectors
         update_dist = update_dist + tf_start_vec.distance(tf_next_vec);
 
@@ -282,15 +294,16 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
     tf::Vector3 tf_start_vec;
     geometry_msgs::PoseStamped start_pose = current_plan.at(0);
     mesh_map::Vector start_vec = poseToPositionVector(start_pose);
-    tf_start_vec = {start_vec.x, start_vec.y, start_vec.z};
+    tf_start_vec = { start_vec.x, start_vec.y, start_vec.z };
 
     tf::Vector3 tf_next_vec;
 
     // add up distance of travelled path
-    for (int i = 1; i <= plan_iter && i < current_plan.size(); i++) {
+    for (int i = 1; i <= plan_iter && i < current_plan.size(); i++)
+    {
       geometry_msgs::PoseStamped next_pose = current_plan.at(i);
       mesh_map::Vector next_vec = poseToPositionVector(next_pose);
-      tf_next_vec = {next_vec.x, next_vec.y, next_vec.z};
+      tf_next_vec = { next_vec.x, next_vec.y, next_vec.z };
 
       dist += tf_start_vec.distance(tf_next_vec);
       // overwrites start position with next position to calculate the
@@ -299,8 +312,10 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
     }
     // compare the now travelled distance with the path length
     // in case the travelled distance is close to start position
-    if (dist < config.fading) {
-      if (dist == 0.0) {
+    if (dist < config.fading)
+    {
+      if (dist == 0.0)
+      {
         // return small factor in case of initial position to enable movement
         // note: if max_velocity is zero, this factor will not matter
         last_fading = config.max_lin_velocity / 10;
@@ -311,7 +326,8 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
       return dist / config.fading;
     }
     // in case the travelled distance is close to goal position
-    else if ((initial_dist - dist) < config.fading) {
+    else if ((initial_dist - dist) < config.fading)
+    {
       // returns a factor slowly decreasing to 0 the end of the full velocity
       // towards the goal position
       last_fading = (initial_dist - dist) / config.fading;
@@ -323,13 +339,15 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
     return last_fading;
   }
   // for mesh gradient use
-  else {
+  else
+  {
     // When the mesh gradient is used only the beeline can be used to ESTIMATE
     // the distance between the start position and the goal as no knowledge
     // about the path that will be travelled is available. If this should be
     // more accurate than a a path would have to be calculated which is not the
     // intention when using the mesh gradient for navigation.
-    if (initial_dist == std::numeric_limits<float>::max()) {
+    if (initial_dist == std::numeric_limits<float>::max())
+    {
       // the position from which the distance is calculated is the first pose of
       // the robot
       geometry_msgs::PoseStamped start_pose = current_plan.at(0);
@@ -355,8 +373,10 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
 
     // compare the now travelled distance with the path length
     // in case the travelled distance is close to start position
-    if (dist_start < config.fading) {
-      if (dist_start == 0.0) {
+    if (dist_start < config.fading)
+    {
+      if (dist_start == 0.0)
+      {
         // return small factor in case of initial position to enable movement
         // note: if max_velocity is zero, this factor will not matter
         last_fading = config.max_lin_velocity / 10;
@@ -367,7 +387,8 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
       return dist_start / config.fading;
     }
     // in case the travelled distance is close to goal position
-    else if (dist_goal < config.fading) {
+    else if (dist_goal < config.fading)
+    {
       // returns a factor slowly decreasing to 0 the end of the full velocity
       // towards the goal position
       last_fading = 1 - (dist_goal / config.fading);
@@ -380,8 +401,8 @@ float MeshController::fadingFactor(const geometry_msgs::PoseStamped &pose) {
   }
 }
 
-mesh_map::Vector
-MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose) {
+mesh_map::Vector MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped& pose)
+{
   // define tf Pose for later assignment
   tf::Stamped<tf::Pose> tfPose;
   // transform pose to tf:Pose
@@ -393,31 +414,27 @@ MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped &pose) {
   return mesh_map::Vector(v.x(), v.y(), v.z());
 }
 
-mesh_map::Vector
-MeshController::poseToPositionVector(const geometry_msgs::PoseStamped &pose) {
-  return {(float)pose.pose.position.x, (float)pose.pose.position.y,
-          (float)pose.pose.position.z};
+mesh_map::Vector MeshController::poseToPositionVector(const geometry_msgs::PoseStamped& pose)
+{
+  return { (float)pose.pose.position.x, (float)pose.pose.position.y, (float)pose.pose.position.z };
 }
 
-float MeshController::angleBetweenVectors(mesh_map::Vector robot_heading,
-                                          mesh_map::Vector planned_heading) {
-  tf::Vector3 tf_robot(
-      robot_heading.x,
-      robot_heading.y,
-      robot_heading.z);
-  tf::Vector3 tf_planned(
-      planned_heading.x,
-      planned_heading.y,
-      planned_heading.z);
+float MeshController::angleBetweenVectors(mesh_map::Vector robot_heading, mesh_map::Vector planned_heading)
+{
+  tf::Vector3 tf_robot(robot_heading.x, robot_heading.y, robot_heading.z);
+  tf::Vector3 tf_planned(planned_heading.x, planned_heading.y, planned_heading.z);
   return tf_robot.angle(tf_planned);
 }
 
-float MeshController::linValue(float max_hight, float x_axis, float max_width,
-                               float value) {
+float MeshController::linValue(float max_hight, float x_axis, float max_width, float value)
+{
   // checking higher and lower boarders
-  if (value > max_width / 2) {
+  if (value > max_width / 2)
+  {
     return max_hight;
-  } else if (value < -max_width / 2) {
+  }
+  else if (value < -max_width / 2)
+  {
     return -max_hight;
   }
   // calculating the incline of the linear function
@@ -425,10 +442,11 @@ float MeshController::linValue(float max_hight, float x_axis, float max_width,
   return abs(incline * (value + x_axis));
 }
 
-float MeshController::gaussValue(float max_hight, float max_width,
-                                 float value) {
+float MeshController::gaussValue(float max_hight, float max_width, float value)
+{
   // in case value lays outside width, the function goes to zero
-  if (value > max_width / 2) {
+  if (value > max_width / 2)
+  {
     return 0.0;
   }
 
@@ -438,73 +456,76 @@ float MeshController::gaussValue(float max_hight, float max_width,
 
   // calculating y value of given normal distribution
   // stretched to max_hight and desired width
-  float y_value = max_hight * 1 / (sqrtf(2 * M_PI * std_dev)) *
-                  pow(E, (-pow(value, 2) * pow((2 * std_dev), 2)));
+  float y_value = max_hight * 1 / (sqrtf(2 * M_PI * std_dev)) * pow(E, (-pow(value, 2) * pow((2 * std_dev), 2)));
 
   return y_value;
 }
 
-float MeshController::direction(mesh_map::Vector &robot_heading,
-                                mesh_map::Vector &planned_heading) {
-
+float MeshController::direction(mesh_map::Vector& robot_heading, mesh_map::Vector& planned_heading)
+{
   tf::Vector3 tf_robot(robot_heading.x, robot_heading.y, robot_heading.z);
-  tf::Vector3 tf_planned(planned_heading.x, planned_heading.y,
-                         planned_heading.z);
+  tf::Vector3 tf_planned(planned_heading.x, planned_heading.y, planned_heading.z);
 
-  https: // www.gamedev.net/forums/topic/508445-left-or-right-direction/
+https:  // www.gamedev.net/forums/topic/508445-left-or-right-direction/
   tf::Vector3 tf_cross_prod = tf_robot.cross(tf_planned);
 
   // TODO use face normal
-  tf::Vector3 tf_up = {0, 0, -1};
+  tf::Vector3 tf_up = { 0, 0, -1 };
 
   // use normal vector of face for dot product as "up" vector
   // => positive result = left, negative result = right,
   float tf_dot_prod = tf_cross_prod.dot(tf_up);
 
-  if (tf_dot_prod < 0.0) {
+  if (tf_dot_prod < 0.0)
+  {
     // left turn
     return 1.0;
-  } else {
+  }
+  else
+  {
     // right turn
     return -1.0;
   }
 }
 
-bool MeshController::offPlan(const geometry_msgs::PoseStamped &robot_pose) {
+bool MeshController::offPlan(const geometry_msgs::PoseStamped& robot_pose)
+{
   // transform the first pose of plan to a tf position vector
   mesh_map::Vector robot_vec = poseToPositionVector(robot_pose);
   mesh_map::Vector plan_vec = poseToPositionVector(plan_position);
 
-  if (euclideanDistance(robot_vec, plan_vec) > config.off_plan) {
+  if (euclideanDistance(robot_vec, plan_vec) > config.off_plan)
+  {
     return true;
   }
   return false;
 }
 
-float MeshController::euclideanDistance(
-    const geometry_msgs::PoseStamped &pose) {
+float MeshController::euclideanDistance(const geometry_msgs::PoseStamped& pose)
+{
   mesh_map::Vector pose_vec = poseToPositionVector(pose);
-  tf::Vector3 tf_pose_vec = {pose_vec.x, pose_vec.y, pose_vec.z};
+  tf::Vector3 tf_pose_vec = { pose_vec.x, pose_vec.y, pose_vec.z };
 
   mesh_map::Vector goal_vec = poseToPositionVector(goal);
-  tf::Vector3 tf_goal_vec = {goal_vec.x, goal_vec.y, goal_vec.z};
+  tf::Vector3 tf_goal_vec = { goal_vec.x, goal_vec.y, goal_vec.z };
 
   return tf_pose_vec.distance(tf_goal_vec);
 }
 
-float MeshController::euclideanDistance(lvr2::BaseVector<float> &current,
-                                        lvr2::BaseVector<float> &planned) {
-  tf::Vector3 tf_current_vec = {current.x, current.y, current.z};
-  tf::Vector3 tf_planned_vec = {planned.x, planned.y, planned.z};
+float MeshController::euclideanDistance(lvr2::BaseVector<float>& current, lvr2::BaseVector<float>& planned)
+{
+  tf::Vector3 tf_current_vec = { current.x, current.y, current.z };
+  tf::Vector3 tf_planned_vec = { planned.x, planned.y, planned.z };
 
   return tf_current_vec.distance(tf_planned_vec);
 }
 
-uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
-                                       float velocity) {
+uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped& pose, float velocity)
+{
   // checking if the function has been called before
   // if not - set the time for the first time
-  if (last_call.isZero()) {
+  if (last_call.isZero())
+  {
     last_call = ros::Time::now();
     // initialize the iterator for the planned path with zero = start position
     plan_iter = 0;
@@ -530,8 +551,10 @@ uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
   float dist = 0;
   // look forward on the plan and check if another position on the plan is
   // closer to the robot
-  do {
-    if (cancel_requested) {
+  do
+  {
+    if (cancel_requested)
+    {
       ROS_WARN_STREAM("Cancel has been requested while looking forward on the "
                       "plan. Canceling...");
       return mbf_msgs::ExePathResult::CANCELED;
@@ -546,7 +569,8 @@ uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
     dist = euclideanDistance(robot_vec, iter_vec);
     // if the distance is smaller than the previously calculated one, save the
     // values
-    if (dist < min_dist) {
+    if (dist < min_dist)
+    {
       ret_iter = iter;
       min_dist = dist;
     }
@@ -560,8 +584,10 @@ uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
   iter = plan_iter;
 
   // look back, as above but going backwards through the plan
-  do {
-    if (cancel_requested) {
+  do
+  {
+    if (cancel_requested)
+    {
       ROS_WARN_STREAM("Cancel has been requested while looking backwards on "
                       "the plan. Canceling...");
       return mbf_msgs::ExePathResult::CANCELED;
@@ -569,7 +595,8 @@ uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
     geometry_msgs::PoseStamped iter_pose = current_plan[iter];
     mesh_map::Vector iter_vec = poseToPositionVector(iter_pose);
     dist = euclideanDistance(robot_vec, iter_vec);
-    if (dist < min_dist) {
+    if (dist < min_dist)
+    {
       ret_iter = iter;
       min_dist = dist;
     }
@@ -590,18 +617,17 @@ uint32_t MeshController::updatePlanPos(const geometry_msgs::PoseStamped &pose,
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
-std::vector<float>
-MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
-                          float velocity) {
+std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& pose, float velocity)
+{
   mesh_map::Vector robot_heading = poseToDirectionVector(pose);
   mesh_map::Vector robot_position = poseToPositionVector(pose);
 
   // initialize time of last look ahead call when function has not been called
   // before
-  if (last_lookahead_call.isZero()) {
+  if (last_lookahead_call.isZero())
+  {
     last_lookahead_call = ros::Time::now();
-    return {std::numeric_limits<float>::max(),
-            std::numeric_limits<float>::max()};
+    return { std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
   }
   // determine the time that has passed since the last look ahead
   ros::Time now = ros::Time::now();
@@ -616,15 +642,16 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
 
   // select how far to look ahead depending on the max travelled distance
   int steps;
-  if (!config.useMeshGradient) {
+  if (!config.useMeshGradient)
+  {
     // calculates approximately how many elements of the path have to be called
     // and travelled along to reach the maximum distance that could be travelled
     // with the given velocity
-    steps = (int)linValue(current_plan.size(), 0.0, 2 * initial_dist,
-                          max_travelled_dist) -
-            plan_iter;
+    steps = (int)linValue(current_plan.size(), 0.0, 2 * initial_dist, max_travelled_dist) - plan_iter;
     ROS_ERROR_STREAM("1 Steps:" << steps);
-  } else {
+  }
+  else
+  {
     // calculates how many steps ahead have to be checked when travelling in the
     // current robot direction with the given velocity by dividing it through
     // the step size that is later used therefore the look ahead will be as far
@@ -632,11 +659,11 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
     steps = (int)(max_travelled_dist / 0.03);
   }
 
-  if (steps == 0) {
+  if (steps == 0)
+  {
     // no look ahead when there is no linear velocity
     // values have to be dealt with after function call
-    return {std::numeric_limits<float>::max(),
-            std::numeric_limits<float>::max()};
+    return { std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
   }
 
   // variable to add how many times the cost could not be calculated and
@@ -659,12 +686,15 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
 
   lvr2::FaceHandle ahead_face = current_face.unwrap();
   // adds up cost and angles of all steps ahead
-  for (int i = 0; i <= steps; i++) {
+  for (int i = 0; i <= steps; i++)
+  {
     // look ahead when using the planned path for navigation reference
     ahead_cost = -1;
-    if (!config.useMeshGradient) {
+    if (!config.useMeshGradient)
+    {
       // in case look ahead extends planned path
-      if ((plan_iter + i) >= current_plan.size()) {
+      if ((plan_iter + i) >= current_plan.size())
+      {
         steps = i;
         ROS_ERROR_STREAM("3. Steps:" << steps);
         break;
@@ -678,64 +708,63 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
       ahead_direction_vec = poseToDirectionVector(pose_ahead);
       // finds the face which contains the current ahead face
       // find cost of the future position
-      const auto &vertex_handles =
-          map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
-      const auto &vertex_positions =
-          map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
+      const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
+      const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
       float dist;
 
-      if (mesh_map::projectedBarycentricCoords(
-              ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face,
-                                        barycentric_coords, 0.05, 0.4)) {
-        ahead_cost =
-            map_ptr->costAtPosition(vertex_handles, barycentric_coords);
-        if(ahead_cost == -1) ROS_ERROR_STREAM("Could not access cost!");
+      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
+          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+      {
+        ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
+        if (ahead_cost == -1)
+          ROS_ERROR_STREAM("Could not access cost!");
       }
     }
     // look ahead for using mesh gradient for navigation reference
-    else {
-      const auto &vertex_positions =
-          map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
+    else
+    {
+      const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
       float dist;
-      if (mesh_map::projectedBarycentricCoords(
-              ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face,
-                                        barycentric_coords, 0.05, 0.4)) {
+      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
+          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+      {
+        const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
 
-        const auto &vertex_handles =
-            map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
-
-        const auto &opt_dir =
-            map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
-        if (opt_dir) {
+        const auto& opt_dir = map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
+        if (opt_dir)
+        {
           ahead_direction_vec = opt_dir.get().normalized() * 0.03;
           ahead_position_vec += ahead_direction_vec;
-          ahead_cost =
-              map_ptr->costAtPosition(vertex_handles, barycentric_coords);
-          if(ahead_cost == -1) ROS_ERROR_STREAM("Could not access cost!!!");
-        } else {
+          ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
+          if (ahead_cost == -1)
+            ROS_ERROR_STREAM("Could not access cost!!!");
+        }
+        else
+        {
           ROS_ERROR_STREAM("No direction at position!");
           break;
         }
       }
     }
 
-    if (ahead_cost == std::numeric_limits<float>::infinity() &&
-        lethal_step == 0) {
+    if (ahead_cost == std::numeric_limits<float>::infinity() && lethal_step == 0)
+    {
       ROS_INFO_STREAM("lethal vertex " << i);
       lethal_step = i;
-    } else if (ahead_cost == -1.0) {
+    }
+    else if (ahead_cost == -1.0)
+    {
       ROS_INFO("cost could not be accessed");
       // cost could not be accessed
       // CAUTION could lead to division by zero
       missed_steps += 1;
-    } else {
+    }
+    else
+    {
       // get direction difference between current position and next position
-      float future_turn =
-          angleBetweenVectors(robot_heading, ahead_direction_vec);
+      float future_turn = angleBetweenVectors(robot_heading, ahead_direction_vec);
       // to determine in which direction to turn in future (neg for left, pos
       // for right)
       float leftRight = direction(robot_heading, ahead_direction_vec);
@@ -744,12 +773,14 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
       accum_turn += (future_turn * leftRight);
     }
 
-    if (cancel_requested) {
-      return {0, 0};
+    if (cancel_requested)
+    {
+      return { 0, 0 };
     }
   }
 
-  if ((steps - missed_steps) <= 0 || steps <= 0) {
+  if ((steps - missed_steps) <= 0 || steps <= 0)
+  {
     ROS_ERROR_STREAM("Missed steps:" << missed_steps << " Steps:" << steps);
     throw mbf_utility::ExePathException(mbf_msgs::ExePathResult::MAP_ERROR);
   }
@@ -757,12 +788,12 @@ MeshController::lookAhead(const geometry_msgs::PoseStamped &pose,
   float av_turn = accum_turn / (steps - missed_steps);
   float av_cost = accum_cost / (steps - missed_steps);
 
-  return {av_turn, av_cost};
+  return { av_turn, av_cost };
 }
 
-std::vector<float>
-MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
-                             mesh_map::Vector supposed_dir, const float &cost) {
+std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
+                                                const float& cost)
+{
   mesh_map::Vector dir_vec = poseToDirectionVector(pose);
   mesh_map::Vector position_vec = poseToPositionVector(pose);
 
@@ -781,8 +812,7 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
 
   // calculate a direction velocity depending on the turn direction and
   // difference angle
-  float final_ang_vel =
-      leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
+  float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
   // LINEAR movement
   float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
@@ -790,18 +820,22 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
 
   // check the size of the angle. If it is not more than about 35 degrees,
   // integrate position costs to linear velocity
-  if (angle < 0.6) {
+  if (angle < 0.6)
+  {
     float cost_lin_vel = cost;
     // in case current vertex is a lethal vertex
-    if (cost_lin_vel != std::numeric_limits<float>::max()) {
+    if (cost_lin_vel != std::numeric_limits<float>::max())
+    {
       // basic linear velocity depending on angle difference between robot pose
       // and plan and the cost at position
-      float lin_factor_by_cost =
-          linValue(config.max_lin_velocity / 10, 0.0, 2.0, cost_lin_vel);
+      float lin_factor_by_cost = linValue(config.max_lin_velocity / 10, 0.0, 2.0, cost_lin_vel);
       lin_vel_by_ang -= lin_factor_by_cost;
-      if (lin_vel_by_ang < 0.0) {
+      if (lin_vel_by_ang < 0.0)
+      {
         lin_vel_by_ang = 0.0;
-      } else if (lin_vel_by_ang > config.max_lin_velocity) {
+      }
+      else if (lin_vel_by_ang > config.max_lin_velocity)
+      {
         lin_vel_by_ang = config.max_lin_velocity;
       }
     }
@@ -812,27 +846,28 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
   // look ahead
   std::vector<float> ahead_values = lookAhead(pose, set_linear_velocity);
 
-  if (ahead_values[1] != std::numeric_limits<float>::max()) {
+  if (ahead_values[1] != std::numeric_limits<float>::max())
+  {
     // get the direction factor from the calculated ahead values
     float aheadLR = ahead_values[0] / abs(ahead_values[0]);
     // calculating angular velocity based on angular ahead value
-    float final_ahead_ang_vel =
-        aheadLR *
-        linValue(config.max_ang_velocity, 0.0, 2 * M_PI, abs(ahead_values[0]));
+    float final_ahead_ang_vel = aheadLR * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, abs(ahead_values[0]));
     // calculating linear value based on angular ahead value
-    float ahead_lin_vel =
-        gaussValue(config.max_lin_velocity, 2 * M_PI, abs(ahead_values[0]));
-    ROS_ERROR_STREAM("Final lin velocity after gauss: "<< final_lin_vel);
+    float ahead_lin_vel = gaussValue(config.max_lin_velocity, 2 * M_PI, abs(ahead_values[0]));
+    ROS_ERROR_STREAM("Final lin velocity after gauss: " << final_lin_vel);
     float final_ahead_lin_vel;
-    if (abs(ahead_values[0]) < 0.6) {
+    if (abs(ahead_values[0]) < 0.6)
+    {
       // basic linear velocity depending on angle difference between robot pose
       // and plan and the cost at position
-      float lin_ahead_by_cost =
-          linValue(config.max_lin_velocity / 10, 0.0, 2.0, ahead_values[1]);
+      float lin_ahead_by_cost = linValue(config.max_lin_velocity / 10, 0.0, 2.0, ahead_values[1]);
       ahead_lin_vel -= lin_ahead_by_cost;
-      if (ahead_lin_vel < 0.0) {
+      if (ahead_lin_vel < 0.0)
+      {
         ahead_lin_vel = 0.0;
-      } else if (ahead_lin_vel > config.max_lin_velocity) {
+      }
+      else if (ahead_lin_vel > config.max_lin_velocity)
+      {
         ahead_lin_vel = config.max_lin_velocity;
       }
     }
@@ -840,11 +875,9 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
 
     // calculating the velocities by proportionally, combining the look ahead
     // velocity with the velocity (without look ahead)
-    final_ang_vel = (1.0 - config.ahead_amount) * final_ang_vel +
-                    config.ahead_amount * final_ahead_ang_vel;
-    final_lin_vel = (1.0 - config.ahead_amount) * final_lin_vel +
-                    config.ahead_amount * final_ahead_lin_vel;
-    ROS_ERROR_STREAM("Final lin velocity: "<< final_lin_vel << " final ahead lin vel:" << final_ahead_lin_vel);
+    final_ang_vel = (1.0 - config.ahead_amount) * final_ang_vel + config.ahead_amount * final_ahead_ang_vel;
+    final_lin_vel = (1.0 - config.ahead_amount) * final_lin_vel + config.ahead_amount * final_ahead_lin_vel;
+    ROS_ERROR_STREAM("Final lin velocity: " << final_lin_vel << " final ahead lin vel:" << final_ahead_lin_vel);
 
     // output: AHEAD angle publishing
     std_msgs::Float32 aheadAngle32;
@@ -861,14 +894,15 @@ MeshController::naiveControl(const geometry_msgs::PoseStamped &pose,
   // store new velocity to use as previous velocity
   set_linear_velocity = final_lin_vel;
 
-  return {final_ang_vel, final_lin_vel};
+  return { final_ang_vel, final_lin_vel };
 }
 
-void MeshController::reconfigureCallback(
-    mesh_controller::MeshControllerConfig &cfg, uint32_t level) {
+void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level)
+{
   ROS_INFO("Value configuration for mesh controller.");
 
-  if (first_config) {
+  if (first_config)
+  {
     config = cfg;
     first_config = false;
   }
@@ -876,11 +910,9 @@ void MeshController::reconfigureCallback(
   config = cfg;
 }
 
-bool MeshController::initialize(
-    const std::string &plugin_name,
-    const boost::shared_ptr<tf2_ros::Buffer> &tf_ptr,
-    const boost::shared_ptr<mesh_map::MeshMap> &mesh_map_ptr) {
-
+bool MeshController::initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                                const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+{
   goalSet = false;
   name = plugin_name;
   private_nh = ros::NodeHandle("~/" + name);
@@ -896,18 +928,14 @@ bool MeshController::initialize(
 
   set_linear_velocity = 0.0;
 
-  reconfigure_server_ptr = boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>>(
-      new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(
-          private_nh));
+  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>>(
+      new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));
 
-  config_callback =
-      boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
+  config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
 
   angle_pub = private_nh.advertise<std_msgs::Float32>("current_angle", 1);
-  position_pub =
-      private_nh.advertise<geometry_msgs::PointStamped>("current_position", 1);
+  position_pub = private_nh.advertise<geometry_msgs::PointStamped>("current_position", 1);
 
   ahead_angle_pub = private_nh.advertise<std_msgs::Float32>("ahead_angle", 1);
   ahead_cost_pub = private_nh.advertise<std_msgs::Float32>("ahead_cost", 1);

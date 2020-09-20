@@ -1,5 +1,5 @@
 /*
- *  Copyright 2020, Sebastian Pütz
+ *  Copyright 2020, The authors
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -31,20 +31,20 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
+ *    Malte kl. Piening <malte@klpiening.de>
  *
  */
 
-#ifndef MESH_MAP__ROUGHNESS_LAYER_H
-#define MESH_MAP__ROUGHNESS_LAYER_H
+#ifndef MESH_MAP__STEEPNESS_LAYER_H
+#define MESH_MAP__STEEPNESS_LAYER_H
 
 #include <dynamic_reconfigure/server.h>
-#include <mesh_layers/RoughnessLayerConfig.h>
+#include <mesh_layers/SteepnessLayerConfig.h>
 #include <mesh_map/abstract_layer.h>
 
 namespace mesh_layers
 {
-class RoughnessLayer : public mesh_map::AbstractLayer
+class SteepnessLayer : public mesh_map::AbstractLayer
 {
   virtual bool readLayer();
 
@@ -70,21 +70,21 @@ class RoughnessLayer : public mesh_map::AbstractLayer
 
   virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal){};
 
-  lvr2::DenseVertexMap<float> roughness;
+  lvr2::DenseVertexMap<float> steepness;
 
   virtual bool initialize(const std::string& name);
 
   std::set<lvr2::VertexHandle> lethal_vertices;
 
   // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>> reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>::CallbackType config_callback;
+  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>> reconfigure_server_ptr;
+  dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>::CallbackType config_callback;
   bool first_config;
-  RoughnessLayerConfig config;
+  SteepnessLayerConfig config;
 
-  void reconfigureCallback(mesh_layers::RoughnessLayerConfig& cfg, uint32_t level);
+  void reconfigureCallback(mesh_layers::SteepnessLayerConfig& cfg, uint32_t level);
 };
 
 } /* namespace mesh_layers */
 
-#endif  // MESH_MAP__ROUGHNESS_LAYER_H
+#endif  // MESH_MAP__STEEPNESS_LAYER_H

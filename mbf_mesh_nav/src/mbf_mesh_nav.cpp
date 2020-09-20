@@ -41,15 +41,18 @@
 
 mbf_mesh_nav::MeshNavigationServer::Ptr mesh_nav_srv_ptr;
 
-void sigintHandler(int sig) {
+void sigintHandler(int sig)
+{
   ROS_INFO_STREAM("Shutdown mesh navigation server.");
-  if (mesh_nav_srv_ptr) {
+  if (mesh_nav_srv_ptr)
+  {
     mesh_nav_srv_ptr->stop();
   }
   ros::shutdown();
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
   ros::init(argc, argv, "mbf_mesh_nav", ros::init_options::NoSigintHandler);
 
   ros::NodeHandle nh;
@@ -65,8 +68,7 @@ int main(int argc, char **argv) {
   TFPtr tf_listener_ptr(new TF(ros::Duration(cache_time)));
   tf2_ros::TransformListener tf_listener(*tf_listener_ptr);
 #endif
-  mesh_nav_srv_ptr =
-      boost::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_listener_ptr);
+  mesh_nav_srv_ptr = boost::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_listener_ptr);
   ros::spin();
   return EXIT_SUCCESS;
 }
