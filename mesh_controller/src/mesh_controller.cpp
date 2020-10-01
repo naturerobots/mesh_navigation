@@ -80,37 +80,53 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
   float max_radius_dist = 0.1;
   float dist;
 
-  // set current face
+  /////////////////////////////////
+  // find face for current position
+  /////////////////////////////////
+
   mesh_map::Vector position = poseToPositionVector(pose);
   std::array<float, 3> barycentric_coords;
 
   if (!current_face)
-    ROS_WARN_STREAM("Current face not set.");
-  if (!current_face && !map_ptr->searchContainingFace(position, current_face, barycentric_coords, 0.3))
   {
-    return mbf_msgs::ExePathResult::OUT_OF_MAP;
+    // initially search current face on complete map
+    ROS_WARN_STREAM("Current face not set.");
+    if (!map_ptr->searchContainingFace(position, current_face, barycentric_coords, 0.3))
+    {
+      // no corresponding face has been found
+      return mbf_msgs::ExePathResult::OUT_OF_MAP;
+    }
   }
 
   lvr2::FaceHandle face = current_face.unwrap();
   map_ptr->publishDebugFace(face, mesh_map::color(1, 1, 1), "current_face");
-
   map_ptr->publishDebugPoint(position, mesh_map::color(1, 1, 1), "robot_pose");
 
-  if ((mesh_map::projectedBarycentricCoords(
-           position, map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()), barycentric_coords, dist) &&
-       dist < 0.3))
+  // check whether or not the position matches the current face
+  // if not search for new current face
+  if (mesh_map::projectedBarycentricCoords(position, map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()),
+                                           barycentric_coords, dist) &&
+      dist < 0.3)
   {
+    // current position has a distance of less than 0.3 to the current face
+    // so the current face is the one to be used
     map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");
   }
   else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, max_radius_dist, 0.1))
   {
-    // update current_face
+    // new face has been found out of the neighbour faces of the current face
     current_face = face;
     map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");
     map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "search_neighbour_pos");
   }
+  else if (map_ptr->searchContainingFace(position, current_face, barycentric_coords, 0.3))
+  {
+    // new face has been found while searching the whole mesh
+    lvr2::FaceHandle face = current_face.unwrap();
+  }
   else
   {
+    // no corresponding face has been found
     return mbf_msgs::ExePathResult::OUT_OF_MAP;
   }
 
@@ -640,8 +656,15 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
 
   double max_travelled_dist = velocity * time_delta.toSec();
 
+  // TODO: do better
+  // this is a hotfix to prevent the steps being MIN_INT which resuts in the controller crashing
+  if (std::isnan(max_travelled_dist))
+  {
+    max_travelled_dist = 0;
+  }
+
   // select how far to look ahead depending on the max travelled distance
-  int steps;
+  int steps = 0;
   if (!config.useMeshGradient)
   {
     // calculates approximately how many elements of the path have to be called
