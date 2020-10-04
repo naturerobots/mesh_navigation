@@ -35,11 +35,8 @@
  *
  */
 
-#include <actionlib/client/simple_action_client.h>
-#include <base_local_planner/footprint_helper.h>
 #include <geometry_msgs/PoseArray.h>
 #include <mbf_abstract_nav/MoveBaseFlexConfig.h>
-#include <mbf_msgs/MoveBaseAction.h>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
 
@@ -78,25 +75,25 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
 }
 
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
-    const std::string name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newControllerExecution(
-    const std::string name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshControllerExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
       tf_listener_ptr_, mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecoveryExecution(
-    const std::string name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshRecoveryExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
       boost::ref(mesh_ptr_), last_config_);
 }
 
