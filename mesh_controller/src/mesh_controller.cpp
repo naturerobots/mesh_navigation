@@ -31,7 +31,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sabrina Frohn <sfrohn@uos.de>
  *    Sebastian Pütz <spuetz@uos.de>
  *
  */
@@ -77,7 +76,6 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
     goalSet = true;
   }
 
-  float max_radius_dist = 0.1;
   float dist;
 
   /////////////////////////////////
@@ -104,15 +102,18 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
 
   // check whether or not the position matches the current face
   // if not search for new current face
-  if (mesh_map::projectedBarycentricCoords(position, map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()),
-                                           barycentric_coords, dist) &&
-      dist < 0.3)
+  if (mesh_map::projectedBarycentricCoords(
+          position,
+          map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()),
+          barycentric_coords,
+          dist)
+      && dist < config.max_search_distance)
   {
     // current position has a distance of less than 0.3 to the current face
     // so the current face is the one to be used
     map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");
   }
-  else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, max_radius_dist, 0.1))
+  else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, config.max_search_radius, config.max_search_distance))
   {
     // new face has been found out of the neighbour faces of the current face
     current_face = face;
@@ -737,7 +738,7 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
       float dist;
 
       if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, config.max_search_radius, config.max_search_distance))
       {
         ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
         if (ahead_cost == -1)
@@ -750,8 +751,18 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
       const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
       float dist;
-      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+      // check if
+      if (mesh_map::projectedBarycentricCoords(
+              ahead_position_vec,
+              vertex_positions,
+              barycentric_coords,
+              dist)
+          || map_ptr->searchNeighbourFaces(
+              ahead_position_vec,
+              ahead_face,
+              barycentric_coords,
+              config.max_search_radius,
+              config.max_search_distance))
       {
         const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
 
