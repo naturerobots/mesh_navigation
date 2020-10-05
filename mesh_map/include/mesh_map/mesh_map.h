@@ -51,6 +51,7 @@
 #include <pluginlib/class_loader.h>
 #include <std_msgs/ColorRGBA.h>
 #include <tf2_ros/buffer.h>
+#include <tuple>
 
 namespace mesh_map
 {
@@ -77,8 +78,8 @@ public:
 
   lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
 
-  bool searchContainingFace(Vector& pos, lvr2::OptionalFaceHandle& face_handle,
-                            std::array<float, 3>& barycentric_coords, const float& max_dist);
+  boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector, 3>,
+    std::array<float, 3>>> searchContainingFace(Vector& position, const float& max_dist);
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 

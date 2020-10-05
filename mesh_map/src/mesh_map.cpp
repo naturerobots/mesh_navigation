@@ -603,9 +603,10 @@ void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
   this->vector_map = vector_map;
 }
 
-boost::optional<Vector> MeshMap::directionAtPosition(const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
-                                                     const std::array<lvr2::VertexHandle, 3>& vertices,
-                                                     const std::array<float, 3>& barycentric_coords)
+boost::optional<Vector> MeshMap::directionAtPosition(
+    const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+    const std::array<lvr2::VertexHandle, 3>& vertices,
+    const std::array<float, 3>& barycentric_coords)
 {
   const auto& a = vector_map.get(vertices[0]);
   const auto& b = vector_map.get(vertices[1]);
@@ -614,18 +615,9 @@ boost::optional<Vector> MeshMap::directionAtPosition(const lvr2::VertexMap<lvr2:
   if (a || b || c)
   {
     lvr2::BaseVector<float> vec;
-    if (a)
-    {
-      vec += a.get() * barycentric_coords[0];
-    }
-    if (b)
-    {
-      vec += b.get() * barycentric_coords[1];
-    }
-    if (c)
-    {
-      vec += c.get() * barycentric_coords[2];
-    }
+    if (a) vec += a.get() * barycentric_coords[0];
+    if (b) vec += b.get() * barycentric_coords[1];
+    if (c) vec += c.get() * barycentric_coords[2];
     if (std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z))
       return vec;
     else
@@ -1065,33 +1057,30 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
 lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& pos, const float& max_dist)
 {
   std::array<float, 3> bary_coords;
-  lvr2::OptionalFaceHandle face_handle;
-  if (!searchContainingFace(pos, face_handle, bary_coords, max_dist))
+  float dist = 0;
+  for (auto face : mesh_ptr->faces())
   {
-    ROS_ERROR_STREAM("Could not find a containing face for (" << pos.x << ", " << pos.y << ", " << pos.z
-                                                              << ") and the maximum distance to the face of "
-                                                              << max_dist);
+    if (projectedBarycentricCoords(pos, face, bary_coords, dist)
+        && std::fabs(dist) < max_dist)
+      return face;
   }
-  return face_handle;
+  return lvr2::OptionalFaceHandle();
 }
 
-bool MeshMap::searchContainingFace(Vector& position, lvr2::OptionalFaceHandle& face_handle,
-                                   std::array<float, 3>& barycentric_coords, const float& max_dist)
+boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+    std::array<float, 3>>> MeshMap::searchContainingFace(
+    Vector& position, const float& max_dist)
 {
   std::array<float, 3> bary_coords;
   for (auto face : mesh_ptr->faces())
   {
     const auto& vertices = mesh_ptr->getVertexPositionsOfFace(face);
     float dist = 0;
-    if (mesh_map::projectedBarycentricCoords(position, vertices, bary_coords, dist) && std::fabs(dist) < max_dist)
-    {
-      face_handle = face;
-      barycentric_coords = bary_coords;
-      position = vertices[0] * bary_coords[0] + vertices[1] * bary_coords[1] + vertices[2] * bary_coords[2];
-      return true;
-    }
+    if (mesh_map::projectedBarycentricCoords(position, vertices, bary_coords, dist)
+        && std::fabs(dist) < max_dist)
+      return std::make_tuple(face, vertices, bary_coords);
   }
-  return false;
+  return boost::none;
 }
 
 lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector& pos)
