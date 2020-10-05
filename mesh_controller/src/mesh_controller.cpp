@@ -179,12 +179,11 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
   float cost = map_ptr->costAtPosition(handles, barycentric_coords);
 
   // variable to store the new angular and linear velocities
-  std::vector<float> values(2);
+  std::array<float, 2> velocities;
 
   try
   {
-    // determine values via naive controller
-    values = naiveControl(pose, supposed_heading, cost);
+    velocities = naiveControl(pose, supposed_heading, cost);
   }
   catch (mbf_utility::ExePathException e)
   {
@@ -192,14 +191,14 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
     return e.outcome;
   }
 
-  if (values[1] == std::numeric_limits<float>::max())
+  if (velocities[1] == std::numeric_limits<float>::max())
   {
     ROS_ERROR_STREAM("Mesh controller calculation failed!");
     return mbf_msgs::GetPathResult::FAILURE;
   }
 
-  cmd_vel.twist.angular.z = std::max(config.max_ang_velocity, values[0] * config.ang_vel_factor);
-  cmd_vel.twist.linear.x = std::max(config.max_lin_velocity, values[1] * config.lin_vel_factor);
+  cmd_vel.twist.angular.z = std::max(config.max_ang_velocity, velocities[0] * config.ang_vel_factor);
+  cmd_vel.twist.linear.x = std::max(config.max_lin_velocity, velocities[1] * config.lin_vel_factor);
 
   if (cancel_requested)
   {
@@ -816,30 +815,30 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
   return { av_turn, av_cost };
 }
 
-std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
-                                                const float& cost)
+std::array<float, 2> MeshController::naiveControl(
+    const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
+    const float& cost)
 {
   mesh_map::Vector dir_vec = poseToDirectionVector(pose);
   mesh_map::Vector position_vec = poseToPositionVector(pose);
 
-  // ANGULAR MOVEMENT
+  // compute angular velocity
   // calculate angle between orientation vectors
   // angle will never be negative and smaller or equal to pi
   angle = angleBetweenVectors(dir_vec, supposed_dir);
 
-  // output: angle publishing
-  std_msgs::Float32 angle32;
-  angle32.data = angle * 180 / M_PI;
-  angle_pub.publish(angle32);
+  // debug output angle between supposed and current angle
+  DEBUG_CALL(std_msgs::Float32 angle32; angle32.data = angle * 180 / M_PI; angle_pub.publish(angle32);)
 
-  // to determine in which direction to turn (neg for left, pos for right)
-  float leftRight = direction(dir_vec, supposed_dir);
+  // determine direction to turn (neg -> left, pos -> right)
+  float left_right = direction(dir_vec, supposed_dir);
 
   // calculate a direction velocity depending on the turn direction and
   // difference angle
-  float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
+  float final_ang_vel = left_right * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
-  // LINEAR movement
+  // linear velocity computation
+  // TODO turn param -> width of gauss function
   float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
   float final_lin_vel;
 

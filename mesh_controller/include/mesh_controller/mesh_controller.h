@@ -225,8 +225,7 @@ public:
    * @return              vector with new angular velocity and new linear
    * velocity
    */
-  std::vector<float> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
-                                  const float& cost);
+  std::array<float, 2> naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir, const float& cost);
 
   void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
