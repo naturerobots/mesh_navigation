@@ -177,11 +177,11 @@ public:
    * @param face        Face handle from which search begins
    * @param max_radius  The radius in which the controller searches for a consecutive face
    * @param max_dist    The maximum distance to the given face vertices
-   * @return            Face handle of the position - empty optional face handle
-   * if position could not be found
+   * @return            Optional of (face handle, vertices, and barycentric coord) tuple
    */
-  bool searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::array<float, 3>& barycentric_coords,
-                            const float& max_radius, const float& max_dist);
+  boost::optional<std::tuple<lvr2::FaceHandle, std::array<Vector, 3>, std::array<float, 3>>>
+  searchNeighbourFaces(const Vector& pos, const lvr2::FaceHandle& face,
+                       const float& max_radius, const float& max_dist);
 
   /**
    * Finds the next position given a position vector and its corresponding face

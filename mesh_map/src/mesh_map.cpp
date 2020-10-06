@@ -956,8 +956,10 @@ bool MeshMap::inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const 
                               mesh_ptr->getVertexPosition(vertices[2]), dist, 0.0001);
 }
 
-bool MeshMap::searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::array<float, 3>& barycentric_coords,
-                                   const float& max_radius, const float& max_dist)
+boost::optional<std::tuple<lvr2::FaceHandle, std::array<Vector, 3>, std::array<float, 3>>>
+  MeshMap::searchNeighbourFaces(
+    const Vector& pos, const lvr2::FaceHandle& face,
+    const float& max_radius, const float& max_dist)
 {
   std::list<lvr2::FaceHandle> possible_faces;
   possible_faces.push_back(face);
@@ -987,16 +989,11 @@ bool MeshMap::searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::arr
 
   while (possible_faces.end() != face_iter)
   {
-    const auto& vertices_positions = mesh_ptr->getVertexPositionsOfFace(*face_iter);
+    const auto& vertices = mesh_ptr->getVertexPositionsOfFace(*face_iter);
     float dist;
-    if (mesh_map::projectedBarycentricCoords(pos, vertices_positions, bary_coords, dist) && std::fabs(dist) < max_dist)
+    if (mesh_map::projectedBarycentricCoords(pos, vertices, bary_coords, dist) && std::fabs(dist) < max_dist)
     {
-      // update current face, barycentric coords, and the projected position
-      face = *face_iter;
-      barycentric_coords = bary_coords;
-      pos = vertices_positions[0] * bary_coords[0] + vertices_positions[1] * bary_coords[1] +
-            vertices_positions[2] * bary_coords[2];
-      return true;
+      return std::make_tuple(*face_iter, vertices, bary_coords);
     }
     else
     {
@@ -1019,6 +1016,7 @@ bool MeshMap::searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::arr
           }
           catch (lvr2::PanicException exception)
           {
+            // TODO handle case properly
           }
         }
       }
@@ -1026,30 +1024,45 @@ bool MeshMap::searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::arr
     }
   }
 
-  return false;
+  return boost::none;
 }
 
 bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const float& step_size)
 {
-  const auto& vertices = mesh_ptr->getVerticesOfFace(face);
-  std::array<float, 3> barycentric_coords;
+  std::array<float, 3> bary_coords;
   float dist;
-  if (mesh_map::projectedBarycentricCoords(pos, mesh_ptr->getVertexPositionsOfFace(face), barycentric_coords, dist) ||
-      searchNeighbourFaces(pos, face, barycentric_coords, step_size, 0.4))
+  // get barycentric coordinates of the current face or the next neighbour face
+  if (mesh_map::projectedBarycentricCoords(pos, mesh_ptr->getVertexPositionsOfFace(face), bary_coords, dist))
   {
-    const auto& opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face), barycentric_coords);
-    if (opt_dir)
+
+  }
+  else if (auto search_res_opt = searchNeighbourFaces(pos, face, step_size, 0.4))
+  {
+    auto search_res = *search_res_opt;
+    face = std::get<0>(search_res);
+    std::array<Vector, 3> vertices = std::get<1>(search_res);
+    bary_coords = std::get<2>(search_res);
+
+    // project position onto surface
+    pos = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
+  }
+  else
+  {
+    return false;
+  }
+  const auto& opt_dir = directionAtPosition(vector_map, mesh_ptr->getVerticesOfFace(face), bary_coords);
+  if (opt_dir)
+  {
+    Vector dir = opt_dir.get().normalized();
+    std::array<lvr2::VertexHandle, 3> handels = mesh_ptr->getVerticesOfFace(face);
+    // iter over all layer vector fields
+    for (auto layer : layers)
     {
-      Vector dir = opt_dir.get().normalized();
-      // iter over all layer vector fields
-      for (auto layer : layers)
-      {
-        dir += layer.second->vectorAt(vertices, barycentric_coords);
-      }
-      dir.normalize();
-      pos += dir * step_size;
-      return true;
+      dir += layer.second->vectorAt(handels, bary_coords);
     }
+    dir.normalize();
+    pos += dir * step_size;
+    return true;
   }
   return false;
 }

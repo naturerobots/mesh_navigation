@@ -78,7 +78,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
     return mbf_msgs::GetPathResult::EMPTY_PATH;
 
   mesh_map::Vector position = poseToPositionVector(pose);
-  std::array<float, 3> barycentric_coords;
+  std::array<float, 3> bary_coords;
   std::array<mesh_map::Vector, 3> vertices;
 
   if (!current_face)
@@ -90,10 +90,10 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
       auto search_res = *search_res_opt;
       current_face = std::get<0>(search_res);
       vertices = std::get<1>(search_res);
-      barycentric_coords = std::get<2>(search_res);
+      bary_coords = std::get<2>(search_res);
 
       // project position onto surface
-      position = mesh_map::linearCombineBarycentricCoords(vertices, barycentric_coords);
+      position = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
     }
     else
     {
@@ -112,28 +112,34 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
     // check whether or not the position matches the current face
     // if not search for new current face
     if (mesh_map::projectedBarycentricCoords(
-        position, vertices, barycentric_coords, dist_to_surface)
+        position, vertices, bary_coords, dist_to_surface)
         && dist_to_surface < config.max_search_distance)
     {
       // current position is located inside and close enough to the face
       DEBUG_CALL(map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");)
     }
-    else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, config.max_search_radius, config.max_search_distance))
+    else if (auto search_res_opt = map_ptr->searchNeighbourFaces(
+                 position, face, config.max_search_radius, config.max_search_distance))
     {
       // new face has been found out of the neighbour faces of the current face
-      current_face = face;
+      // update variables to new face
+      auto search_res = *search_res_opt;
+      current_face = face = std::get<0>(search_res);
+      vertices = std::get<1>(search_res);
+      bary_coords = std::get<2>(search_res);
+      position = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
       DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");)
       DEBUG_CALL(map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "search_neighbour_pos");)
     }
-    else if(auto face_and_bary_coords_opt = map_ptr->searchContainingFace(
+    else if(auto search_res_opt = map_ptr->searchContainingFace(
         position, config.max_search_distance))
     {
       // update variables to new face
-      auto face_and_bary_coords = *face_and_bary_coords_opt;
-      current_face = std::get<0>(face_and_bary_coords);
-      vertices = std::get<1>(face_and_bary_coords);
-      barycentric_coords = std::get<2>(face_and_bary_coords);
-      position = mesh_map::linearCombineBarycentricCoords(vertices, barycentric_coords);
+      auto search_res = *search_res_opt;
+      current_face = face = std::get<0>(search_res);
+      vertices = std::get<1>(search_res);
+      bary_coords = std::get<2>(search_res);
+      position = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
     }
     else
     {
@@ -165,7 +171,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
   }
   else
   {
-    const auto& opt_dir = map_ptr->directionAtPosition(vector_map, handles, barycentric_coords);
+    const auto& opt_dir = map_ptr->directionAtPosition(vector_map, handles, bary_coords);
     if (opt_dir)
       supposed_heading = opt_dir.get().normalized();
     else
@@ -176,7 +182,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
     }
   }
 
-  float cost = map_ptr->costAtPosition(handles, barycentric_coords);
+  float cost = map_ptr->costAtPosition(handles, bary_coords);
 
   // variable to store the new angular and linear velocities
   std::array<float, 2> velocities;
@@ -722,54 +728,73 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
       ahead_direction_vec = poseToDirectionVector(pose_ahead);
       // finds the face which contains the current ahead face
       // find cost of the future position
-      const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
+      auto vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
       const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
       float dist;
 
-      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, config.max_search_radius, config.max_search_distance))
+      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist))
       {
+
+      }
+      else if(auto search_res_opt = map_ptr->searchNeighbourFaces(
+                   ahead_position_vec, ahead_face,
+                   config.max_search_radius, config.max_search_distance))
+      {
+        auto search_res = *search_res_opt;
+        ahead_face = std::get<0>(search_res);
+        barycentric_coords = std::get<2>(search_res);
+        vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
         ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
         if (ahead_cost == -1)
           ROS_ERROR_STREAM("Could not access cost!");
       }
     }
-    // look ahead for using mesh gradient for navigation reference
+    // look ahead using mesh gradient
     else
     {
       const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
-      std::array<float, 3> barycentric_coords;
+      std::array<float, 3> bary_coords;
       float dist;
-      // check if
       if (mesh_map::projectedBarycentricCoords(
-              ahead_position_vec,
-              vertex_positions,
-              barycentric_coords,
-              dist)
-          || map_ptr->searchNeighbourFaces(
-              ahead_position_vec,
-              ahead_face,
-              barycentric_coords,
-              config.max_search_radius,
-              config.max_search_distance))
+              ahead_position_vec, vertex_positions,
+              bary_coords,dist)
+          )
       {
-        const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
 
-        const auto& opt_dir = map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
-        if (opt_dir)
-        {
-          ahead_direction_vec = opt_dir.get().normalized() * 0.03;
-          ahead_position_vec += ahead_direction_vec;
-          ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
-          if (ahead_cost == -1)
-            ROS_ERROR_STREAM("Could not access cost!!!");
-        }
-        else
-        {
-          ROS_ERROR_STREAM("No direction at position!");
-          break;
-        }
+      }
+      else if(auto search_res_opt = map_ptr->searchNeighbourFaces(
+                   ahead_position_vec, ahead_face,
+                   config.max_search_radius,config.max_search_distance))
+      {
+        auto search_res = *search_res_opt;
+        ahead_face = std::get<0>(search_res);
+        auto vertices = std::get<1>(search_res);
+        bary_coords = std::get<2>(search_res);
+        auto vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
+        ahead_cost = map_ptr->costAtPosition(vertex_handles, bary_coords);
+        ahead_position_vec = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
+      }
+      else
+      {
+
+      }
+
+      const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
+
+      const auto& opt_dir = map_ptr->directionAtPosition(vector_map, vertex_handles, bary_coords);
+      if (opt_dir)
+      {
+        ahead_direction_vec = opt_dir.get().normalized() * 0.03;
+        ahead_position_vec += ahead_direction_vec;
+        ahead_cost = map_ptr->costAtPosition(vertex_handles, bary_coords);
+        if (ahead_cost == -1)
+          ROS_ERROR_STREAM("Could not access cost!!!");
+      }
+      else
+      {
+        ROS_ERROR_STREAM("No direction at position!");
+        break;
       }
     }
 
