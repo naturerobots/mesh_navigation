@@ -35,11 +35,8 @@
  *
  */
 
-#include <actionlib/client/simple_action_client.h>
-#include <base_local_planner/footprint_helper.h>
 #include <geometry_msgs/PoseArray.h>
 #include <mbf_abstract_nav/MoveBaseFlexConfig.h>
-#include <mbf_msgs/MoveBaseAction.h>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
 
@@ -78,25 +75,25 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
 }
 
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
-    const std::string name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newControllerExecution(
-    const std::string name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshControllerExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
       tf_listener_ptr_, mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecoveryExecution(
-    const std::string name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
+    const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshRecoveryExecution>(
-      name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
       boost::ref(mesh_ptr_), last_config_);
 }
 
@@ -294,217 +291,15 @@ bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request
     }
   }
 
-  double x = pose.pose.position.x;
-  double y = pose.pose.position.y;
-  double z = pose.pose.position.z;
-  double yaw = tf::getYaw(pose.pose.orientation);
-
-  /*
-  // pad raw footprint to the requested safety distance; note that we discard
-  footprint_padding parameter effect std::vector<geometry_msgs::Point> footprint
-  = mesh->getUnpaddedRobotFootprint(); mesh_map::padFootprint(footprint,
-  request.safety_dist);
-
-  // use a footprint helper instance to get all the cells totally or partially
-  within footprint polygon base_local_planner::FootprintHelper fph;
-  std::vector<base_local_planner::Position2DInt> footprint_cells =
-    fph.getFootprintCells(Eigen::Vector3f(x, y, yaw), footprint,
-  *mesh->getMesh(), true); response.state = mbf_msgs::CheckPose::Response::FREE;
-  if (footprint_cells.empty())
-  {
-    // no cells within footprint polygon must mean that robot is completely
-  outside of the map response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPose::Response::OUTSIDE));
-  }
-  else
-  {
-    // lock mesh so content doesn't change while adding cell costs
-    boost::unique_lock<mesh_2d::Mesh2D::mutex_t>
-  lock(*(mesh->getMesh()->getMutex()));
-
-    // integrate the cost of all cells; state value precedence is UNKNOWN >
-  LETHAL > INSCRIBED > FREE for (int i = 0; i < footprint_cells.size(); ++i)
-    {
-      unsigned char cost = mesh->getMesh()->getCost(footprint_cells[i].x,
-  footprint_cells[i].y); switch (cost)
-      {
-        case mesh_2d::NO_INFORMATION:
-          response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPose::Response::UNKNOWN)); response.cost
-  += cost * (request.unknown_cost_mult ? request.unknown_cost_mult : 1.0);
-          break;
-        case mesh_2d::LETHAL_OBSTACLE:
-          response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPose::Response::LETHAL)); response.cost +=
-  cost * (request.lethal_cost_mult ? request.lethal_cost_mult : 1.0); break;
-        case mesh_2d::INSCRIBED_INFLATED_OBSTACLE:
-          response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPose::Response::INSCRIBED)); response.cost
-  += cost * (request.inscrib_cost_mult ? request.inscrib_cost_mult : 1.0);
-          break;
-        default:response.cost += cost;
-          break;
-      }
-    }
-  }
-   */
-
-  // Provide some details of the outcome
-  switch (response.state)
-  {
-    case mbf_msgs::CheckPose::Response::OUTSIDE:
-      ROS_DEBUG_STREAM("Pose [" << x << ", " << y << ", " << yaw << "] is outside the map (cost = " << response.cost
-                                << "; safety distance = " << request.safety_dist << ")");
-      break;
-    case mbf_msgs::CheckPose::Response::UNKNOWN:
-      ROS_DEBUG_STREAM("Pose [" << x << ", " << y << ", " << yaw << "] is in unknown space! (cost = " << response.cost
-                                << "; safety distance = " << request.safety_dist << ")");
-      break;
-    case mbf_msgs::CheckPose::Response::LETHAL:
-      ROS_DEBUG_STREAM("Pose [" << x << ", " << y << ", " << yaw << "] is in collision! (cost = " << response.cost
-                                << "; safety distance = " << request.safety_dist << ")");
-      break;
-    case mbf_msgs::CheckPose::Response::INSCRIBED:
-      ROS_DEBUG_STREAM("Pose [" << x << ", " << y << ", " << yaw << "] is near an obstacle (cost = " << response.cost
-                                << "; safety distance = " << request.safety_dist << ")");
-      break;
-    case mbf_msgs::CheckPose::Response::FREE:
-      ROS_DEBUG_STREAM("Pose [" << x << ", " << y << ", " << yaw << "] is free (cost = " << response.cost
-                                << "; safety distance = " << request.safety_dist << ")");
-      break;
-  }
-
-  return true;
+  // TODO implement
+  return false;
 }
 
 bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request& request,
                                                     mbf_msgs::CheckPath::Response& response)
 {
-  // get target pose or current robot pose as x, y, yaw coordinates
-  std::string mesh_frame = mesh_ptr_->getGlobalFrameID();
-
-  /*
-  std::vector<geometry_msgs::Point> footprint;
-  if (!request.path_cells_only)
-  {
-    // unless we want to check just the cells directly traversed by the path,
-  pad raw footprint
-    // to the requested safety distance; note that we discard footprint_padding
-  parameter effect footprint = mesh->getUnpaddedRobotFootprint();
-    mesh_2d::padFootprint(footprint, request.safety_dist);
-  }
-
-  // lock mesh so content doesn't change while adding cell costs
-  boost::unique_lock<mesh_2d::Mesh2D::mutex_t>
-  lock(*(mesh->getMesh()->getMutex()));
-
-  geometry_msgs::PoseStamped pose;
-
-  response.state = mbf_msgs::CheckPath::Response::FREE;
-
-  for (int i = 0; i < request.path.poses.size(); ++i)
-  {
-    response.last_checked = i;
-
-    if (! mbf_utility::transformPose(*tf_listener_ptr_, mesh_frame,
-  request.path.header.stamp, ros::Duration(0.5), request.path.poses[i],
-  global_frame_, pose))
-    {
-      ROS_ERROR_STREAM("Transform target pose to " << mesh_name << " frame '" <<
-  mesh_frame << "' failed"); return false;
-    }
-
-    double x = pose.pose.position.x;
-    double y = pose.pose.position.y;
-    double yaw = tf::getYaw(pose.pose.orientation);
-    std::vector<base_local_planner::Position2DInt> cells_to_check;
-    if (request.path_cells_only)
-    {
-      base_local_planner::Position2DInt cell;
-      if (mesh->getMesh()->worldToMap(x, y, (unsigned int&)cell.x, (unsigned
-  int&)cell.y)) cells_to_check.push_back(cell);  // out of map if false;
-  cells_to_check will be empty
-    }
-    else
-    {
-      cells_to_check = fph.getFootprintCells(Eigen::Vector3f(x, y, yaw),
-  footprint, *mesh->getMesh(), true);
-    }
-
-    if (cells_to_check.empty())
-    {
-      // if path_cells_only is true, this means that current path's pose is
-  outside the map
-      // if not, no cells within footprint polygon means that robot is
-  completely outside of the map response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPath::Response::OUTSIDE));
-    }
-    else
-    {
-      // integrate the cost of all cells; state value precedence is UNKNOWN >
-  LETHAL > INSCRIBED > FREE
-      // we apply the requested cost multipliers if different from zero (default
-  value) for (int j = 0; j < cells_to_check.size(); ++j)
-      {
-        unsigned char cost = mesh->getMesh()->getCost(cells_to_check[j].x,
-  cells_to_check[j].y); switch (cost)
-        {
-          case mesh_2d::NO_INFORMATION:
-            response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPose::Response::UNKNOWN)); response.cost
-  += cost * (request.unknown_cost_mult ? request.unknown_cost_mult : 1.0);
-            break;
-          case mesh_2d::LETHAL_OBSTACLE:
-            response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPath::Response::LETHAL)); response.cost +=
-  cost * (request.lethal_cost_mult ? request.lethal_cost_mult : 1.0); break;
-          case mesh_2d::INSCRIBED_INFLATED_OBSTACLE:
-            response.state = std::max(response.state,
-  static_cast<uint8_t>(mbf_msgs::CheckPath::Response::INSCRIBED)); response.cost
-  += cost * (request.inscrib_cost_mult ? request.inscrib_cost_mult : 1.0);
-            break;
-          default:response.cost += cost;
-            break;
-        }
-      }
-    }
-
-    if (request.return_on && response.state >= request.return_on)
-    {
-      // i-th pose state is bad enough for the client, so provide some details
-  of the outcome and abort checking switch (response.state)
-      {
-        case mbf_msgs::CheckPath::Response::OUTSIDE:
-          ROS_DEBUG_STREAM("At pose " << i << " [" << x << ", " << y << ", " <<
-  yaw << "] path goes outside the map "
-                           << "(cost = " << response.cost << "; safety distance
-  = " << request.safety_dist << ")"); break; case
-  mbf_msgs::CheckPath::Response::UNKNOWN: ROS_DEBUG_STREAM("At pose " << i << "
-  [" << x << ", " << y << ", " << yaw << "] path goes in unknown space! "
-                           << "(cost = " << response.cost << "; safety distance
-  = " << request.safety_dist << ")"); break; case
-  mbf_msgs::CheckPath::Response::LETHAL: ROS_DEBUG_STREAM("At pose " << i << "
-  [" << x << ", " << y << ", " << yaw << "] path goes in collision! "
-                           << "(cost = " << response.cost << "; safety distance
-  = " << request.safety_dist << ")"); break; case
-  mbf_msgs::CheckPath::Response::INSCRIBED: ROS_DEBUG_STREAM("At pose " << i <<
-  " [" << x << ", " << y << ", " << yaw << "] path goes near an obstacle "
-                           << "(cost = " << response.cost << "; safety distance
-  = " << request.safety_dist << ")"); break; case
-  mbf_msgs::CheckPath::Response::FREE: ROS_DEBUG_STREAM("Path is entirely free
-  (maximum cost = "
-                           << response.cost << "; safety distance = " <<
-  request.safety_dist << ")"); break;
-      }
-
-      break;
-    }
-
-    i += request.skip_poses;  // skip some poses to speedup processing (disabled
-  by default)
-  }
-*/
-  return true;
+  // TODO implement
+  return false;
 }
 
 bool MeshNavigationServer::callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)

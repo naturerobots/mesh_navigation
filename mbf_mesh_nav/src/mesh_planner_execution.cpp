@@ -61,18 +61,17 @@ mbf_abstract_nav::MoveBaseFlexConfig MeshPlannerExecution::toAbstract(const Move
   return abstract_config;
 }
 
-uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                                        double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                                        std::string& message)
+uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped &start,
+                                           const geometry_msgs::PoseStamped &goal,
+                                           double tolerance,
+                                           std::vector<geometry_msgs::PoseStamped> &plan,
+                                           double &cost,
+                                           std::string &message)
 {
-  if (lock_mesh_)
-  {
-    // TODO
-    // boost::unique_lock<mesh_map::MeshMap::mutex_t>
-    // lock(*(mesh_ptr_->getMutex())); return planner_->makePlan(start, goal,
-    // tolerance, plan, cost, message);
-  }
-  return planner_->makePlan(start, goal, tolerance, plan, cost, message);
+  ros::Time start_time = ros::Time::now();
+  uint32_t outcome = planner_->makePlan(start, goal, tolerance, plan, cost, message);
+  ROS_INFO_STREAM("Runtime of " << plugin_name_ << ":" << (ros::Time::now() - start_time).toNSec() * 1e-6 << "ms");
+  return outcome;
 }
 
 } /* namespace mbf_mesh_nav */

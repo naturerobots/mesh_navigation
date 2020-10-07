@@ -89,9 +89,13 @@ private:
    * @return An outcome number, see also the action definition in the
    * GetPath.action file
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                            std::string& message);
+  virtual uint32_t makePlan(
+      const geometry_msgs::PoseStamped &start,
+      const geometry_msgs::PoseStamped &goal,
+      double tolerance,
+      std::vector<geometry_msgs::PoseStamped> &plan,
+      double &cost,
+      std::string &message);
 
   //! Shared pointer to the mesh for 3d navigation planning
   const MeshPtr& mesh_ptr_;

@@ -534,12 +534,10 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
                                                 lvr2::DenseVertexMap<float>& distances,
                                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
-  ROS_INFO_STREAM("Init wave front propagation.");
+  ROS_DEBUG_STREAM("Init wave front propagation.");
 
   const auto& mesh = mesh_map->mesh();
-
   const auto& vertex_costs = mesh_map->vertexCosts();
-
   auto& invalid = mesh_map->invalid;
 
   mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
@@ -551,6 +549,8 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
   // Find the containing faces of start and goal
   const auto& start_opt = mesh_map->getContainingFace(start, 0.4);
   const auto& goal_opt = mesh_map->getContainingFace(goal, 0.4);
+
+  ros::WallTime t_initialization_start = ros::WallTime::now();
 
   // reset cancel planning
   cancel_planning = false;
@@ -603,7 +603,7 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
   }
 
   std::array<lvr2::VertexHandle, 3> goal_vertices = mesh.getVerticesOfFace(goal_face);
-  ROS_INFO_STREAM("The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z << ") at the face ("
+  ROS_DEBUG_STREAM("The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z << ") at the face ("
                                      << goal_vertices[0] << ", " << goal_vertices[1] << ", " << goal_vertices[2]
                                      << ")");
   mesh_map->publishDebugPoint(mesh.getVertexPosition(goal_vertices[0]), mesh_map::color(0, 0, 1), "goal_face_v1");
@@ -612,19 +612,19 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
 
   float goal_dist = std::numeric_limits<float>::infinity();
 
-  ROS_INFO_STREAM("Start wave front propagation...");
-
-  ros::WallTime t_start, t_end;
-  t_start = ros::WallTime::now();
+  ROS_DEBUG_STREAM("Start wavefront propagation...");
 
   size_t fixed_cnt = 0;
+  size_t fixed_set_cnt = 0;
+  ros::WallTime t_wavefront_start = ros::WallTime::now();
+  double initialization_duration = (t_wavefront_start - t_initialization_start).toNSec() * 1e-6;
+
   while (!pq.isEmpty() && !cancel_planning)
   {
     lvr2::VertexHandle current_vh = pq.popMin().key();
 
-    // check if already fixed
-    // if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
+    fixed_set_cnt++;
 
     if (distances[current_vh] > goal_dist)
       continue;
@@ -640,7 +640,7 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
       if (goal_dist == std::numeric_limits<float>::infinity() && fixed[goal_vertices[0]] && fixed[goal_vertices[1]] &&
           fixed[goal_vertices[2]])
       {
-        ROS_INFO_STREAM("Wave front reached the goal!");
+        ROS_DEBUG_STREAM("Wave front reached the goal!");
         goal_dist = distances[current_vh] + goal_dist_offset;
       }
     }
@@ -740,20 +740,19 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
     }
   }
 
-  t_end = ros::WallTime::now();
-  double execution_time = (t_end - t_start).toNSec() * 1e-6;
-  ROS_INFO_STREAM("Execution time (ms): " << execution_time << " for " << mesh.numVertices()
-                                          << " num vertices in the mesh.");
-
   if (cancel_planning)
   {
     ROS_WARN_STREAM("Wave front propagation has been canceled!");
     return mbf_msgs::GetPathResult::CANCELED;
   }
-
-  ROS_INFO_STREAM("Finished wave front propagation.");
-  ROS_INFO_STREAM("Computing the vector map...");
+  ros::WallTime t_wavefront_end = ros::WallTime::now();
+  double wavefront_propagation_duration = (t_wavefront_end - t_wavefront_start).toNSec() * 1e-6;
+  ROS_DEBUG_STREAM("Finished wave front propagation.");
+  ROS_DEBUG_STREAM("Computing the vector map...");
   computeVectorMap();
+
+  ros::WallTime t_vector_field_end = ros::WallTime::now();
+  double vector_field_duration = (t_vector_field_end - t_wavefront_end).toNSec() * 1e-6;
 
   bool path_exists = false;
   for (auto goal_vertex : goal_vertices)
@@ -771,21 +770,20 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
     return mbf_msgs::GetPathResult::NO_PATH_FOUND;
   }
 
-  ROS_INFO_STREAM("Start vector field back tracking!");
-  constexpr float step_width = 0.6;  // step width of 3 cm
+  ROS_DEBUG_STREAM("Start vector field back tracking!");
 
   lvr2::FaceHandle current_face = goal_face;
   mesh_map::Vector current_pos = goal;
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
 
   // move from the goal position towards the start position
-  while (current_pos.distance2(start) > step_width && !cancel_planning)
+  while (current_pos.distance2(start) > config.step_width && !cancel_planning)
   {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
     try
     {
-      if (mesh_map->meshAhead(current_pos, current_face, step_width))
+      if (mesh_map->meshAhead(current_pos, current_face, config.step_width))
       {
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
       }
@@ -802,6 +800,15 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
     }
   }
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(start, start_face));
+
+  ros::WallTime t_path_backtracking = ros::WallTime::now();
+  double path_backtracking_duration = (t_path_backtracking - t_vector_field_end).toNSec() * 1e-6;
+
+  ROS_INFO_STREAM("Processed " << fixed_set_cnt << " vertices in the fixed set.");
+  ROS_INFO_STREAM("Initialization duration (ms): " << initialization_duration);
+  ROS_INFO_STREAM("Execution time wavefront propagation (ms): "<< wavefront_propagation_duration);
+  ROS_INFO_STREAM("Vector field post computation (ms): " << vector_field_duration);
+  ROS_INFO_STREAM("Path backtracking duration (ms): " << path_backtracking_duration);
 
   if (cancel_planning)
   {

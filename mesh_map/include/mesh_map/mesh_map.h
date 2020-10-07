@@ -51,6 +51,7 @@
 #include <pluginlib/class_loader.h>
 #include <std_msgs/ColorRGBA.h>
 #include <tf2_ros/buffer.h>
+#include <tuple>
 
 namespace mesh_map
 {
@@ -77,8 +78,8 @@ public:
 
   lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
 
-  bool searchContainingFace(Vector& pos, lvr2::OptionalFaceHandle& face_handle,
-                            std::array<float, 3>& barycentric_coords, const float& max_dist);
+  boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector, 3>,
+    std::array<float, 3>>> searchContainingFace(Vector& position, const float& max_dist);
 
   void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
 
@@ -170,12 +171,13 @@ public:
   }
 
   /**
-   * Searches in the sourrounding triangles for the triangle in which the given
+   * Searches in the surrounding triangles for the triangle in which the given
    * position lies.
-   * @param pose_vec  Vector of the position which searched for
-   * @param face      Face handle from which search begins,
-   * @param max_dist  The maximum distance to the given face vertices
-   * @return          Face handle of the position - empty optional face handle
+   * @param pose_vec    Vector of the position which searched for
+   * @param face        Face handle from which search begins
+   * @param max_radius  The radius in which the controller searches for a consecutive face
+   * @param max_dist    The maximum distance to the given face vertices
+   * @return            Face handle of the position - empty optional face handle
    * if position could not be found
    */
   bool searchNeighbourFaces(Vector& pos, lvr2::FaceHandle& face, std::array<float, 3>& barycentric_coords,
@@ -186,6 +188,7 @@ public:
    * handle by following the direction For: look ahead when using mesh gradient
    * @param vec   direction vector from which the next step vector is calculated
    * @param face  face of the direction vector
+   * @param step_width The step length to go ahead on the mesh surface
    * @return      new vector (also updates the ahead_face handle to correspond
    * to the new vector)
    */

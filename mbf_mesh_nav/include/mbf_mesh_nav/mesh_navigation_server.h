@@ -93,15 +93,15 @@ public:
 private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
-  newPlannerExecution(const std::string name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
+  newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref controller_execution "ControllerExecution"
   virtual mbf_abstract_nav::AbstractControllerExecution::Ptr
-  newControllerExecution(const std::string name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
+  newControllerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref recovery_execution "RecoveryExecution"
   virtual mbf_abstract_nav::AbstractRecoveryExecution::Ptr
-  newRecoveryExecution(const std::string name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
+  newRecoveryExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
 
   /**
    * @brief Loads the plugin associated with the given planner_type parameter.

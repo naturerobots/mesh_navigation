@@ -31,7 +31,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sabrina Frohn <sfrohn@uos.de>
  *    Sebastian Pütz <spuetz@uos.de>
  *
  */
@@ -48,6 +47,14 @@
 #include <mbf_utility/exe_path_exception.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController, mbf_mesh_core::MeshController);
+
+#define DEBUG
+
+#ifdef DEBUG
+#define DEBUG_CALL(method) method
+#else
+#define DEBUG_CALL(method)
+#endif
 
 namespace mesh_controller
 {
@@ -68,60 +75,80 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
 
   // check if a path has been calculated and given
   if (current_plan.empty())
-  {
     return mbf_msgs::GetPathResult::EMPTY_PATH;
-  }
-  else if (!goalSet)
-  {
-    goal = current_plan.back();
-    goalSet = true;
-  }
 
-  float max_radius_dist = 0.1;
-  float dist;
-
-  // set current face
   mesh_map::Vector position = poseToPositionVector(pose);
   std::array<float, 3> barycentric_coords;
+  std::array<mesh_map::Vector, 3> vertices;
 
   if (!current_face)
-    ROS_WARN_STREAM("Current face not set.");
-  if (!current_face && !map_ptr->searchContainingFace(position, current_face, barycentric_coords, 0.3))
   {
-    return mbf_msgs::ExePathResult::OUT_OF_MAP;
+    // initially search current face on complete map
+    if (auto search_res_opt = map_ptr->searchContainingFace(
+            position, config.max_search_distance))
+    {
+      auto search_res = *search_res_opt;
+      current_face = std::get<0>(search_res);
+      vertices = std::get<1>(search_res);
+      barycentric_coords = std::get<2>(search_res);
+
+      // project position onto surface
+      position = mesh_map::linearCombineBarycentricCoords(vertices, barycentric_coords);
+    }
+    else
+    {
+      // no corresponding face has been found
+      return mbf_msgs::ExePathResult::OUT_OF_MAP;
+    }
+  }
+  else // current face is set
+  {
+
+    lvr2::FaceHandle face = current_face.unwrap();
+    DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(1, 1, 1), "current_face");)
+    DEBUG_CALL(map_ptr->publishDebugPoint(position, mesh_map::color(1, 1, 1), "robot_pose");)
+
+    float dist_to_surface;
+    // check whether or not the position matches the current face
+    // if not search for new current face
+    if (mesh_map::projectedBarycentricCoords(
+        position, vertices, barycentric_coords, dist_to_surface)
+        && dist_to_surface < config.max_search_distance)
+    {
+      // current position is located inside and close enough to the face
+      DEBUG_CALL(map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");)
+    }
+    else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, config.max_search_radius, config.max_search_distance))
+    {
+      // new face has been found out of the neighbour faces of the current face
+      current_face = face;
+      DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");)
+      DEBUG_CALL(map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "search_neighbour_pos");)
+    }
+    else if(auto face_and_bary_coords_opt = map_ptr->searchContainingFace(
+        position, config.max_search_distance))
+    {
+      // update variables to new face
+      auto face_and_bary_coords = *face_and_bary_coords_opt;
+      current_face = std::get<0>(face_and_bary_coords);
+      vertices = std::get<1>(face_and_bary_coords);
+      barycentric_coords = std::get<2>(face_and_bary_coords);
+      position = mesh_map::linearCombineBarycentricCoords(vertices, barycentric_coords);
+    }
+    else
+    {
+      // no corresponding face has been found
+      return mbf_msgs::ExePathResult::OUT_OF_MAP;
+    }
+
   }
 
-  lvr2::FaceHandle face = current_face.unwrap();
-  map_ptr->publishDebugFace(face, mesh_map::color(1, 1, 1), "current_face");
-
-  map_ptr->publishDebugPoint(position, mesh_map::color(1, 1, 1), "robot_pose");
-
-  if ((mesh_map::projectedBarycentricCoords(
-           position, map_ptr->mesh_ptr->getVertexPositionsOfFace(current_face.unwrap()), barycentric_coords, dist) &&
-       dist < 0.3))
-  {
-    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "current_pos");
-  }
-  else if (map_ptr->searchNeighbourFaces(position, face, barycentric_coords, max_radius_dist, 0.1))
-  {
-    // update current_face
-    current_face = face;
-    map_ptr->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");
-    map_ptr->publishDebugPoint(position, mesh_map::color(0, 0, 1), "search_neighbour_pos");
-  }
-  else
-  {
-    return mbf_msgs::ExePathResult::OUT_OF_MAP;
-  }
-
-  const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(face);
-  const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(face);
-
-  // projected position onto the surface.
-  // position = mesh_map::linearCombineBarycentricCoords(vertex_positions,
-  // barycentric_coords);
+  const lvr2::FaceHandle face = current_face.unwrap();
+  std::array<lvr2::VertexHandle, 3> handles = map_ptr->mesh_ptr->getVerticesOfFace(face);
 
   // update to which position of the plan the robot is closest
+
+  mesh_map::Vector supposed_heading;
   if (!config.useMeshGradient)
   {
     // update to which position of the plan the robot is closest
@@ -133,67 +160,48 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
       // TODO check if mesh gradient should be used then
       return mbf_msgs::GetPathResult::FAILURE;
     }
-  }
-
-  // variable that contains the planned / supposed orientation of the robot at
-  // the current position
-  mesh_map::Vector supposed_heading;
-  if (!config.useMeshGradient)
-  {
     // use supposed orientation from calculated path
     supposed_heading = poseToDirectionVector(plan_position);
   }
   else
   {
-    const auto& opt_dir = map_ptr->directionAtPosition(vector_map, vertex_handles, barycentric_coords);
-
+    const auto& opt_dir = map_ptr->directionAtPosition(vector_map, handles, barycentric_coords);
     if (opt_dir)
-    {
       supposed_heading = opt_dir.get().normalized();
-      if (!std::isfinite(supposed_heading.length()))
-      {
-      }
-
-      ROS_DEBUG_STREAM("Supposed heading:" << supposed_heading);
-    }
     else
     {
-      map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");
+      DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");)
       ROS_ERROR_STREAM("Could not access vector field for the given face!");
       return mbf_msgs::ExePathResult::FAILURE;
     }
   }
 
-  float cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
+  float cost = map_ptr->costAtPosition(handles, barycentric_coords);
 
   // variable to store the new angular and linear velocities
-  std::vector<float> values(2);
+  std::array<float, 2> velocities;
 
   try
   {
-    // determine values via naive controller
-    values = naiveControl(pose, supposed_heading, cost);
+    velocities = naiveControl(pose, supposed_heading, cost);
   }
   catch (mbf_utility::ExePathException e)
   {
-    ROS_ERROR_STREAM("Mbf Exe Path Exception:" << e.what());
+    ROS_ERROR_STREAM("MBF ExePath Exception:" << e.what());
     return e.outcome;
   }
 
-  if (values[1] == std::numeric_limits<float>::max())
+  if (velocities[1] == std::numeric_limits<float>::max())
   {
     ROS_ERROR_STREAM("Mesh controller calculation failed!");
     return mbf_msgs::GetPathResult::FAILURE;
   }
-  // set velocities
 
-  // TODO max vel
-  cmd_vel.twist.angular.z = values[0] * config.ang_vel_factor;
-  cmd_vel.twist.linear.x = values[1] * config.lin_vel_factor;
+  cmd_vel.twist.angular.z = std::max(config.max_ang_velocity, velocities[0] * config.ang_vel_factor);
+  cmd_vel.twist.linear.x = std::max(config.max_lin_velocity, velocities[1] * config.lin_vel_factor);
 
   if (cancel_requested)
   {
-    ROS_WARN_STREAM("Mesh controller will be canceled!");
     return mbf_msgs::ExePathResult::CANCELED;
   }
   return mbf_msgs::ExePathResult::SUCCESS;
@@ -216,8 +224,8 @@ bool MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan
   // checks if the given vector contains the plan
   if (!plan.empty())
   {
-    map_ptr->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");
-    map_ptr->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");
+    DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");)
+    DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");)
 
     // assign given plan to current_plan variable to make it usable for
     // navigation
@@ -226,7 +234,6 @@ bool MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan
     current_plan.erase(current_plan.begin());
     // set goal according to plan
     goal = current_plan.back();
-    goalSet = true;
     current_pose = current_plan.front().pose;
 
     // reset current and ahead face
@@ -640,8 +647,15 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
 
   double max_travelled_dist = velocity * time_delta.toSec();
 
+  // TODO: do better
+  // this is a hotfix to prevent the steps being MIN_INT which resuts in the controller crashing
+  if (std::isnan(max_travelled_dist))
+  {
+    max_travelled_dist = 0;
+  }
+
   // select how far to look ahead depending on the max travelled distance
-  int steps;
+  int steps = 0;
   if (!config.useMeshGradient)
   {
     // calculates approximately how many elements of the path have to be called
@@ -714,7 +728,7 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
       float dist;
 
       if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, config.max_search_radius, config.max_search_distance))
       {
         ahead_cost = map_ptr->costAtPosition(vertex_handles, barycentric_coords);
         if (ahead_cost == -1)
@@ -727,8 +741,18 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
       const auto& vertex_positions = map_ptr->mesh_ptr->getVertexPositionsOfFace(ahead_face);
       std::array<float, 3> barycentric_coords;
       float dist;
-      if (mesh_map::projectedBarycentricCoords(ahead_position_vec, vertex_positions, barycentric_coords, dist) ||
-          map_ptr->searchNeighbourFaces(ahead_position_vec, ahead_face, barycentric_coords, 0.05, 0.4))
+      // check if
+      if (mesh_map::projectedBarycentricCoords(
+              ahead_position_vec,
+              vertex_positions,
+              barycentric_coords,
+              dist)
+          || map_ptr->searchNeighbourFaces(
+              ahead_position_vec,
+              ahead_face,
+              barycentric_coords,
+              config.max_search_radius,
+              config.max_search_distance))
       {
         const auto& vertex_handles = map_ptr->mesh_ptr->getVerticesOfFace(ahead_face);
 
@@ -791,30 +815,30 @@ std::vector<float> MeshController::lookAhead(const geometry_msgs::PoseStamped& p
   return { av_turn, av_cost };
 }
 
-std::vector<float> MeshController::naiveControl(const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
-                                                const float& cost)
+std::array<float, 2> MeshController::naiveControl(
+    const geometry_msgs::PoseStamped& pose, mesh_map::Vector supposed_dir,
+    const float& cost)
 {
   mesh_map::Vector dir_vec = poseToDirectionVector(pose);
   mesh_map::Vector position_vec = poseToPositionVector(pose);
 
-  // ANGULAR MOVEMENT
+  // compute angular velocity
   // calculate angle between orientation vectors
   // angle will never be negative and smaller or equal to pi
   angle = angleBetweenVectors(dir_vec, supposed_dir);
 
-  // output: angle publishing
-  std_msgs::Float32 angle32;
-  angle32.data = angle * 180 / M_PI;
-  angle_pub.publish(angle32);
+  // debug output angle between supposed and current angle
+  DEBUG_CALL(std_msgs::Float32 angle32; angle32.data = angle * 180 / M_PI; angle_pub.publish(angle32);)
 
-  // to determine in which direction to turn (neg for left, pos for right)
-  float leftRight = direction(dir_vec, supposed_dir);
+  // determine direction to turn (neg -> left, pos -> right)
+  float left_right = direction(dir_vec, supposed_dir);
 
   // calculate a direction velocity depending on the turn direction and
   // difference angle
-  float final_ang_vel = leftRight * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
+  float final_ang_vel = left_right * linValue(config.max_ang_velocity, 0.0, 2 * M_PI, angle);
 
-  // LINEAR movement
+  // linear velocity computation
+  // TODO turn param -> width of gauss function
   float lin_vel_by_ang = gaussValue(config.max_lin_velocity, 2 * M_PI, angle);
   float final_lin_vel;
 
@@ -913,7 +937,6 @@ void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& 
 bool MeshController::initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
                                 const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
 {
-  goalSet = false;
   name = plugin_name;
   private_nh = ros::NodeHandle("~/" + name);
 
