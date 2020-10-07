@@ -48,7 +48,7 @@ using namespace std;
 
 #include "wave_front_planner/wave_front_planner.h"
 //#define DEBUG
-//#define USE_UPDATE_WITH_S
+#define USE_UPDATE_WITH_S
 
 PLUGINLIB_EXPORT_CLASS(wave_front_planner::WaveFrontPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -773,20 +773,19 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
   }
 
   ROS_DEBUG_STREAM("Start vector field back tracking!");
-  constexpr float step_width = 0.6;  // step width of 3 cm
 
   lvr2::FaceHandle current_face = goal_face;
   mesh_map::Vector current_pos = goal;
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
 
   // move from the goal position towards the start position
-  while (current_pos.distance2(start) > step_width && !cancel_planning)
+  while (current_pos.distance2(start) > config.step_width && !cancel_planning)
   {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
     try
     {
-      if (mesh_map->meshAhead(current_pos, current_face, step_width))
+      if (mesh_map->meshAhead(current_pos, current_face, config.step_width))
       {
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
       }
