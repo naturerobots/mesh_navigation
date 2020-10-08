@@ -109,12 +109,15 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::PoseStamped& start, 
     plan.push_back(pose);
   }
 
+  ROS_INFO_STREAM("Path length: " << cost << "m");
   nav_msgs::Path path_msg;
   path_msg.poses = plan;
   path_msg.header = header;
 
   path_pub.publish(path_msg);
   mesh_map->publishVertexCosts(potential, "Potential");
+
+  ROS_INFO_STREAM("Path length: " << cost << "m");
 
   if (publish_vector_field)
   {

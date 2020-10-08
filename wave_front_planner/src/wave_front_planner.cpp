@@ -85,6 +85,7 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
   header.frame_id = mesh_map->mapFrame();
 
   cost = 0;
+  float dir_length;
   if (!path.empty())
   {
     mesh_map::Vector vec = path.front().first;
@@ -92,12 +93,12 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
     path.pop_front();
 
     const auto& face_normals = mesh_map->faceNormals();
-
     for (auto& next : path)
     {
       geometry_msgs::PoseStamped pose;
       pose.header = header;
-      pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first, face_normals[fH]);
+      pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first, face_normals[fH], dir_length);
+      cost += dir_length;
       vec = next.first;
       fH = next.second;
       plan.push_back(pose);
@@ -105,7 +106,8 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
 
     geometry_msgs::PoseStamped pose;
     pose.header = header;
-    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH]);
+    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH], dir_length);
+    cost += dir_length;
     plan.push_back(pose);
   }
 
@@ -115,6 +117,7 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
 
   path_pub.publish(path_msg);
   mesh_map->publishVertexCosts(potential, "Potential");
+  ROS_INFO_STREAM("Path length: " << cost << "m");
 
   if (publish_vector_field)
   {
