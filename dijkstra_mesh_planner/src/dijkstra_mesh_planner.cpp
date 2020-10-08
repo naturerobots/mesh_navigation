@@ -210,6 +210,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
                                        lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
   ROS_INFO_STREAM("Init wave front propagation.");
+  ros::WallTime t_initialization_start = ros::WallTime::now();
 
   const auto& mesh = mesh_map->mesh();
   const auto& vertex_costs = mesh_map->vertexCosts();
@@ -268,11 +269,16 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   float goal_dist = std::numeric_limits<float>::infinity();
 
   ROS_INFO_STREAM("Start Dijkstra");
+  ros::WallTime t_propagation_start = ros::WallTime::now();
+  double initialization_duration = (t_propagation_start - t_initialization_start).toNSec() * 1e-6;
+
+  size_t fixed_set_cnt = 0;
 
   while (!pq.isEmpty() && !cancel_planning)
   {
     lvr2::VertexHandle current_vh = pq.popMin().key();
     fixed[current_vh] = true;
+    fixed_set_cnt++;
 
     if (current_vh == goal_vertex)
     {
@@ -345,6 +351,9 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     return mbf_msgs::GetPathResult::NO_PATH_FOUND;
   }
 
+  ros::WallTime t_propagation_end = ros::WallTime::now();
+  double propagation_duration = (t_propagation_end - t_propagation_start).toNSec() * 1e-6;
+
   auto vH = goal_vertex;
 
   while (vH != start_vertex && !cancel_planning)
@@ -365,6 +374,14 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     ROS_WARN_STREAM("Dijkstra has been canceled!");
     return mbf_msgs::GetPathResult::CANCELED;
   }
+
+  ros::WallTime t_path_backtracking = ros::WallTime::now();
+  double path_backtracking_duration = (t_path_backtracking - t_propagation_end).toNSec() * 1e-6;
+
+  ROS_INFO_STREAM("Processed " << fixed_set_cnt << " vertices in the fixed set.");
+  ROS_INFO_STREAM("Initialization duration (ms): " << initialization_duration);
+  ROS_INFO_STREAM("Execution time wavefront propagation (ms): "<< propagation_duration);
+  ROS_INFO_STREAM("Path backtracking duration (ms): " << path_backtracking_duration);
 
   ROS_INFO_STREAM("Successfully finished Dijkstra back tracking!");
   return mbf_msgs::GetPathResult::SUCCESS;
