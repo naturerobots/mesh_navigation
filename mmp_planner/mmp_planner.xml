@@ -1,0 +1,8 @@
+<library path="lib/libmmp_planner">
+    <class name="mmp_planner/MMPPlanner" type="mmp_planner::MMPPlanner"
+           base_class_type="mbf_mesh_core::MeshPlanner">
+        <description>
+            A MMP for mbf_mesh_nav
+        </description>
+    </class>
+</library>

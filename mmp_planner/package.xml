@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>mmp_planner</name>
+    <version>0.1.0</version>
+    <description>The mmp_planner package</description>
+    <maintainer email="mklpiening@uos.de">Malte kl. Piening</maintainer>
+    <license>TODO</license>
+    <author email="mklpiening@uos.de">Malte kl. Piening</author>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>roscpp</depend>
+    <depend>mbf_mesh_core</depend>
+    <depend>mbf_utility</depend>
+    <depend>mesh_map</depend>
+    <depend>lvr_ros</depend>
+
+    <export>
+        <mbf_mesh_core plugin="${prefix}/mmp_planner.xml"/>
+    </export>
+</package>
