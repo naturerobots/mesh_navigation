@@ -46,6 +46,7 @@ using namespace std;
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.h>
+#include <limits>
 
 #include <mmp_planner/mmp_planner.h>
 
@@ -66,12 +67,37 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
                               std::string& message)
 {
   // search points
-  std::size_t source_idx = 0;
-  std::size_t target_idx = 42;
+  geodesic::Vertex* source_vertex = nullptr;
+  geodesic::Vertex* target_vertex = nullptr;
+  double source_distance = std::numeric_limits<double>::infinity();
+  double target_distance = std::numeric_limits<double>::infinity();
+
+  ROS_INFO_STREAM("Searching matching vertices on mesh");
+  for (geodesic::Vertex& vertex : geodesic_mesh.vertices())
+  {
+    double current_source_distance = sqrt((start.pose.position.x - vertex.x()) * (start.pose.position.x - vertex.x()) +
+                                          (start.pose.position.y - vertex.y()) * (start.pose.position.y - vertex.y()) +
+                                          (start.pose.position.z - vertex.z()) * (start.pose.position.z - vertex.z()));
+    double current_target_distance = sqrt((goal.pose.position.x - vertex.x()) * (goal.pose.position.x - vertex.x()) +
+                                          (goal.pose.position.y - vertex.y()) * (goal.pose.position.y - vertex.y()) +
+                                          (goal.pose.position.z - vertex.z()) * (goal.pose.position.z - vertex.z()));
+
+    if (current_source_distance < source_distance)
+    {
+      source_distance = current_source_distance;
+      source_vertex = &vertex;
+    }
+
+    if (current_target_distance < target_distance)
+    {
+      target_distance = current_target_distance;
+      target_vertex = &vertex;
+    }
+  }
 
   // setup points
-  geodesic::SurfacePoint source(&geodesic_mesh.vertices()[source_idx]);
-  geodesic::SurfacePoint target(&geodesic_mesh.vertices()[target_idx]);
+  geodesic::SurfacePoint source(source_vertex);
+  geodesic::SurfacePoint target(target_vertex);
 
   std::vector<geodesic::SurfacePoint> sources(1, source);
 
@@ -79,13 +105,40 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
   geodesic::GeodesicAlgorithmExact algorithm(&geodesic_mesh);
   double const distance_limit = geodesic::GEODESIC_INF;        // no limit for propagation
   std::vector<geodesic::SurfacePoint> stop_points(1, target);  // stop propagation when the target is covered
+
+  ROS_INFO_STREAM("Starting mmp propagation");
   algorithm.propagate(sources, distance_limit, &stop_points);
+  ROS_INFO_STREAM("Finished mmp propagation");
 
   // trace back path
   std::vector<geodesic::SurfacePoint> path;
   algorithm.trace_back(target, path);
 
-  ROS_INFO_STREAM("size: " << path.size());
+  ROS_INFO_STREAM("Path size: " << path.size());
+
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = mesh_map->mapFrame();
+
+  cost = 0;
+
+  geometry_msgs::PoseStamped pose;
+  pose.header = header;
+  for (geodesic::SurfacePoint& point : path)
+  {
+    pose.pose.position.x = point.x();
+    pose.pose.position.y = point.y();
+    pose.pose.position.z = point.z();
+
+    plan.push_back(pose);
+  }
+
+  ROS_INFO_STREAM("Path length: " << cost << "m");
+  nav_msgs::Path path_msg;
+  path_msg.poses = plan;
+  path_msg.header = header;
+
+  path_pub.publish(path_msg);
 
   return 0;
 }
@@ -103,36 +156,49 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
   const auto& vertex_costs = mesh_map->vertexCosts();
   const auto& invalid = mesh_map->invalid;
 
-  std::vector<double> points;
-  std::vector<unsigned> faces;
-
   size_t filtered_faces = 0;
 
-  std::unordered_map<std::size_t, std::size_t> vertex_remapping;
+  // create filter for non manifold vertices
+  std::unordered_map<std::size_t, bool> filter_vertices;
+  std::unordered_map<std::size_t, bool> filter_faces;
+  for (auto const& vH : mesh.vertices())
+  {
+    filter_vertices[vH.idx()] = true;
+  }
+
+  for (auto const& fH : mesh.faces())
+  {
+    filter_faces[fH.idx()] = true;
+  }
 
   std::unordered_map<std::size_t, std::vector<std::size_t>> known_edges;
   for (auto const& fH : mesh.faces())
   {
     array<lvr2::VertexHandle, 3> vertices = mesh.getVerticesOfFace(fH);
-    if (!invalid[vertices[0]] && !invalid[vertices[1]] && !invalid[vertices[2]])
+    if (!invalid[vertices[0]] && !invalid[vertices[1]] && !invalid[vertices[2]] && !isinf(vertex_costs[vertices[0]]) &&
+        !isinf(vertex_costs[vertices[1]]) && !isinf(vertex_costs[vertices[2]]))
+
     {
       // check whether or not the edge has already been created to filter non 2 manifold edges
       if (known_edges.find(vertices[0].idx()) != known_edges.end() &&
           std::find(known_edges[vertices[0].idx()].begin(), known_edges[vertices[0].idx()].end(), vertices[1].idx()) !=
               known_edges[vertices[0].idx()].end())
       {
+        filtered_faces++;
         continue;
       }
       if (known_edges.find(vertices[1].idx()) != known_edges.end() &&
           std::find(known_edges[vertices[1].idx()].begin(), known_edges[vertices[1].idx()].end(), vertices[2].idx()) !=
               known_edges[vertices[1].idx()].end())
       {
+        filtered_faces++;
         continue;
       }
       if (known_edges.find(vertices[2].idx()) != known_edges.end() &&
           std::find(known_edges[vertices[2].idx()].begin(), known_edges[vertices[2].idx()].end(), vertices[0].idx()) !=
               known_edges[vertices[2].idx()].end())
       {
+        filtered_faces++;
         continue;
       }
 
@@ -141,24 +207,24 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
       mesh_map::Vector vertex1_position = mesh.getVertexPosition(vertices[1]);
       mesh_map::Vector vertex2_position = mesh.getVertexPosition(vertices[2]);
 
-      float angle0 =
-          acos(vertex0_position.dot(vertex1_position) / (vertex0_position.length() * vertex1_position.length()));
-      float angle1 =
-          acos(vertex1_position.dot(vertex2_position) / (vertex1_position.length() * vertex2_position.length()));
-      float angle2 =
-          acos(vertex2_position.dot(vertex0_position) / (vertex2_position.length() * vertex0_position.length()));
+      float angle0 = acos((vertex1_position - vertex0_position).dot(vertex2_position - vertex0_position) /
+                          (vertex1_position.length() * vertex2_position.length()));
+      float angle1 = acos((vertex0_position - vertex1_position).dot(vertex2_position - vertex1_position) /
+                          (vertex0_position.length() * vertex2_position.length()));
+      float angle2 = acos((vertex0_position - vertex2_position).dot(vertex1_position - vertex2_position) /
+                          (vertex0_position.length() * vertex1_position.length()));
 
-      if (isnan(angle0) || angle0 <= 0.001)
+      if (isnan(angle0) || angle0 <= 0.01)
       {
         filtered_faces++;
         continue;
       }
-      if (isnan(angle1) || angle1 <= 0.001)
+      if (isnan(angle1) || angle1 <= 0.01)
       {
         filtered_faces++;
         continue;
       }
-      if (isnan(angle2) || angle2 <= 0.001)
+      if (isnan(angle2) || angle2 <= 0.01)
       {
         filtered_faces++;
         continue;
@@ -168,69 +234,46 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
       known_edges[vertices[1].idx()].push_back(vertices[2].idx());
       known_edges[vertices[2].idx()].push_back(vertices[0].idx());
 
-      // remap to new vertex indices
-      std::size_t vertex0 = 0;
-      std::size_t vertex1 = 0;
-      std::size_t vertex2 = 0;
+      filter_vertices[vertices[0].idx()] = false;
+      filter_vertices[vertices[1].idx()] = false;
+      filter_vertices[vertices[2].idx()] = false;
 
-      auto vertex0_mapping = vertex_remapping.find(vertices[0].idx());
-      if (vertex0_mapping != vertex_remapping.end())
-      {
-        vertex0 = vertex_remapping[vertices[0].idx()];
-      }
-      else
-      {
-        vertex0 = vertex_remapping.size();
-        vertex_remapping[vertices[0].idx()] = vertex0;
-      }
-
-      auto vertex1_mapping = vertex_remapping.find(vertices[1].idx());
-      if (vertex1_mapping != vertex_remapping.end())
-      {
-        vertex1 = vertex_remapping[vertices[1].idx()];
-      }
-      else
-      {
-        vertex1 = vertex_remapping.size();
-        vertex_remapping[vertices[1].idx()] = vertex0;
-      }
-
-      auto vertex2_mapping = vertex_remapping.find(vertices[2].idx());
-      if (vertex2_mapping != vertex_remapping.end())
-      {
-        vertex2 = vertex_remapping[vertices[2].idx()];
-      }
-      else
-      {
-        vertex2 = vertex_remapping.size();
-        vertex_remapping[vertices[2].idx()] = vertex0;
-      }
-
-      // add face
-      faces.push_back(vertices[0].idx());
-      faces.push_back(vertices[1].idx());
-      faces.push_back(vertices[2].idx());
+      filter_faces[fH.idx()] = false;
     }
   }
 
-  // points.resize(vertex_remapping.size() * 3);
+  std::vector<double> points;
+  std::vector<unsigned> faces;
+
+  // remove non manifold vertices from list and build remapping map
+  std::unordered_map<std::size_t, std::size_t> vertex_remapping;
   for (auto const& vH : mesh.vertices())
   {
-    auto vertex_index = vertex_remapping.find(vH.idx());
-    if (vertex_index == vertex_remapping.end())
+    if (filter_vertices[vH.idx()])
     {
-        // continue;
+      continue;
     }
 
+    vertex_remapping[vH.idx()] = points.size() / 3;
+
     mesh_map::Vector vertex = mesh.getVertexPosition(vH);
-
-    // points[vertex_index->second] = vertex.x;
-    // points[vertex_index->second] = vertex.y;
-    // points[vertex_index->second] = vertex.z;
-
     points.push_back(vertex.x);
     points.push_back(vertex.y);
     points.push_back(vertex.z);
+  }
+
+  for (auto const& fH : mesh.faces())
+  {
+    array<lvr2::VertexHandle, 3> vertices = mesh.getVerticesOfFace(fH);
+
+    if (filter_faces[fH.idx()])
+    {
+      continue;
+    }
+
+    faces.push_back(vertex_remapping[vertices[0].idx()]);
+    faces.push_back(vertex_remapping[vertices[1].idx()]);
+    faces.push_back(vertex_remapping[vertices[2].idx()]);
   }
 
   ROS_INFO_STREAM(*std::max_element(faces.begin(), faces.end()) << " " << points.size());
