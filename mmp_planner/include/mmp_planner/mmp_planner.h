@@ -38,6 +38,8 @@
 #ifndef MESH_NAVIGATION_MMP_PLANNER_H
 #define MESH_NAVIGATION_MMP_PLANNER_H
 
+// #define EXPORT_MESH
+
 #include <mbf_mesh_core/mesh_planner.h>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/mesh_map.h>

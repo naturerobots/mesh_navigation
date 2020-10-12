@@ -50,6 +50,9 @@ using namespace std;
 
 #include <mmp_planner/mmp_planner.h>
 
+#include <lvr2/io/PLYIO.hpp>
+#include <lvr2/io/DataStruct.hpp>
+
 PLUGINLIB_EXPORT_CLASS(mmp_planner::MMPPlanner, mbf_mesh_core::MeshPlanner);
 
 namespace mmp_planner
@@ -124,6 +127,8 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
 
   geometry_msgs::PoseStamped pose;
   pose.header = header;
+
+  geodesic::SurfacePoint& last_point = path[0];
   for (geodesic::SurfacePoint& point : path)
   {
     pose.pose.position.x = point.x();
@@ -131,6 +136,12 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
     pose.pose.position.z = point.z();
 
     plan.push_back(pose);
+
+    cost += sqrt((point.x() - last_point.x()) * (point.x() - last_point.x()) +
+                 (point.y() - last_point.y()) * (point.y() - last_point.y()) +
+                 (point.z() - last_point.z()) * (point.z() - last_point.z()));
+
+    last_point = point;
   }
 
   ROS_INFO_STREAM("Path length: " << cost << "m");
@@ -175,77 +186,97 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
   for (auto const& fH : mesh.faces())
   {
     array<lvr2::VertexHandle, 3> vertices = mesh.getVerticesOfFace(fH);
-    if (!invalid[vertices[0]] && !invalid[vertices[1]] && !invalid[vertices[2]] && !isinf(vertex_costs[vertices[0]]) &&
-        !isinf(vertex_costs[vertices[1]]) && !isinf(vertex_costs[vertices[2]]))
 
+    // filter lethal vetrtices
+    if (invalid[vertices[0]] && invalid[vertices[1]] && invalid[vertices[2]])
     {
-      // check whether or not the edge has already been created to filter non 2 manifold edges
-      if (known_edges.find(vertices[0].idx()) != known_edges.end() &&
-          std::find(known_edges[vertices[0].idx()].begin(), known_edges[vertices[0].idx()].end(), vertices[1].idx()) !=
-              known_edges[vertices[0].idx()].end())
-      {
-        filtered_faces++;
-        continue;
-      }
-      if (known_edges.find(vertices[1].idx()) != known_edges.end() &&
-          std::find(known_edges[vertices[1].idx()].begin(), known_edges[vertices[1].idx()].end(), vertices[2].idx()) !=
-              known_edges[vertices[1].idx()].end())
-      {
-        filtered_faces++;
-        continue;
-      }
-      if (known_edges.find(vertices[2].idx()) != known_edges.end() &&
-          std::find(known_edges[vertices[2].idx()].begin(), known_edges[vertices[2].idx()].end(), vertices[0].idx()) !=
-              known_edges[vertices[2].idx()].end())
-      {
-        filtered_faces++;
-        continue;
-      }
-
-      // check vertex angles to remove degenerated faces
-      mesh_map::Vector vertex0_position = mesh.getVertexPosition(vertices[0]);
-      mesh_map::Vector vertex1_position = mesh.getVertexPosition(vertices[1]);
-      mesh_map::Vector vertex2_position = mesh.getVertexPosition(vertices[2]);
-
-      float angle0 = acos((vertex1_position - vertex0_position).dot(vertex2_position - vertex0_position) /
-                          (vertex1_position.length() * vertex2_position.length()));
-      float angle1 = acos((vertex0_position - vertex1_position).dot(vertex2_position - vertex1_position) /
-                          (vertex0_position.length() * vertex2_position.length()));
-      float angle2 = acos((vertex0_position - vertex2_position).dot(vertex1_position - vertex2_position) /
-                          (vertex0_position.length() * vertex1_position.length()));
-
-      if (isnan(angle0) || angle0 <= 0.01)
-      {
-        filtered_faces++;
-        continue;
-      }
-      if (isnan(angle1) || angle1 <= 0.01)
-      {
-        filtered_faces++;
-        continue;
-      }
-      if (isnan(angle2) || angle2 <= 0.01)
-      {
-        filtered_faces++;
-        continue;
-      }
-
-      known_edges[vertices[0].idx()].push_back(vertices[1].idx());
-      known_edges[vertices[1].idx()].push_back(vertices[2].idx());
-      known_edges[vertices[2].idx()].push_back(vertices[0].idx());
-
-      filter_vertices[vertices[0].idx()] = false;
-      filter_vertices[vertices[1].idx()] = false;
-      filter_vertices[vertices[2].idx()] = false;
-
-      filter_faces[fH.idx()] = false;
+      filtered_faces++;
+      continue;
     }
+    if (isinf(vertex_costs[vertices[0]]) && isinf(vertex_costs[vertices[1]]) && isinf(vertex_costs[vertices[2]]))
+    {
+      filtered_faces++;
+      continue;
+    }
+
+    // check whether or not the edge has already been created to filter non 2 manifold edges
+    if (known_edges.find(vertices[0].idx()) != known_edges.end() &&
+        std::find(known_edges[vertices[0].idx()].begin(), known_edges[vertices[0].idx()].end(), vertices[1].idx()) !=
+            known_edges[vertices[0].idx()].end())
+    {
+      filtered_faces++;
+      continue;
+    }
+    if (known_edges.find(vertices[1].idx()) != known_edges.end() &&
+        std::find(known_edges[vertices[1].idx()].begin(), known_edges[vertices[1].idx()].end(), vertices[2].idx()) !=
+            known_edges[vertices[1].idx()].end())
+    {
+      filtered_faces++;
+      continue;
+    }
+    if (known_edges.find(vertices[2].idx()) != known_edges.end() &&
+        std::find(known_edges[vertices[2].idx()].begin(), known_edges[vertices[2].idx()].end(), vertices[0].idx()) !=
+            known_edges[vertices[2].idx()].end())
+    {
+      filtered_faces++;
+      continue;
+    }
+
+    // check vertex angles to remove degenerated faces
+    mesh_map::Vector vertex0_position = mesh.getVertexPosition(vertices[0]);
+    mesh_map::Vector vertex1_position = mesh.getVertexPosition(vertices[1]);
+    mesh_map::Vector vertex2_position = mesh.getVertexPosition(vertices[2]);
+
+    float angle0 = acos((vertex1_position - vertex0_position).dot(vertex2_position - vertex0_position) /
+                        (vertex1_position.length() * vertex2_position.length()));
+    float angle1 = acos((vertex0_position - vertex1_position).dot(vertex2_position - vertex1_position) /
+                        (vertex0_position.length() * vertex2_position.length()));
+    float angle2 = acos((vertex0_position - vertex2_position).dot(vertex1_position - vertex2_position) /
+                        (vertex0_position.length() * vertex1_position.length()));
+
+    if (isnan(angle0) || angle0 <= 0.01)
+    {
+      filtered_faces++;
+      continue;
+    }
+    if (isnan(angle1) || angle1 <= 0.01)
+    {
+      filtered_faces++;
+      continue;
+    }
+    if (isnan(angle2) || angle2 <= 0.01)
+    {
+      filtered_faces++;
+      continue;
+    }
+
+    // filter small faces
+    float edge0_length = vertex0_position.distance(vertex1_position);
+    float edge1_length = vertex1_position.distance(vertex2_position);
+    float edge2_length = vertex2_position.distance(vertex0_position);
+
+    if (edge0_length < 0.04 && edge1_length < 0.04 && edge2_length < 0.04)
+    {
+      filtered_faces++;
+      continue;
+    }
+
+    // mark vertices and faces to keep them
+    known_edges[vertices[0].idx()].push_back(vertices[1].idx());
+    known_edges[vertices[1].idx()].push_back(vertices[2].idx());
+    known_edges[vertices[2].idx()].push_back(vertices[0].idx());
+
+    filter_vertices[vertices[0].idx()] = false;
+    filter_vertices[vertices[1].idx()] = false;
+    filter_vertices[vertices[2].idx()] = false;
+
+    filter_faces[fH.idx()] = false;
   }
 
   std::vector<double> points;
   std::vector<unsigned> faces;
 
-  // remove non manifold vertices from list and build remapping map
+  // remove non manifold and lethal vertices from list and build remapping map
   std::unordered_map<std::size_t, std::size_t> vertex_remapping;
   for (auto const& vH : mesh.vertices())
   {
@@ -262,6 +293,7 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
     points.push_back(vertex.z);
   }
 
+  // add only not filtered faces and update vertex indices
   for (auto const& fH : mesh.faces())
   {
     array<lvr2::VertexHandle, 3> vertices = mesh.getVerticesOfFace(fH);
@@ -276,10 +308,30 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
     faces.push_back(vertex_remapping[vertices[2].idx()]);
   }
 
-  ROS_INFO_STREAM(*std::max_element(faces.begin(), faces.end()) << " " << points.size());
-
   ROS_INFO_STREAM("removed " << filtered_faces << " faces");
   ROS_INFO_STREAM("vertices before: " << mesh.numVertices() << "; vertices after: " << vertex_remapping.size());
+
+#ifdef EXPORT_MESH
+  boost::shared_array<float> lvr_vertices(new float[points.size()]);
+  boost::shared_array<unsigned int> lvr_faces(new unsigned int[faces.size()]);
+  for (int i = 0; i < points.size(); i++)
+  {
+    lvr_vertices[i] = points[i];
+  }
+
+  for (int i = 0; i < faces.size(); i++)
+  {
+    lvr_faces[i] = faces[i];
+  }
+
+  lvr2::MeshBufferPtr lvr_mesh(new lvr2::MeshBuffer());
+  lvr_mesh->setVertices(lvr_vertices, points.size() / 3);
+  lvr_mesh->setFaceIndices(lvr_faces, faces.size() / 3);
+  lvr2::ModelPtr lvr_model(new lvr2::Model(lvr_mesh));
+
+  lvr2::PLYIO io;
+  io.save(lvr_model, "mmp.ply");
+#endif
 
   geodesic_mesh.initialize_mesh_data(points, faces);
 
