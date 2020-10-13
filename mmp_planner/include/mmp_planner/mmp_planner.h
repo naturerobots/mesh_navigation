@@ -78,6 +78,7 @@ private:
   boost::shared_ptr<dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>> reconfigure_server_ptr;
   dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>::CallbackType config_callback;
   MMPPlannerConfig config;
+  bool geodesic_map_ready = false;
 };
 
 }  // namespace mmp_planner

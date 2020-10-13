@@ -69,6 +69,11 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
                               double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
                               std::string& message)
 {
+  if (!geodesic_map_ready)
+  {
+    return 58;
+  }
+
   // search points
   geodesic::Vertex* source_vertex = nullptr;
   geodesic::Vertex* target_vertex = nullptr;
@@ -119,6 +124,7 @@ uint32_t MMPPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geo
 
   ROS_INFO_STREAM("Path size: " << path.size());
 
+  // publish path
   std_msgs::Header header;
   header.stamp = ros::Time::now();
   header.frame_id = mesh_map->mapFrame();
@@ -163,6 +169,24 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
 {
   mesh_map = mesh_map_ptr;
 
+  private_nh = ros::NodeHandle("~/" + plugin_name);
+  path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
+
+  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>>(
+      new dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>(private_nh));
+  config_callback = boost::bind(&MMPPlanner::reconfigureCallback, this, _1, _2);
+  reconfigure_server_ptr->setCallback(config_callback);
+
+  return true;
+}
+
+void MMPPlanner::reconfigureCallback(mmp_planner::MMPPlannerConfig& cfg, uint32_t level)
+{
+  geodesic_map_ready = false;
+  config = cfg;
+
+  ROS_INFO_STREAM("preparing geodesic mesh ...");
+
   const auto& mesh = mesh_map->mesh();
   const auto& vertex_costs = mesh_map->vertexCosts();
   const auto& invalid = mesh_map->invalid;
@@ -194,6 +218,14 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
       continue;
     }
     if (isinf(vertex_costs[vertices[0]]) && isinf(vertex_costs[vertices[1]]) && isinf(vertex_costs[vertices[2]]))
+    {
+      filtered_faces++;
+      continue;
+    }
+
+    // filter faces with too high costs
+    if (vertex_costs[vertices[0]] > config.cost_limit && vertex_costs[vertices[1]] > config.cost_limit &&
+        vertex_costs[vertices[2]] > config.cost_limit)
     {
       filtered_faces++;
       continue;
@@ -234,17 +266,17 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
     float angle2 = acos((vertex0_position - vertex2_position).dot(vertex1_position - vertex2_position) /
                         (vertex0_position.length() * vertex1_position.length()));
 
-    if (isnan(angle0) || angle0 <= 0.01)
+    if (isnan(angle0) || angle0 < config.min_vertex_angle)
     {
       filtered_faces++;
       continue;
     }
-    if (isnan(angle1) || angle1 <= 0.01)
+    if (isnan(angle1) || angle1 < config.min_vertex_angle)
     {
       filtered_faces++;
       continue;
     }
-    if (isnan(angle2) || angle2 <= 0.01)
+    if (isnan(angle2) || angle2 < config.min_vertex_angle)
     {
       filtered_faces++;
       continue;
@@ -255,7 +287,8 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
     float edge1_length = vertex1_position.distance(vertex2_position);
     float edge2_length = vertex2_position.distance(vertex0_position);
 
-    if (edge0_length < 0.04 && edge1_length < 0.04 && edge2_length < 0.04)
+    if (edge0_length < config.min_edge_length && edge1_length < config.min_edge_length &&
+        edge2_length < config.min_edge_length)
     {
       filtered_faces++;
       continue;
@@ -333,22 +366,10 @@ bool MMPPlanner::initialize(const std::string& plugin_name, const boost::shared_
   io.save(lvr_model, "mmp.ply");
 #endif
 
+  geodesic_mesh = geodesic::Mesh();
   geodesic_mesh.initialize_mesh_data(points, faces);
 
-  private_nh = ros::NodeHandle("~/" + plugin_name);
-  path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
-
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>>(
-      new dynamic_reconfigure::Server<mmp_planner::MMPPlannerConfig>(private_nh));
-  config_callback = boost::bind(&MMPPlanner::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
-
-  return true;
-}
-
-void MMPPlanner::reconfigureCallback(mmp_planner::MMPPlannerConfig& cfg, uint32_t level)
-{
-  config = cfg;
+  geodesic_map_ready = true;
 }
 
 } /* namespace mmp_planner */
