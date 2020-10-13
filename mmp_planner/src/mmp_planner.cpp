@@ -212,16 +212,16 @@ void MMPPlanner::reconfigureCallback(mmp_planner::MMPPlannerConfig& cfg, uint32_
     array<lvr2::VertexHandle, 3> vertices = mesh.getVerticesOfFace(fH);
 
     // filter lethal vetrtices
-    if (invalid[vertices[0]] && invalid[vertices[1]] && invalid[vertices[2]])
-    {
-      filtered_faces++;
-      continue;
-    }
-    if (isinf(vertex_costs[vertices[0]]) && isinf(vertex_costs[vertices[1]]) && isinf(vertex_costs[vertices[2]]))
-    {
-      filtered_faces++;
-      continue;
-    }
+    // if (invalid[vertices[0]] && invalid[vertices[1]] && invalid[vertices[2]])
+    // {
+    //   filtered_faces++;
+    //   continue;
+    // }
+    // if (isinf(vertex_costs[vertices[0]]) && isinf(vertex_costs[vertices[1]]) && isinf(vertex_costs[vertices[2]]))
+    // {
+    //   filtered_faces++;
+    //   continue;
+    // }
 
     // filter faces with too high costs
     if (vertex_costs[vertices[0]] > config.cost_limit && vertex_costs[vertices[1]] > config.cost_limit &&
@@ -344,27 +344,29 @@ void MMPPlanner::reconfigureCallback(mmp_planner::MMPPlannerConfig& cfg, uint32_
   ROS_INFO_STREAM("removed " << filtered_faces << " faces");
   ROS_INFO_STREAM("vertices before: " << mesh.numVertices() << "; vertices after: " << vertex_remapping.size());
 
-#ifdef EXPORT_MESH
-  boost::shared_array<float> lvr_vertices(new float[points.size()]);
-  boost::shared_array<unsigned int> lvr_faces(new unsigned int[faces.size()]);
-  for (int i = 0; i < points.size(); i++)
+  if (config.export_filtered_mesh)
   {
-    lvr_vertices[i] = points[i];
+    ROS_INFO_STREAM("saving filtered mesh to mmp.ply ...");
+    boost::shared_array<float> lvr_vertices(new float[points.size()]);
+    boost::shared_array<unsigned int> lvr_faces(new unsigned int[faces.size()]);
+    for (int i = 0; i < points.size(); i++)
+    {
+      lvr_vertices[i] = points[i];
+    }
+
+    for (int i = 0; i < faces.size(); i++)
+    {
+      lvr_faces[i] = faces[i];
+    }
+
+    lvr2::MeshBufferPtr lvr_mesh(new lvr2::MeshBuffer());
+    lvr_mesh->setVertices(lvr_vertices, points.size() / 3);
+    lvr_mesh->setFaceIndices(lvr_faces, faces.size() / 3);
+    lvr2::ModelPtr lvr_model(new lvr2::Model(lvr_mesh));
+
+    lvr2::PLYIO io;
+    io.save(lvr_model, "mmp.ply");
   }
-
-  for (int i = 0; i < faces.size(); i++)
-  {
-    lvr_faces[i] = faces[i];
-  }
-
-  lvr2::MeshBufferPtr lvr_mesh(new lvr2::MeshBuffer());
-  lvr_mesh->setVertices(lvr_vertices, points.size() / 3);
-  lvr_mesh->setFaceIndices(lvr_faces, faces.size() / 3);
-  lvr2::ModelPtr lvr_model(new lvr2::Model(lvr_mesh));
-
-  lvr2::PLYIO io;
-  io.save(lvr_model, "mmp.ply");
-#endif
 
   geodesic_mesh = geodesic::Mesh();
   geodesic_mesh.initialize_mesh_data(points, faces);
