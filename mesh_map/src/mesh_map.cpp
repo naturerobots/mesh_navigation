@@ -1072,16 +1072,11 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
   return false;
 }
 
-lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& pos, const float& max_dist)
+lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
 {
-  std::array<float, 3> bary_coords;
-  float dist = 0;
-  for (auto face : mesh_ptr->faces())
-  {
-    if (projectedBarycentricCoords(pos, face, bary_coords, dist)
-        && std::fabs(dist) < max_dist)
-      return face;
-  }
+  auto search_result = searchContainingFace(position, max_dist);
+  if(search_result)
+    return std::get<0>(*search_result);
   return lvr2::OptionalFaceHandle();
 }
 
@@ -1113,7 +1108,7 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
       triangle_dist += (vertices[2] - position).length2();
       if(triangle_dist < min_triangle_position_distance)
       {
-        min_triangle_position_distance = dist;
+        min_triangle_position_distance = triangle_dist;
         opt_fH = fH;
         vertices = tmp_vertices;
         bary_coords = tmp_bary_coords;
