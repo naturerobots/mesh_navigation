@@ -52,6 +52,8 @@
 #include <std_msgs/ColorRGBA.h>
 #include <tf2_ros/buffer.h>
 #include <tuple>
+#include "nanoflann.hpp"
+#include "nanoflann_mesh_adaptor.h"
 
 namespace mesh_map
 {
@@ -289,6 +291,13 @@ private:
   std::string uuid_str;
 
   std::mutex layer_mtx;
+
+  typedef nanoflann::KDTreeSingleIndexAdaptor<
+      nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
+      NanoFlannMeshAdaptor, 3> KDTree;
+
+  std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
+  std::unique_ptr<KDTree> kd_tree_ptr;
 };
 
 } /* namespace mesh_map */

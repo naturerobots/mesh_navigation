@@ -155,6 +155,11 @@ bool MeshMap::readMap()
     ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh_ptr->numVertices() << " vertices and "
                                                                   << mesh_ptr->numFaces() << " faces and "
                                                                   << mesh_ptr->numEdges() << " edges.");
+
+    adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
+    kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+    kd_tree_ptr->buildIndex();
+    ROS_INFO_STREAM("The k-d tree has been build successfully!");
   }
   else
   {
@@ -1084,34 +1089,54 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
     std::array<float, 3>>> MeshMap::searchContainingFace(
     Vector& position, const float& max_dist)
 {
-  std::array<float, 3> bary_coords;
-  for (auto face : mesh_ptr->faces())
+  if(auto vH_opt = getNearestVertexHandle(position))
   {
-    const auto& vertices = mesh_ptr->getVertexPositionsOfFace(face);
-    float dist = 0;
-    if (mesh_map::projectedBarycentricCoords(position, vertices, bary_coords, dist)
-        && std::fabs(dist) < max_dist)
-      return std::make_tuple(face, vertices, bary_coords);
+    auto vH = vH_opt.unwrap();
+    float min_triangle_position_distance = std::numeric_limits<float>::max();
+    std::array<Vector, 3> vertices;
+    std::array<float, 3> bary_coords;
+    lvr2::OptionalFaceHandle opt_fH;
+    for(auto fH : mesh_ptr->getFacesOfVertex(vH))
+    {
+      const auto& tmp_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+      float dist = 0;
+      std::array<float, 3> tmp_bary_coords;
+      if (mesh_map::projectedBarycentricCoords(position, vertices, tmp_bary_coords, dist)
+          && std::fabs(dist) < max_dist)
+      {
+        return std::make_tuple(fH, tmp_vertices, tmp_bary_coords);
+      }
+
+      float triangle_dist = 0;
+      triangle_dist += (vertices[0] - position).length2();
+      triangle_dist += (vertices[1] - position).length2();
+      triangle_dist += (vertices[2] - position).length2();
+      if(triangle_dist < min_triangle_position_distance)
+      {
+        min_triangle_position_distance = dist;
+        opt_fH = fH;
+        vertices = tmp_vertices;
+        bary_coords = tmp_bary_coords;
+      }
+    }
+    if(opt_fH)
+    {
+      return std::make_tuple(opt_fH.unwrap(), vertices, bary_coords);
+    }
+    ROS_ERROR_STREAM("No containing face found!");
+    return boost::none;
   }
+  ROS_FATAL_STREAM("Could not find the nearest vertex");
   return boost::none;
 }
 
 lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector& pos)
 {
-  double smallest_dist = std::numeric_limits<double>::max();
-  lvr2::OptionalVertexHandle nearest_handle;
-
-  // For all Vertices of the BaseMesh
-  for (auto vH : mesh_ptr->vertices())
-  {
-    float dist = pos.distanceFrom(mesh_ptr->getVertexPosition(vH));
-    if (dist < smallest_dist)
-    {
-      smallest_dist = dist;
-      nearest_handle = vH;
-    }
-  }
-  return nearest_handle;
+  float querry_point[3] = {pos.x, pos.y, pos.z};
+  size_t ret_index;
+  float out_dist_sqr;
+  size_t num_results = kd_tree_ptr->knnSearch(&querry_point[0], 1, &ret_index, &out_dist_sqr);
+  return num_results == 0 ? lvr2::OptionalVertexHandle() : lvr2::VertexHandle(ret_index);
 }
 
 inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
