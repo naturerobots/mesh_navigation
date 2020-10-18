@@ -85,6 +85,7 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
   header.frame_id = mesh_map->mapFrame();
 
   cost = 0;
+  float dir_length;
   if (!path.empty())
   {
     mesh_map::Vector vec = path.front().first;
@@ -92,12 +93,12 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
     path.pop_front();
 
     const auto& face_normals = mesh_map->faceNormals();
-
     for (auto& next : path)
     {
       geometry_msgs::PoseStamped pose;
       pose.header = header;
-      pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first, face_normals[fH]);
+      pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first, face_normals[fH], dir_length);
+      cost += dir_length;
       vec = next.first;
       fH = next.second;
       plan.push_back(pose);
@@ -105,7 +106,8 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
 
     geometry_msgs::PoseStamped pose;
     pose.header = header;
-    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH]);
+    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH], dir_length);
+    cost += dir_length;
     plan.push_back(pose);
   }
 
@@ -115,6 +117,7 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
 
   path_pub.publish(path_msg);
   mesh_map->publishVertexCosts(potential, "Potential");
+  ROS_INFO_STREAM("Path length: " << cost << "m");
 
   if (publish_vector_field)
   {
@@ -363,16 +366,14 @@ inline bool WaveFrontPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& dista
   const double u1_sq = u1 * u1;
   const double u2_sq = u2 * u2;
 
-  const double A = sqrt(std::max<double>((-u1 + u2 + c) * (u1 - u2 + c) * (u1 + u2 - c) * (u1 + u2 + c), 0));
-  const double B = sqrt(std::max<double>((-a + b + c) * (a - b + c) * (a + b - c) * (a + b + c), 0));
   const double sx = (c_sq + u1_sq - u2_sq) / (2 * c);
-  // const float sy = -A / (2 * c);
-  const double p = (-a_sq + b_sq + c_sq) / (2 * c);
-  // const float hc = B / (2 * c);
-  // const float dy = hc-sy;
-  const double dy = (A + B) / (2 * c);
-  const double dx = (u2_sq - u1_sq + b_sq - a_sq) / (2 * c);
-  // const float dx = p - sx;
+  const double sy = -sqrt(std::max(u1_sq - sx*sx, 0.0));
+
+  const double p = (b_sq + c_sq -a_sq) / (2 * c);
+  const double hc = sqrt(std::max(b_sq - p*p, 0.0));
+
+  const double dy = hc - sy;
+  const double dx = p - sx;
 
   const double u3tmp_sq = dx * dx + dy * dy;
   double u3tmp = sqrt(u3tmp_sq);
@@ -773,20 +774,19 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
   }
 
   ROS_DEBUG_STREAM("Start vector field back tracking!");
-  constexpr float step_width = 0.6;  // step width of 3 cm
 
   lvr2::FaceHandle current_face = goal_face;
   mesh_map::Vector current_pos = goal;
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
 
   // move from the goal position towards the start position
-  while (current_pos.distance2(start) > step_width && !cancel_planning)
+  while (current_pos.distance2(start) > config.step_width && !cancel_planning)
   {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
     try
     {
-      if (mesh_map->meshAhead(current_pos, current_face, step_width))
+      if (mesh_map->meshAhead(current_pos, current_face, config.step_width))
       {
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
       }

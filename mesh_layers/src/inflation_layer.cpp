@@ -422,6 +422,9 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
 lvr2::BaseVector<float> InflationLayer::vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                                  const std::array<float, 3>& barycentric_coords)
 {
+  if (!config.repulsive_field)
+    return lvr2::BaseVector<float>();
+
   const float distance = mesh_map::linearCombineBarycentricCoords(vertices, distances, barycentric_coords);
 
   if (distance > config.inflation_radius)
@@ -448,6 +451,9 @@ lvr2::BaseVector<float> InflationLayer::vectorAt(const std::array<lvr2::VertexHa
 
 lvr2::BaseVector<float> InflationLayer::vectorAt(const lvr2::VertexHandle& vH)
 {
+  if (!config.repulsive_field)
+    return lvr2::BaseVector<float>();
+
   float distance = 0;
   lvr2::BaseVector<float> vec;
 
