@@ -703,33 +703,6 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
   marker_pub.publish(marker);
 }
 
-void MeshMap::publishDebugVector(const lvr2::VertexHandle& a, const lvr2::VertexHandle& b, const lvr2::FaceHandle& fh,
-                                 const double angle, const std_msgs::ColorRGBA& color, const std::string& name)
-{
-  auto vec_a = mesh_ptr->getVertexPosition(a);
-  auto vec_b = mesh_ptr->getVertexPosition(b);
-
-  auto normal = vertex_normals[a].normalized();
-  // auto normal = face_normals[fh];
-  auto dir = (vec_b - vec_a).rotated(normal, angle);
-
-  visualization_msgs::Marker marker;
-  marker.header.frame_id = mapFrame();
-  marker.header.stamp = ros::Time();
-  marker.ns = name;
-  marker.id = 0;
-  marker.type = visualization_msgs::Marker::ARROW;
-  marker.action = visualization_msgs::Marker::ADD;
-  geometry_msgs::Vector3 scale;
-  scale.x = 0.1;
-  scale.y = 0.02;
-  scale.z = 0.02;
-  marker.scale = scale;
-  marker.color = color;
-  marker.pose = mesh_map::calculatePoseFromDirection(vec_a, dir, normal);
-  marker_pub.publish(marker);
-}
-
 void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
                                  const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
