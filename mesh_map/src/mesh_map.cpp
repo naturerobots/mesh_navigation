@@ -515,14 +515,6 @@ void MeshMap::findLethalByContours(const int& min_contour_size, std::set<lvr2::V
   ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices as contour vertices");
 }
 
-void MeshMap::findLethalAreas(const int min_contour_size, const float height_diff_threshold,
-                              const float roughness_threshold)
-{
-  ROS_INFO_STREAM("Find lethal vertices...");
-  lethals.clear();
-  findLethalByContours(min_contour_size, lethals);
-}
-
 void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size)
 {
   ROS_INFO_STREAM("Find contours...");
@@ -839,6 +831,7 @@ void MeshMap::publishVectorField(const std::string& name,
       continue;
     }
 
+    // TODO remove cutting faces from method
     /*
     vector.pose = mesh_map::calculatePoseFromDirection(
         mesh.getVertexPosition(vH), dir_vec,
