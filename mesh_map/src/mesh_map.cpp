@@ -705,10 +705,9 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
 
 void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                                 const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                                  const bool publish_face_vectors)
 {
-  publishVectorField(name, vector_map, cutting_faces, vertex_costs, {}, publish_face_vectors);
+  publishVectorField(name, vector_map, vertex_costs, {}, publish_face_vectors);
 }
 
 void MeshMap::publishCombinedVectorField()
@@ -761,7 +760,6 @@ void MeshMap::publishCombinedVectorField()
 
 void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                                 const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                                  const lvr2::DenseVertexMap<float>& values,
                                  const std::function<float(float)>& cost_function, const bool publish_face_vectors)
 {
@@ -798,18 +796,11 @@ void MeshMap::publishVectorField(const std::string& name,
   {
     const auto& dir_vec = vector_map[vH];
     const float len2 = dir_vec.length2();
-    if (len2 == 0 || !std::isfinite(len2) || !cutting_faces.containsKey(vH))
+    if (len2 == 0 || !std::isfinite(len2))
     {
       ROS_DEBUG_STREAM_THROTTLE(0.3, "Found invalid direction vector in vector field \"" << name << "\". Ignoring it!");
       continue;
     }
-
-    // TODO remove cutting faces from method
-    /*
-    vector.pose = mesh_map::calculatePoseFromDirection(
-        mesh.getVertexPosition(vH), dir_vec,
-        face_normals[cutting_faces[vH]]);
-    */
 
     auto u = mesh.getVertexPosition(vH);
     auto v = u + dir_vec * 0.1;

@@ -375,24 +375,20 @@ public:
    * @brief Publishes a vector field as visualisation_msgs/Marker
    * @param name The marker's name
    * @param vector_map The vector field to publish
-   * @param cutting_faces
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
   void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                          const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                           const bool publish_face_vectors = false);
 
   /**
    * @brief Publishes a vector field as visualisation_msgs/Marker
    * @param name The marker's name
    * @param vector_map The vector field to publish
-   * @param cutting_faces
    * @param values The vertex cost values
    * @param cost_function A cost function to compute costs inside a triangle
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
   void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                          const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                           const lvr2::DenseVertexMap<float>& values,
                           const std::function<float(float)>& cost_function = {},
                           const bool publish_face_vectors = false);
