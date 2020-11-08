@@ -409,21 +409,33 @@ public:
   lvr2::DenseVertexMap<bool> invalid;
 
 private:
+  //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
+  //! mapping from name to layer instance
   std::map<std::string, mesh_map::AbstractLayer::Ptr> layer_names;
 
+  //! vector of name and layer instances
   std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> layers;
 
+  //! each layer maps to a set of impassable indices
   std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
 
+  //! all impassable vertices
   std::set<lvr2::VertexHandle> lethals;
 
+  //! global frame / coordinate system id
   std::string global_frame;
 
+  //! server url
   std::string srv_url;
+
+  //! login username to connect to the server
   std::string srv_username;
+
+  //! login password to connect to the server
   std::string srv_password;
+
   std::string mesh_layer;
   float min_roughness;
   float max_roughness;
