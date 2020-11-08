@@ -118,7 +118,7 @@ uint32_t WaveFrontPlanner::makePlan(const geometry_msgs::PoseStamped& start, con
 
   if (publish_vector_field)
   {
-    mesh_map->publishVectorField("vector_field", vector_map, cutting_faces, publish_face_vectors);
+    mesh_map->publishVectorField("vector_field", vector_map, publish_face_vectors);
   }
 
   return outcome;

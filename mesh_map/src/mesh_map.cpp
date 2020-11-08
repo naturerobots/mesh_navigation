@@ -515,14 +515,6 @@ void MeshMap::findLethalByContours(const int& min_contour_size, std::set<lvr2::V
   ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices as contour vertices");
 }
 
-void MeshMap::findLethalAreas(const int min_contour_size, const float height_diff_threshold,
-                              const float roughness_threshold)
-{
-  ROS_INFO_STREAM("Find lethal vertices...");
-  lethals.clear();
-  findLethalByContours(min_contour_size, lethals);
-}
-
 void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size)
 {
   ROS_INFO_STREAM("Find contours...");
@@ -711,39 +703,11 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
   marker_pub.publish(marker);
 }
 
-void MeshMap::publishDebugVector(const lvr2::VertexHandle& a, const lvr2::VertexHandle& b, const lvr2::FaceHandle& fh,
-                                 const double angle, const std_msgs::ColorRGBA& color, const std::string& name)
-{
-  auto vec_a = mesh_ptr->getVertexPosition(a);
-  auto vec_b = mesh_ptr->getVertexPosition(b);
-
-  auto normal = vertex_normals[a].normalized();
-  // auto normal = face_normals[fh];
-  auto dir = (vec_b - vec_a).rotated(normal, angle);
-
-  visualization_msgs::Marker marker;
-  marker.header.frame_id = mapFrame();
-  marker.header.stamp = ros::Time();
-  marker.ns = name;
-  marker.id = 0;
-  marker.type = visualization_msgs::Marker::ARROW;
-  marker.action = visualization_msgs::Marker::ADD;
-  geometry_msgs::Vector3 scale;
-  scale.x = 0.1;
-  scale.y = 0.02;
-  scale.z = 0.02;
-  marker.scale = scale;
-  marker.color = color;
-  marker.pose = mesh_map::calculatePoseFromDirection(vec_a, dir, normal);
-  marker_pub.publish(marker);
-}
-
 void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                                 const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                                  const bool publish_face_vectors)
 {
-  publishVectorField(name, vector_map, cutting_faces, vertex_costs, {}, publish_face_vectors);
+  publishVectorField(name, vector_map, vertex_costs, {}, publish_face_vectors);
 }
 
 void MeshMap::publishCombinedVectorField()
@@ -796,7 +760,6 @@ void MeshMap::publishCombinedVectorField()
 
 void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
-                                 const lvr2::DenseVertexMap<lvr2::FaceHandle>& cutting_faces,
                                  const lvr2::DenseVertexMap<float>& values,
                                  const std::function<float(float)>& cost_function, const bool publish_face_vectors)
 {
@@ -833,17 +796,11 @@ void MeshMap::publishVectorField(const std::string& name,
   {
     const auto& dir_vec = vector_map[vH];
     const float len2 = dir_vec.length2();
-    if (len2 == 0 || !std::isfinite(len2) || !cutting_faces.containsKey(vH))
+    if (len2 == 0 || !std::isfinite(len2))
     {
       ROS_DEBUG_STREAM_THROTTLE(0.3, "Found invalid direction vector in vector field \"" << name << "\". Ignoring it!");
       continue;
     }
-
-    /*
-    vector.pose = mesh_map::calculatePoseFromDirection(
-        mesh.getVertexPosition(vH), dir_vec,
-        face_normals[cutting_faces[vH]]);
-    */
 
     auto u = mesh.getVertexPosition(vH);
     auto v = u + dir_vec * 0.1;

@@ -410,7 +410,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
       riskiness.insert(vH, fading(distances[vH]));
     }
 
-    map_ptr->publishVectorField("inflation", vector_map, cutting_faces, distances,
+    map_ptr->publishVectorField("inflation", vector_map, distances,
                                 std::bind(&InflationLayer::fading, this, std::placeholders::_1));
   }
   else
@@ -646,7 +646,7 @@ void InflationLayer::reconfigureCallback(mesh_layers::InflationLayerConfig& cfg,
   if (config.inscribed_radius != cfg.inscribed_radius || config.inflation_radius != cfg.inflation_radius ||
       config.lethal_value != cfg.lethal_value || config.inscribed_value != cfg.inscribed_value)
   {
-    map_ptr->publishVectorField("inflation", vector_map, cutting_faces, distances,
+    map_ptr->publishVectorField("inflation", vector_map, distances,
                                 std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
     notify = true;
   }
