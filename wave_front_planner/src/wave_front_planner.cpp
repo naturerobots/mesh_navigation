@@ -156,11 +156,6 @@ bool WaveFrontPlanner::initialize(const std::string& plugin_name,
   return true;
 }
 
-lvr2::DenseVertexMap<mesh_map::Vector> WaveFrontPlanner::getVectorMap()
-{
-  return vector_map;
-}
-
 void WaveFrontPlanner::reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig& cfg, uint32_t level)
 {
   ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");

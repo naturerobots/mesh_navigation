@@ -51,6 +51,9 @@ class WaveFrontPlanner : public mbf_mesh_core::MeshPlanner
 public:
   typedef boost::shared_ptr<wave_front_planner::WaveFrontPlanner> Ptr;
 
+  /**
+   * @brief Constructor
+   */
   WaveFrontPlanner();
 
   /**
@@ -59,28 +62,14 @@ public:
   virtual ~WaveFrontPlanner();
 
   /**
-   * @brief Given a goal pose in the world, compute a plan
+   * @brief Compute a continuous vector field and geodesic path on the mesh's surface
    * @param start The start pose
    * @param goal The goal pose
-   * @param tolerance If the goal is obstructed, how many meters the planner can
-   * relax the constraint in x and y before failing
-   * @param plan The plan... filled by the planner
-   * @param cost The cost for the the plan
-   * @param message Optional more detailed outcome as a string
-   * @return Result code as described on GetPath action result:
-   *         SUCCESS         = 0
-   *         1..9 are reserved as plugin specific non-error results
-   *         FAILURE         = 50  # Unspecified failure, only used for old,
-   * non-mfb_core based plugins CANCELED        = 51 INVALID_START   = 52
-   *         INVALID_GOAL    = 53
-   *         NO_PATH_FOUND   = 54
-   *         PAT_EXCEEDED    = 55
-   *         EMPTY_PATH      = 56
-   *         TF_ERROR        = 57
-   *         NOT_INITIALIZED = 58
-   *         INVALID_PLUGIN  = 59
-   *         INTERNAL_ERROR  = 60
-   *         71..99 are reserved as plugin specific errors
+   * @param tolerance The goal tolerance, TODO is currently not used
+   * @param plan The computed plan
+   * @param cost The computed cost for the plan
+   * @param message a detailed outcome message
+   * @return result outcome code, see the GetPath action definition
    */
   virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
                             double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
@@ -88,64 +77,138 @@ public:
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
-   * @return True if a cancel has been successfully requested, false if not
-   * implemented.
+   * @return true if cancel has been successfully requested, false otherwise
    */
   virtual bool cancel();
 
+  /**
+   * @brief Initializes the planner plugin with a user configured name and a shared pointer to the mesh map
+   * @param name The user configured name, which is used as namespace for parameters, etc.
+   * @param mesh_map_ptr A shared pointer to the mesh map instance to access attributes and helper functions, etc.
+   * @return true if the plugin has been initialized successfully
+   */
   virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
-  lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
-
 protected:
+
+  /**
+   * @brief Computes a wavefront propagation from the start until it reached the goal
+   * @param start The seed of the wave, i.e. the robot's goal pose
+   * @param goal The goal of the wavefront, where it will stop propagating
+   * @param path The backtracked path
+   * @return a ExePath action related outcome code
+   */
   uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                                 std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path);
 
+  /**
+   *
+   * @brief Computes a wavefront propagation from the start until it reached the goal
+   * @param start The seed of the wave, i.e. the robot's goal pose
+   * @param goal The goal of the wavefront, where it will stop propagating
+   * @param edge_weights The edge weights map to use for vertex distances in a triangle
+   * @param costs The combined vertex costs to use during the propagation
+   * @param path The backtracked path
+   * @param distances The computed distances
+   * @param predecessors The backtracked predecessors
+   * @return a ExePath action related outcome code
+   */
   uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                                 const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::DenseVertexMap<float>& costs,
                                 std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
                                 lvr2::DenseVertexMap<float>& distances,
                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
+  /**
+   * Fast Marching Method update step using the Hesse normal form to determine if the direction vector is cutting the current triangle
+   * @param distances Distance map to the goal which stores the current state of all distances to the goal
+   * @param edge_weights Distances assigned to each edge
+   * @param v1 The first vertex of the triangle
+   * @param v2 The second vertex of the triangle
+   * @param v3 The thrid vertex of the triangle
+   * @return true if the newly computed distance is shorter than before and if the current triangle is cut
+   */
   inline bool waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& distances,
                                    const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::VertexHandle& v1,
                                    const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
 
+
+  /**
+   * Fast Marching Method update step using the Law of Cosines to determine if the direction vector is cutting the current triangle
+   * @param distances Distance map to the goal which stores the current state of all distances to the goal
+   * @param edge_weights Distances assigned to each edge
+   * @param v1 The first vertex of the triangle
+   * @param v2 The second vertex of the triangle
+   * @param v3 The thrid vertex of the triangle
+   * @return true if the newly computed distance is shorter than before and if the current triangle is cut
+   */
   inline bool waveFrontUpdate(lvr2::DenseVertexMap<float>& distances, const lvr2::DenseEdgeMap<float>& edge_weights,
                               const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
 
+  /**
+   * @brief Computes the vector field in a post processing. It rotates the predecessor edges by the stored angles
+   */
   void computeVectorMap();
 
+  /**
+   * @brief Dynamic reconfigure callback
+   */
   void reconfigureCallback(wave_front_planner::WaveFrontPlannerConfig& cfg, uint32_t level);
 
 private:
+
+  //! shared pointer to the mesh map
   mesh_map::MeshMap::Ptr mesh_map;
+
+  //! the user defined plugin name
   std::string name;
+
+  //! the private node handle with the user defined namespace (name)
   ros::NodeHandle private_nh;
+
+  //! flag if cancel has been requested
   std::atomic_bool cancel_planning;
+
+  //! publisher for the backtracked path
   ros::Publisher path_pub;
+
+  //! whether to publish the vector field or not
   bool publish_vector_field;
+
+  //! whether to also publish direction vectors at the triangle centers
   bool publish_face_vectors;
+
+  //! the map coordinate frame / system id
   std::string map_frame;
 
+  //! an offset that determines how far beyond the goal (robot's position) is propagated.
   float goal_dist_offset;
 
-  // Server for Reconfiguration
+  //! shared pointer to dynamic reconfigure server
   boost::shared_ptr<dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>> reconfigure_server_ptr;
+
+  //! dynamic reconfigure callback function binding
   dynamic_reconfigure::Server<wave_front_planner::WaveFrontPlannerConfig>::CallbackType config_callback;
+
+  //! indicates if dynamic reconfigure has been called the first time
   bool first_config;
+
+  //! the current dynamic reconfigure planner configuration
   WaveFrontPlannerConfig config;
 
-  // theta angles to the source of the wave front propagation vertices
+  //! theta angles to the source of the wave front propagation
   lvr2::DenseVertexMap<float> direction;
-  // predecessors while wave propagation
+
+  //! predecessors while wave propagation
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-  // the face which is cut by line to the source
+
+  //! the face which is cut by the computed line to the source
   lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
-  // stores the current vector map containing vectors pointing to the source
-  // (path goal)
+
+  //! stores the current vector map containing vectors pointing to the seed
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
-  // potential field or distance values to the source (path goal)
+
+  //! potential field / scalar distance field to the seed
   lvr2::DenseVertexMap<float> potential;
 };
 
