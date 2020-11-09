@@ -79,6 +79,12 @@ public:
    */
   virtual bool cancel() = 0;
 
+  /**
+   * @brief Initializes the planner plugin with a user configured name and a shared pointer to the mesh map
+   * @param name The user configured name, which is used as namespace for parameters, etc.
+   * @param mesh_map_ptr A shared pointer to the mesh map instance to access attributes and helper functions, etc.
+   * @return true if the plugin has been initialized successfully
+   */
   virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
 
 protected:

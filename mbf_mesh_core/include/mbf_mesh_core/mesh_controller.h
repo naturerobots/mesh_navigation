@@ -96,6 +96,13 @@ public:
    */
   virtual bool cancel() = 0;
 
+  /**
+   * @brief Initializes the controller plugin with a name, a tf pointer and a mesh map pointer
+   * @param plugin_name The controller plugin name, defined by the user. It defines the controller namespace
+   * @param tf_ptr A shared pointer to a transformation buffer
+   * @param mesh_map_ptr A shared pointer to the mesh map
+   * @return true if the plugin has been initialized successfully
+   */
   virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
                           const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
 
