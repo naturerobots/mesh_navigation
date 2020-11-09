@@ -71,7 +71,6 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStampe
                                                  geometry_msgs::TwistStamped& cmd_vel, std::string& message)
 {
   const auto& mesh = map_ptr->mesh();
-  current_pose = pose.pose;
 
   robot_pos = poseToPositionVector(pose);
   robot_dir = poseToDirectionVector(pose);
@@ -181,6 +180,7 @@ bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance
 
 bool MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
 {
+  // copy vector field // TODO just use vector field without copying
   vector_map = map_ptr->getVectorMap();
   DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");)
   DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");)

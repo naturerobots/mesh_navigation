@@ -46,8 +46,13 @@ namespace mesh_controller
 class MeshController : public mbf_mesh_core::MeshController
 {
 public:
+
+  //! shared pointer typedef to simplify pointer access of the mesh controller
   typedef boost::shared_ptr<mesh_controller::MeshController> Ptr;
 
+  /**
+   * @brief Constructor
+   */
   MeshController();
 
   /**
@@ -57,64 +62,45 @@ public:
 
   /**
    * @brief Given the current position, orientation, and velocity of the robot,
-   * compute velocity commands to send to the base.
-   * @param pose The current pose of the robot.
-   * @param velocity The current velocity of the robot.
-   * @param cmd_vel Will be filled with the velocity command to be passed to the
-   * robot base.
-   * @param message Optional more detailed outcome as a string
-   * @return Result code as described on ExePath action result:
-   *         SUCCESS         = 0
-   *         1..9 are reserved as plugin specific non-error results
-   *         FAILURE         = 100   Unspecified failure, only used for old,
-   * non-mfb_core based plugins CANCELED        = 101 NO_VALID_CMD    = 102
-   *         PAT_EXCEEDED    = 103
-   *         COLLISION       = 104
-   *         OSCILLATION     = 105
-   *         ROBOT_STUCK     = 106
-   *         MISSED_GOAL     = 107
-   *         MISSED_PATH     = 108
-   *         BLOCKED_PATH    = 109
-   *         INVALID_PATH    = 110
-   *         TF_ERROR        = 111
-   *         NOT_INITIALIZED = 112
-   *         INVALID_PLUGIN  = 113
-   *         INTERNAL_ERROR  = 114
-   *         121..149 are reserved as plugin specific errors
+   * compute the next velocity commands to move the robot towards the goal.
+   * @param pose The current pose of the robot
+   * @param velocity The current velocity of the robot
+   * @param cmd_vel Computed velocity command
+   * @param message Detailed outcome as string message
+   * @return An mbf_msgs/ExePathResult outcome code
    */
   virtual uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
                                            const geometry_msgs::TwistStamped& velocity,
                                            geometry_msgs::TwistStamped& cmd_vel, std::string& message);
 
   /**
-   * @brief Check if the goal pose has been achieved by the local planner
-   * @param pose The current pose of the robot.
+   * @brief Checks if the robot reached to goal pose
+   * @param pose The current pose of the robot
    * @param angle_tolerance The angle tolerance in which the current pose will
    * be partly accepted as reached goal
    * @param dist_tolerance The distance tolerance in which the current pose will
    * be partly accepted as reached goal
-   * @return True if achieved, false otherwise
+   * @return true if the goal is reached
    */
   virtual bool isGoalReached(double dist_tolerance, double angle_tolerance);
 
   /**
-   * @brief Set the plan that the local planner is following
-   * @param plan The plan to pass to the local planner
-   * @return True if the plan was updated successfully, false otherwise
+   * @brief Sets the current plan to follow, it also sets the vector field
+   * @param plan The plan to follow
+   * @return true if the plan was set successfully, false otherwise
    */
   virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
 
   /**
-   * @brief Requests the planner to cancel, e.g. if it takes too much time.
-   * @return True if a cancel has been successfully requested, false if not
-   * implemented.
+   * @brief Requests the planner to cancel, e.g. if it takes too much time
+   * @return True if cancel has been successfully requested, false otherwise
    */
   virtual bool cancel();
 
   /**
-   * Transforms a PoseStamped into a direction mesh_map Vector
-   * @param pose      any geometry_msgs PoseStamped
-   * @return          direction mesh_map Normal
+   * Converts the orientation of a geometry_msgs/PoseStamped message to a direction vector
+   * @param pose      the pose to convert
+   * @return          direction normal vector
    */
   mesh_map::Normal poseToDirectionVector(
       const geometry_msgs::PoseStamped& pose,
@@ -122,9 +108,9 @@ public:
 
 
   /**
-   * Transforms a PoseStamped into a position vector
-   * @param pose      any geometry_msgs PoseStamped
-   * @return          position mesh_map Vector
+   * Converts the position of a geometry_msgs/PoseStamped message to a position vector
+   * @param pose      the pose to convert
+   * @return          position vector
    */
   mesh_map::Vector poseToPositionVector(
       const geometry_msgs::PoseStamped& pose);
@@ -152,30 +138,54 @@ public:
       const mesh_map::Normal& mesh_normal,
       const float& mesh_cost);
 
+  /**
+   * @brief reconfigure callback function which is called if a dynamic reconfiguration were triggered.
+   */
   void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
+  /**
+   * @brief Initializes the controller plugin with a name, a tf pointer and a mesh map pointer
+   * @param plugin_name The controller plugin name, defined by the user. It defines the controller namespace
+   * @param tf_ptr A shared pointer to a transformation buffer
+   * @param mesh_map_ptr A shared pointer to the mesh map
+   * @return true if the plugin has been initialized successfully
+   */
   virtual bool initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
                           const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
 private:
+
+  //! shared pointer to the used mesh map
   boost::shared_ptr<mesh_map::MeshMap> map_ptr;
+
+  //! the current set plan
   vector<geometry_msgs::PoseStamped> current_plan;
 
+  //! the goal and robot pose
   mesh_map::Vector goal_pos, robot_pos;
+
+  //! the goal's and robot's orientation
   mesh_map::Normal goal_dir, robot_dir;
 
+  //! The triangle on which the robot is located
   lvr2::OptionalFaceHandle current_face;
-  // angle between pose vector and planned / supposed vector
-  geometry_msgs::Pose current_pose;
 
+  //! The vector field to the goal.
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
+  //! shared pointer to dynamic reconfigure server
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>> reconfigure_server_ptr;
+
+  //! dynamic reconfigure callback function binding
   dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>::CallbackType config_callback;
+
+  //! current mesh controller configuration
   MeshControllerConfig config;
 
+  //! publishes the angle between the robots orientation and the goal vector field for debug purposes
   ros::Publisher angle_pub;
 
+  //! flag to handle cancel requests
   std::atomic_bool cancel_requested;
 };
 
