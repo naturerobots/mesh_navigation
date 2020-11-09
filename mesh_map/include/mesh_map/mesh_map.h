@@ -279,14 +279,6 @@ public:
   }
 
   /**
-   * @brief Returns the stored scalar distance field
-   */
-  const lvr2::DenseVertexMap<float>& getPotential()
-  {
-    return potential;
-  }
-
-  /**
    * @brief Returns the map frame / coordinate system id
    */
   const std::string& mapFrame()
@@ -437,6 +429,7 @@ private:
   std::string srv_password;
 
   std::string mesh_layer;
+
   float min_roughness;
   float max_roughness;
   float min_height_diff;
@@ -451,48 +444,75 @@ private:
   std::string mesh_file;
   std::string mesh_part;
 
-  // combined layers
+  //! combined layer costs
   lvr2::DenseVertexMap<float> vertex_costs;
-  lvr2::DenseVertexMap<float> vertex_distances;
 
-  // path surface potential
-  lvr2::DenseVertexMap<float> potential;
-
+  //! stored vector map to share between planner and controller
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-  // edge vertex distances
+  //! vertex distance for each edge
   lvr2::DenseEdgeMap<float> edge_distances;
+
+  //! edge weights
   lvr2::DenseEdgeMap<float> edge_weights;
 
+  //! triangle normals
   lvr2::DenseFaceMap<Normal> face_normals;
+
+  //! vertex normals
   lvr2::DenseVertexMap<Normal> vertex_normals;
 
+  //! publisher for vertex costs
   ros::Publisher vertex_costs_pub;
+
+  //! publisher for vertex colors
   ros::Publisher vertex_colors_pub;
+
+  //! publisher for the mesh geometry
   ros::Publisher mesh_geometry_pub;
+
+  //! publisher for the debug markers
   ros::Publisher marker_pub;
+
+  //! publisher for the stored vector field
   ros::Publisher vector_field_pub;
 
-  // Server for Reconfiguration
+  //! shared pointer to dynamic reconfigure server
   boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>> reconfigure_server_ptr;
+
+  //! dynamic reconfigure callback function binding
   dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
+
+  //! first reconfigure call
   bool first_config;
+
+  //! indicates whether the map has been loaded
   bool map_loaded;
+
+  //! current mesh map configuration
   MeshMapConfig config;
 
+  //! private node handle within the mesh map namespace
   ros::NodeHandle private_nh;
 
+  //! transformation buffer
   tf2_ros::Buffer& tf_buffer;
 
+  //! uuid for the load mesh map
   std::string uuid_str;
 
+  //! layer mutex to handle simultaneous layer changes
   std::mutex layer_mtx;
 
+  //! k-d tree type for 3D with a custom mesh adaptor
   typedef nanoflann::KDTreeSingleIndexAdaptor<
       nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
       NanoFlannMeshAdaptor, 3> KDTree;
 
+  //! k-d tree nano flann mesh adaptor to access mesh data
   std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
+
+  //! k-d tree to query mesh vertices in logarithmic time
   std::unique_ptr<KDTree> kd_tree_ptr;
 };
 
