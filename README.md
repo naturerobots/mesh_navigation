@@ -90,7 +90,7 @@ below.
 | **RoughnessLayer**   | `mesh_layers/RoughnessLayer`    | local radius based normal fluctuation    |  ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer")      | 
 | **SteepnessLayer**   | `mesh_layers/SteepnessLayer`    | arccos of the normal's z coordinate      |  ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer")      |
 | **RidgeLayer**       | `mesh_layer/RidgeLayer`         | local radius based distance along normal |  ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
-| **InflationLayer**   | `mesh_layers/InflationLayer`    | by distance to a lethal vertex           |                                                                                          |
+| **InflationLayer**   | `mesh_layers/InflationLayer`    | by distance to a lethal vertex           |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 
 ## Planners
 
