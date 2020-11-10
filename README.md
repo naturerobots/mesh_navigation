@@ -64,15 +64,15 @@ since it is not restricted to the edges or topology of the mesh. A comparison is
 [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4)
 
 
-### Stone Pit
+### Stone Quarry
 #### Colored Point Cloud
-![StonePitPointCLoud](docs/images/stone_pit/cloud.png?raw=true "Stone Pit Point Cloud")
+![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud")
 
 #### Height Diff Layer
-![StonePitHeightDiff](docs/images/stone_pit/height_diff.jpg?raw=true "Stone Pit Height Diff")
+![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff")
 
 #### Mesh RGB Vertex Colors
-![StonePitVertexColors](docs/images/stone_pit/mesh_rgb.jpg?raw=true "Stone Pit Vertex Colors")
+![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors")
 
 ## Run Mesh Navigation in Simulation
 If you want to test the mesh navigation stack with Pluto please use the simulation setup and the corresponding launch
@@ -98,7 +98,7 @@ roslaunch pluto_gazebo pluto_botanical_garden.launch
 roslaunch pluto_navigation pluto_botanical_garden.launch
 ```
 
-- Stone Pit in the Forest in Brockum: 
+- Stone Quarry in the Forest in Brockum: 
 ```
 roscore
 roslaunch pluto_gazebo pluto_stone_quarry.launch
@@ -119,12 +119,12 @@ Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz.
 The planners are compared to each other.
 
 #### Wave Front Planner
-![WaveFrontPlanner](docs/images/stone_pit/fmm_pot.jpg?raw=true "Wave Front Planner")
+![WaveFrontPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Wave Front Planner")
 
 #### Dijkstra Mesh Planner
-![DijkstraMeshPlanner](docs/images/stone_pit/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner")
+![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner")
 
 #### 2D Planner on 2.5 Digital Elevation Map (DEM)
-![2D-DEM-Planner](docs/images/stone_pit/dem_side.jpg?raw=true "2D DEM Planner")
+![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner")
 
 
