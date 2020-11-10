@@ -196,8 +196,13 @@ private:
    */
   void reconfigure(mbf_mesh_nav::MoveBaseFlexConfig& config, uint32_t level);
 
+  //! plugin class loader for recovery behaviors plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
+
+  //! plugin class loader for controller plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshController> controller_plugin_loader_;
+
+  //! plugin class loader for planner plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
 
   //! Dynamic reconfigure server for the mbf_mesh2d_specific part
