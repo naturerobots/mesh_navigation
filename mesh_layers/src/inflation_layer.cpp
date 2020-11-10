@@ -35,7 +35,8 @@
  *
  */
 
-#include <mesh_layers/inflation_layer.h>
+#include "mesh_layers/inflation_layer.h"
+
 #include <queue>
 #include <lvr2/util/Meap.hpp>
 #include <pluginlib/class_list_macros.h>
