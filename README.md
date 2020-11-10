@@ -1,29 +1,32 @@
 # Mesh Navigation
 
-The *Mesh Navigation* bundle provides software to perform efficient robot navigation on 3D meshes in ROS.
+The *Mesh Navigation* bundle provides software to perform efficient robot navigation on 2D-manifolds in 3D represented 
+as triangular meshes. It allows to safely navigate in various complex outdoor environments by using a modular extendable
+layerd mesh map. Layers can be loaded as plugins and represent certain geometric or semantic metrics of the terrain.
+The layered mesh map is integrated with Move Base Flex (MBF) which provides a universal ROS action interface for path
+planning and motion control, as well as for recovery behaviours. Thus, additional planner and controller plugins running
+on the layered mesh map are provided.
+
+**Overview**
+* [Installation](#installation)
+* [Mesh Navigation Stack](#mesh-navigation-stack)
+* [Simulation](#simulation)
+* [Demos](#demos)
 
 
 * Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)
 * Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
-## Installation from Repository 
+## Installation
 If you want to install the mesh navigation stack from source please follow the instructions from the 
 [pluto_robot](https://github.com/uos/pluto_robot) repository, since we use the robot Pluto as exemplary
 robot to perform mesh navigation in simulation but also in the real world.
 
 Otherwise use `sudo apt install ros-melodic-mesh-navigation`
 
-## Pluto in Simulation
-You can use Pluto in an outdoor simulation environment. We provides several datasets and the corresponding environments
-for the Gazebo simulation. For navigation purposes the corresponding navigation launch file should be started, too. 
-The following simulation environments are currently available:
-- Botanical Garden at Osnabrück University: `roslaunch pluto_gazebo pluto_botanical_garden.launch`
-- Stone Quarry in the Forest in Brockum: `roslaunch pluto_gazebo pluto_stone_quarry.launch`
-- Physics building at Osnabrück University: `roslaunch pluto_gazebo pluto_physics.launch`
-
 ## Mesh Navigation Stack
-This [mesh_navigation](https://github.com/uos/mesh_navigation) stack provides a navigation server for 
-[Move Base Flex (MBF)](https://github.com/magazino/move_base_flex). It provides a couple of configuration files and launch 
+This **[mesh_navigation](https://github.com/uos/mesh_navigation)** stack provides a navigation server for 
+**[Move Base Flex (MBF)](https://github.com/magazino/move_base_flex)**. It provides a couple of configuration files and launch 
 files to start the navigation server with the configured layer plugins for the layered mesh map, and the configured
 planners and controller to perform path planning and motion control in 3D (or more specifically on 2D-manifold). 
 
@@ -38,16 +41,17 @@ planner and controller plugins with one `mesh_map` instance. It provides the fol
 - `mbf_mesh_nav` contains the mesh navigation server which build on top of the abstract MBF navigation server.
 It uses the plugin interfaces in `mbf_mesh_core` to load and initialize plugins of the types described above.
 - `mesh_map` contains an implementation of a mesh map representation building on top of the mesh data structures
-in [LVR2](https://github.com/uos/lvr2). This package provides a layered mesh map implementation. Layers can be 
+in **[lvr2](https://github.com/uos/lvr2)**. This package provides a layered mesh map implementation. Layers can be 
 loaded as plugins to allow a highly configurable 3D navigation stack for robots traversing on the ground in outdoor
 and rough terrain.
 - `mesh_layers` The package provides a couple of mesh layers to compute the trafficability of the terrain. 
 Furthermore, these plugins have access to the HDF5 map file and can load and store layer information. 
 The mesh layers can be configured for the robots abilities and needs. Currently we provide the following layer plugins:
-  - HeightDiffLayer - `mesh_layers/height_diff_layer.h`
-  - RoughnessLayer - `mesh_layers/roughness_layer.h`
-  - InflationLayer - `mesh_layers/inflation_layer.h`
-  - SteepnessLayer - `mesh_layers/steepness_layer.h`
+  - HeightDiffLayer - `mesh_layers/HeightDiffLayer`
+  - RoughnessLayer - `mesh_layers/RoughnessLayer`
+  - SteepnessLayer - `mesh_layers/SteepnessLayer`
+  - RidgeLayer - `mesh_layer/RidgeLayer`
+  - InflationLayer - `mesh_layers/InflationLayer`
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm.
 It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed 
 vertex to the goal pose can be computed. This leads in a sub-optimal potential field, which highly depends on the mesh 
@@ -57,74 +61,97 @@ This planner is able to plan over the surface, due to that it results in shorter
 since it is not restricted to the edges or topology of the mesh. A comparison is shown below.
 - `mesh_client` Is an experimental package to load navigation meshes only from a mesh server.
 
-## Mesh Navigation Demo
-
-### Botanical Garden at Osnabrück University 
-#### Demo Video Botanical Garden
-[![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4)
-
-
-### Stone Quarry
-#### Colored Point Cloud
-![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud")
-
-#### Height Diff Layer
-![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff")
-
-#### Mesh RGB Vertex Colors
-![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors")
-
-## Run Mesh Navigation in Simulation
+## Simulation
 If you want to test the mesh navigation stack with Pluto please use the simulation setup and the corresponding launch
 files below for the respective outdoor or rough terrain environment. The mesh tools have to be installed.
-We developed the [Mesh Tools](https://github.com/uos/mesh_tools) as a package consisting of message definitions, RViz plugins and tools, as well as a
+We developed the **[Mesh Tools](https://github.com/uos/mesh_tools)** as a package consisting of message definitions, RViz plugins and tools, as well as a
 persistence layer to store such maps. These tools make the benefits of annotated triangle maps available in ROS and
 allow to publish, edit and inspect such maps within the existing ROS software stack.
 
+## Demos
+| Botanical Garden of Osnabrück University | Stone Quarry in the Forest in Brockum | 
+[![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4)
 
-### RVIZ
-Run RViz with the preconfigured display panels for mesh navigation. 
-```
-roscd pluto_navigation
-rviz -d rviz/mesh_navigation.rviz
-```
+### Botanical Garden at Osnabrück University 
 
-### Outdoor Environments
+### Stone Quarry in the Forest in Brockum
+| Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
+|---------------------|-------------------|-------------------|
+|![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud")|![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff")|![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors")|
 
-- Botanical Garden at Osnabrück University: 
-```
-rosocre
-roslaunch pluto_gazebo pluto_botanical_garden.launch
-roslaunch pluto_navigation pluto_botanical_garden.launch
-```
-
-- Stone Quarry in the Forest in Brockum: 
-```
-roscore
-roslaunch pluto_gazebo pluto_stone_quarry.launch
-roslaunch pluto_navigation pluto_stone_quarry.launch
-```
-
-- Physics Building at Osnabrück University: 
-```
-roscore
-roslaunch pluto_gazebo pluto_physics.launch
-roslaunch pluto_navigation pluto_physics.launch
-roslaunch pluto_navigation navigation_goals.launch goal:=physics1
-```
 
 ### Path Planning and Motion Control
 Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz. 
 
+## Mesh Map
+
+### Mesh Layers
+The following table gives an overview of all currently implemented layer plugins available in the stack and the 
+corresponding types tp specify for usage in the mesh map configuration. An example mesh map configuration is shown
+below.
+
+#### Overview of all layers
+
+| Layer            |     Plugin Type Specifier       |      Cost Computation per Vertex         |
+|------------------|---------------------------------|------------------------------------------|
+| HeightDiffLayer  | `mesh_layers/HeightDiffLayer`   | local radius based height differences    |
+| RoughnessLayer   | `mesh_layers/RoughnessLayer`    | local radius based normal fluctuation    | 
+| SteepnessLayer   | `mesh_layers/SteepnessLayer`    | arccos of the normal's z coordinate      |
+| RidgeLayer       | `mesh_layer/RidgeLayer`         | local radius based distance along normal |
+| InflationLayer   | `mesh_layers/InflationLayer`    | by distance to a lethal vertex           |
+
+#### Example layer configuration ####
+
+```
+layers:
+  - name: 'height_diff'
+    type: 'mesh_layers/HeightDiffLayer'
+  - name: 'roughness'
+    type: 'mesh_layers/RoughnessLayer'
+  - name: 'inflation'
+    type: 'mesh_layers/InflationLayer'
+
+height_diff:
+  factor: 1.0
+  threshold: 0.1
+
+roughness:
+  factor: 1.0
+  threshold: 0.6
+
+inflation:
+  factor: 1.0
+  inflation_radius: 0.25
+  inscribed_radius: 0.15
+  lethal_value: 1
+  inscribed_value: 0.4
+  repulsive_field: false
+
+```
+
+## Planners
+
+### Usage with Move Base Flex
+Currently the following planners are available:
+#### Dijkstra Mesh Planner
+```
+  - name: 'dijkstra_mesh_planner'
+    type: 'dijkstra_mesh_planner/DijkstraMeshPlanner'
+```
+#### Vector Field Planner
+```
+  - name: 'wave_front_planner'
+    type: 'wave_front_planner/WaveFrontPlanner'
+```
+#### MMP Planner
+```
+  - name: 'mmp_planner'
+    type: 'mmp_planner/MMPPlanner'
+```
 The planners are compared to each other.
 
-#### Wave Front Planner
-![WaveFrontPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Wave Front Planner")
+| Vector Field Planner |  Dijkstra Mesh Planner | ROS Global Planner on 2.5D DEM |
+|----------------------|------------------------|--------------------------------|
+|![VectorFieldPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Vector Field Planner") | ![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner") | ![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner") |
 
-#### Dijkstra Mesh Planner
-![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner")
-
-#### 2D Planner on 2.5 Digital Elevation Map (DEM)
-![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner")
-
-
+## Controllers
