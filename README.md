@@ -10,7 +10,6 @@ on the layered mesh map are provided.
 Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)  
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
-
 * [Installation](#installation)
 * [Software Stack](#software-stack)
 * [Mesh Map](#mesh-map)
@@ -19,6 +18,9 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 * [Simulation](#simulation)
 * [Demos](#demos)
 
+
+
+<img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600">
 
 ## Installation
 
@@ -31,6 +33,7 @@ All dependencies can be installed using rosdep
 `rosdep install mesh_navigation`
 
 As explicit dependencies we refer to the following ROS packages, which are also developed by us:
+
 * **[lvr2](https://github.com/uos/lvr2)**
 * **[mesh_tools](https://github.com/uos/mesh_tools/)**
 * **[move_base_flex](https://github.com/magazino/move_base_flex/)**
@@ -38,6 +41,7 @@ As explicit dependencies we refer to the following ROS packages, which are also 
 Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for example HDF5 map datasets, Gazebo simulations, and example configurations.
 
 ## Software Stack
+
 This **[mesh_navigation](https://github.com/uos/mesh_navigation)** stack provides a navigation server for 
 **[Move Base Flex (MBF)](https://github.com/magazino/move_base_flex)**. It provides a couple of configuration files and launch 
 files to start the navigation server with the configured layer plugins for the layered mesh map, and the configured
@@ -61,9 +65,11 @@ The package structure is as follows:
   in **[lvr2](https://github.com/uos/lvr2)**. This package provides a layered mesh map implementation. Layers can be 
   loaded as plugins to allow a highly configurable 3D navigation stack for robots traversing on the ground in outdoor
   and rough terrain.
+
 - `mesh_layers` The package provides a couple of mesh layers to compute the trafficability of the terrain. 
   Furthermore, these plugins have access to the HDF5 map file and can load and store layer information. 
   The mesh layers can be configured for the robots abilities and needs. Currently we provide the following layer plugins:
+  
   - HeightDiffLayer - `mesh_layers/HeightDiffLayer`
   - RoughnessLayer - `mesh_layers/RoughnessLayer`
   - SteepnessLayer - `mesh_layers/SteepnessLayer`
@@ -81,55 +87,65 @@ The package structure is as follows:
 
 - `mesh_client` Is an experimental package to load navigation meshes only from a mesh server.
 
-
 ### Path Planning and Motion Control
+
 Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz. 
 
 ## Mesh Map
 
 ### Mesh Layers
+
 The following table gives an overview of all currently implemented layer plugins available in the stack and the 
 corresponding types tp specify for usage in the mesh map configuration. An example mesh map configuration is shown
 below.
 
 #### Overview of all layers
 
-| Layer                | Plugin Type Specifier           | Description of Cost Computation          |  Example Image                                                                           |
-|----------------------|---------------------------------|------------------------------------------|------------------------------------------------------------------------------------------|
-| **HeightDiffLayer**  | `mesh_layers/HeightDiffLayer`   | local radius based height differences    |  ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") |
-| **RoughnessLayer**   | `mesh_layers/RoughnessLayer`    | local radius based normal fluctuation    |  ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer")      | 
-| **SteepnessLayer**   | `mesh_layers/SteepnessLayer`    | arccos of the normal's z coordinate      |  ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer")      |
-| **RidgeLayer**       | `mesh_layer/RidgeLayer`         | local radius based distance along normal |  ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
-| **InflationLayer**   | `mesh_layers/InflationLayer`    | by distance to a lethal vertex           |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
+| Layer               | Plugin Type Specifier         | Description of Cost Computation          | Example Image                                                                           |
+| ------------------- | ----------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| **HeightDiffLayer** | `mesh_layers/HeightDiffLayer` | local radius based height differences    | ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") |
+| **RoughnessLayer**  | `mesh_layers/RoughnessLayer`  | local radius based normal fluctuation    | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer")      |
+| **SteepnessLayer**  | `mesh_layers/SteepnessLayer`  | arccos of the normal's z coordinate      | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer")      |
+| **RidgeLayer**      | `mesh_layer/RidgeLayer`       | local radius based distance along normal | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
+| **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 
 ## Planners
 
 ### Usage with Move Base Flex
+
 Currently the following planners are available:
+
 #### Dijkstra Mesh Planner
+
 ```
   - name: 'dijkstra_mesh_planner'
     type: 'dijkstra_mesh_planner/DijkstraMeshPlanner'
 ```
+
 #### Vector Field Planner
+
 ```
   - name: 'wave_front_planner'
     type: 'wave_front_planner/WaveFrontPlanner'
 ```
+
 #### MMP Planner
+
 ```
   - name: 'mmp_planner'
     type: 'mmp_planner/MMPPlanner'
 ```
+
 The planners are compared to each other.
 
-| Vector Field Planner |  Dijkstra Mesh Planner | ROS Global Planner on 2.5D DEM |
-|----------------------|------------------------|--------------------------------|
-|![VectorFieldPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Vector Field Planner") | ![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner") | ![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner") |
+| Vector Field Planner                                                                        | Dijkstra Mesh Planner                                                                              | ROS Global Planner on 2.5D DEM                                                     |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| ![VectorFieldPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Vector Field Planner") | ![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner") | ![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner") |
 
 ## Controllers
 
 ## Simulation
+
 If you want to test the mesh navigation stack with Pluto please use the simulation setup and the corresponding launch
 files below for the respective outdoor or rough terrain environment. The mesh tools have to be installed.
 We developed the **[Mesh Tools](https://github.com/uos/mesh_tools)** as a package consisting of message definitions, RViz plugins and tools, as well as a
@@ -137,12 +153,13 @@ persistence layer to store such maps. These tools make the benefits of annotated
 allow to publish, edit and inspect such maps within the existing ROS software stack.
 
 ## Demos
-| Dataset and Description                  | Demo Video                            |
-|------------------------------------------|---------------------------------------| 
-| Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4)|
+
+| Dataset and Description                  | Demo Video                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
 
 ### Stone Quarry in the Forest in Brockum
-| Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
-|---------------------|-------------------|-------------------|
-|![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud")|![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff")|![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors")|
 
+| Colored Point Cloud                                                                              | Height Diff Layer                                                                                      | RGB Vertex Colors                                                                                       |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
