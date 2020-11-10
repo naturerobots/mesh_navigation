@@ -60,6 +60,7 @@ public:
 
   /**
    * @brief Given a goal pose in the world, compute a plan
+   *
    * @param start The start pose
    * @param goal The goal pose
    * @param tolerance If the goal is obstructed, how many meters the planner can
@@ -67,6 +68,7 @@ public:
    * @param plan The plan... filled by the planner
    * @param cost The cost for the the plan
    * @param message Optional more detailed outcome as a string
+   *
    * @return Result code as described on GetPath action result:
    *         SUCCESS         = 0
    *         1..9 are reserved as plugin specific non-error results
@@ -88,36 +90,93 @@ public:
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
+   *
    * @return True if a cancel has been successfully requested, false if not
    * implemented.
    */
   virtual bool cancel();
 
+  /**
+   * @brief initializes this planner with the given plugin name and map
+   *
+   * @param name name of this plugin
+   * @param mesh_map_ptr environment map on which planning is done
+   *
+   * @return true if initialization was successul; else false
+   */
   virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
 
+  /**
+   * @brief delivers vector field which has been generated during the latest planning
+   *
+   * @return vector field of the plan
+   */
   lvr2::DenseVertexMap<mesh_map::Vector> getVectorMap();
 
 protected:
+  /**
+   * @brief runs dijkstra path planning and stores the resulting distances and predecessors to the fields potential and
+   * predecessors of this class
+   *
+   * @param start[in] 3D starting position of the requested path
+   * @param goal[in] 3D goal position of the requested path
+   * @param path[out] optimal path from the given starting position to tie goal position
+   *
+   * @return result code in form of GetPath action result: SUCCESS, NO_PATH_FOUND, INVALID_START, INVALID_GOAL, and
+   * CANCELED are possible
+   */
   uint32_t dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal, std::list<lvr2::VertexHandle>& path);
 
+  /**
+   * @brief runs dijkstra path planning
+   *
+   * @param start[in] 3D starting position of the requested path
+   * @param goal[in] 3D goal position of the requested path
+   * @param edge_weights[in] edge distances of the map
+   * @param costs[in] vertex costs of the map
+   * @param path[out] optimal path from the given starting position to tie goal position
+   * @param distances[out] per vertex distances to goal
+   * @param predecessors[out] dense predecessor map for all visited vertices
+   *
+   * @return result code in form of GetPath action result: SUCCESS, NO_PATH_FOUND, INVALID_START, INVALID_GOAL, and
+   * CANCELED are possible
+   */
   uint32_t dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                     const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::DenseVertexMap<float>& costs,
                     std::list<lvr2::VertexHandle>& path, lvr2::DenseVertexMap<float>& distances,
                     lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
+  /**
+   * @brief calculates the vector field based on the current predecessors map and stores it to the vector_map field of this class
+   */
   void computeVectorMap();
 
+  /**
+   * @brief gets called on new incoming reconfigure parameters
+   *
+   * @param cfg new configuration
+   * @param level level
+   */
   void reconfigureCallback(dijkstra_mesh_planner::DijkstraMeshPlannerConfig& cfg, uint32_t level);
 
 private:
+  // current map
   mesh_map::MeshMap::Ptr mesh_map;
+  // name of this plugin
   std::string name;
+  // node handle
   ros::NodeHandle private_nh;
+  // true if the abort of the current planning was requested; else false
   std::atomic_bool cancel_planning;
+  // publisher of resulting path
   ros::Publisher path_pub;
+  // publisher of resulting vector fiels
   bool publish_vector_field;
+  // publisher of per face vectorfield
   bool publish_face_vectors;
+  // tf frame of the map
   std::string map_frame;
+  // offset of maximum distance from goal position
   float goal_dist_offset;
   // Server for Reconfiguration
   boost::shared_ptr<dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>

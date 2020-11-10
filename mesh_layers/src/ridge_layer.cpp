@@ -35,16 +35,11 @@
  *
  */
 
-using namespace std;
 #include "mesh_layers/ridge_layer.h"
 
 #include <lvr2/geometry/BaseVector.hpp>
-#include <lvr2/geometry/Normal.hpp>
-#include <lvr2/io/Timestamp.hpp>
-
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-
 #include <pluginlib/class_list_macros.h>
 #include <math.h>
 

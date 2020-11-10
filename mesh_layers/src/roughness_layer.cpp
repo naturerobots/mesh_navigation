@@ -35,17 +35,12 @@
  *
  */
 
-// TODO fixing LVR
-
-using namespace std;
-#include <lvr2/geometry/Normal.hpp>
-#include <lvr2/io/Timestamp.hpp>
+#include "mesh_layers/roughness_layer.h"
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <mesh_layers/roughness_layer.h>
-
 #include <pluginlib/class_list_macros.h>
+
 PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer)
 
 namespace mesh_layers {

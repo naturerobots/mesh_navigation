@@ -53,3 +53,4 @@ CATKIN_IGNORE
 # clangd stuff
 compile_commands.json
 .clangd
+.ccls
