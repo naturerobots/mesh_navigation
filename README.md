@@ -21,13 +21,23 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
 
 ## Installation
-If you want to install the mesh navigation stack from source please follow the instructions from the 
-[pluto_robot](https://github.com/uos/pluto_robot) repository, since we use the robot Pluto as exemplary
-robot to perform mesh navigation in simulation but also in the real world.
 
-Otherwise use `sudo apt install ros-melodic-mesh-navigation`
+Please use the official released ros package or install more recent versions from source.  
 
-## Mesh Navigation Stack
+`sudo apt install ros-melodic-mesh-navigation`
+
+**Installation from source**  
+All dependencies can be installed using rosdep  
+`rosdep install mesh_navigation`
+
+As explicit dependencies we refer to the following ROS packages, which are also developed by us:
+* **[lvr2](https://github.com/uos/lvr2)**
+* **[mesh_tools](https://github.com/uos/mesh_tools/)**
+* **[move_base_flex](https://github.com/magazino/move_base_flex/)**
+
+Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for example HDF5 map datasets, Gazebo simulations, and example configurations.
+
+## Software Stack
 This **[mesh_navigation](https://github.com/uos/mesh_navigation)** stack provides a navigation server for 
 **[Move Base Flex (MBF)](https://github.com/magazino/move_base_flex)**. It provides a couple of configuration files and launch 
 files to start the navigation server with the configured layer plugins for the layered mesh map, and the configured
