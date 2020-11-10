@@ -12,7 +12,7 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
 
 * [Installation](#installation)
-* [Software Stack](#mesh-navigation-stack)
+* [Software Stack](#software-stack)
 * [Mesh Map](#mesh-map)
 * [Planners](#planners)
 * [Controllers](#controllers)
