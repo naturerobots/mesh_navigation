@@ -161,5 +161,4 @@ The planners are compared to each other.
 | **roughness**   | The roughness layer computes the local *roughness* of the surface surrounding each vertex.<br/><br/>As shown in the example, this layer is useful to *differentiate between paths and overgrown areas*. | ![HeightDiffLayer](docs/images/costlayers/roughness.jpg?raw=true "Height Diff Costlayer")   |
 | **steepness**   | The steepness layer calculates the costs based on the angle of the vertex normals.<br/><br/>The example shows a use case of this costlayer by penalizing *steep areas* like stairs or walls             | ![HeightDiffLayer](docs/images/costlayers/steepness.jpg?raw=true "Height Diff Costlayer")   |
 | **ridge**       | The ridge costlayer penalizes *ridges on the surface*<br/><br/>It is useful for *agricultural environments* like the field shown in the example.                                                        | ![HeightDiffLayer](docs/images/costlayers/ridge.jpg?raw=true "Height Diff Costlayer")       |
-
-
+| **inflation**   | The inflation layer *inflates obstacles* detected by other layers.<br/><br/>This is useful to *avoid near proximity* to obstacles and avoid collisions.                                                 | ![HeightDiffLayer](docs/images/costlayers/inflation.jpg?raw=true "Height Diff Costlayer")   |
