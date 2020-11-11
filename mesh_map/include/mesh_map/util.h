@@ -190,6 +190,22 @@ T linearCombineBarycentricCoords(const std::array<lvr2::VertexHandle, 3>& vertic
   return linearCombineBarycentricCoords<T>(values, barycentric_coords);
 }
 
+/**
+ * @brief map value to color on color rainbow
+ * @param value value in range from 0 to 1
+ * @return color message
+ */
+std_msgs::ColorRGBA getRainbowColor(const float value);
+
+/**
+ * @brief map value to color on color rainbow
+ * @param value value in range from 0 to 1
+ * @param[out] r resulting red value
+ * @param[out] g resulting green value
+ * @param[out] b resultning blue value
+ */
+void getRainbowColor(float value, float& r, float& g, float& b);
+
 } /* namespace mesh_map */
 
 #endif  // MESH_MAP__UTIL_H

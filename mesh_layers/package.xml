@@ -10,7 +10,6 @@
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <buildtool_depend>catkin</buildtool_depend>
-    <depend>lvr_ros</depend>
     <depend>mesh_map</depend>
     <depend>dynamic_reconfigure</depend>
 

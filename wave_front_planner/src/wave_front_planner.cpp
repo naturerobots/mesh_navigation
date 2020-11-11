@@ -38,7 +38,6 @@
 #include <lvr2/geometry/Handles.hpp>
 #include <lvr2/util/Meap.hpp>
 
-#include <lvr_ros/colors.h>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.h>

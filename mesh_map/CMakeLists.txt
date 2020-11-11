@@ -7,10 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   geometry_msgs
-  lvr_ros
+  xmlrpcpp
   mesh_client
   pluginlib
   visualization_msgs
+  mesh_msgs_conversions
 )
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -26,7 +27,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include 
   LIBRARIES mesh_map
-  CATKIN_DEPENDS geometry_msgs lvr_ros visualization_msgs dynamic_reconfigure pluginlib mesh_client
+  CATKIN_DEPENDS geometry_msgs xmlrpcpp visualization_msgs dynamic_reconfigure pluginlib mesh_client mesh_msgs_conversions
   DEPENDS LVR2 Boost JSONCPP
 )
 

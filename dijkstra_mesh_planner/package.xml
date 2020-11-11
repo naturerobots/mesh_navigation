@@ -13,7 +13,6 @@
     <depend>mbf_mesh_core</depend>
     <depend>mbf_utility</depend>
     <depend>mesh_map</depend>
-    <depend>lvr_ros</depend>
 
     <export>
         <mbf_mesh_core plugin="${prefix}/dijkstra_mesh_planner.xml"/>

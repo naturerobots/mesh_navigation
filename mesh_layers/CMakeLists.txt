@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS
-  lvr_ros
   mesh_map
   dynamic_reconfigure
 )
@@ -22,7 +21,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES mesh_layers
-  CATKIN_DEPENDS lvr_ros mesh_map dynamic_reconfigure
+  CATKIN_DEPENDS mesh_map dynamic_reconfigure
 )
 
 include_directories(

@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   mbf_mesh_core
   mbf_utility
   mesh_map
-  lvr_ros
 )
 
 find_package(PkgConfig REQUIRED)

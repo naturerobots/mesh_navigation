@@ -45,19 +45,14 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <mesh_client/mesh_client.h>
 
-// TODO fix lvr2 missing includes
-using namespace std;
 #include <lvr2/geometry/Normal.hpp>
-#include <lvr2/io/Timestamp.hpp>
-
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <lvr2/io/hdf5/MeshIO.hpp>
-#include <lvr_ros/colors.h>
-#include <lvr_ros/conversions.h>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
 #include <mesh_msgs/MeshGeometryStamped.h>
+#include <mesh_msgs_conversions/conversions.h>
 #include <mutex>
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
@@ -219,7 +214,7 @@ bool MeshMap::readMap()
     }
   }
 
-  mesh_geometry_pub.publish(lvr_ros::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+  mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
   ROS_INFO_STREAM("Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
@@ -357,7 +352,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
       break;
   }
 
-  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
+  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
                                                          layer_iter->second->defaultValue(), layer_iter->first,
                                                          global_frame, uuid_str));
 
@@ -372,7 +367,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
 
-    vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
+    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
                                                            layer_iter->second->defaultValue(), layer_iter->first,
                                                            global_frame, uuid_str));
   }
@@ -463,7 +458,7 @@ void MeshMap::combineVertexCosts()
     vertex_costs[vH] = std::numeric_limits<float>::infinity();
   }
 
-  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 
   hasNaN = false;
 
@@ -817,7 +812,7 @@ void MeshMap::publishVectorField(const std::string& name,
     vector_field.points.push_back(toPoint(v));
 
     const float value = cost_function ? cost_function(values[vH]) : values[vH];
-    std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
+    std_msgs::ColorRGBA color = getRainbowColor(value);
     vector_field.colors.push_back(color);
     vector_field.colors.push_back(color);
 
@@ -874,7 +869,7 @@ void MeshMap::publishVectorField(const std::string& name,
           const float& cost = costAtPosition(values, vertex_handles, barycentric_coords);
           const float& value = cost_function ? cost_function(cost) : cost;
 
-          // vector.color = lvr_ros::getRainbowColor(value);
+          // vector.color = getRainbowColor(value);
           // vector.pose = mesh_map::calculatePoseFromDirection(
           //    center, dir_opt.get(), face_normals[fH]);
 
@@ -892,7 +887,7 @@ void MeshMap::publishVectorField(const std::string& name,
           vector_field.points.push_back(toPoint(u));
           vector_field.points.push_back(toPoint(v));
 
-          std_msgs::ColorRGBA color = lvr_ros::getRainbowColor(value);
+          std_msgs::ColorRGBA color = getRainbowColor(value);
           vector_field.colors.push_back(color);
           vector_field.colors.push_back(color);
         }
@@ -1189,17 +1184,17 @@ void MeshMap::publishCostLayers()
 {
   for (auto& layer : layers)
   {
-    vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
                                                            layer.second->defaultValue(), layer.first, global_frame,
                                                            uuid_str));
   }
-  vertex_costs_pub.publish(lvr_ros::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name)
 {
   vertex_costs_pub.publish(
-      lvr_ros::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
+      mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
 }
 
 void MeshMap::publishVertexColors()
