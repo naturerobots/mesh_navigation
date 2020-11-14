@@ -267,30 +267,6 @@ void MeshNavigationServer::reconfigure(mbf_mesh_nav::MoveBaseFlexConfig& config,
 bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request& request,
                                                     mbf_msgs::CheckPose::Response& response)
 {
-  // selecting the requested mesh
-
-  // get target pose or current robot pose as x, y, yaw coordinates
-  std::string mesh_frame = mesh_ptr_->getGlobalFrameID();
-
-  geometry_msgs::PoseStamped pose;
-  if (request.current_pose)
-  {
-    if (!mbf_utility::getRobotPose(*tf_listener_ptr_, robot_frame_, mesh_frame, ros::Duration(0.5), pose))
-    {
-      ROS_ERROR_STREAM("Could not get robot pose in the mesh map in the frame '" << mesh_frame << "'!");
-      return false;
-    }
-  }
-  else
-  {
-    if (!mbf_utility::transformPose(*tf_listener_ptr_, mesh_frame, request.pose.header.stamp, ros::Duration(0.5),
-                                    request.pose, global_frame_, pose))
-    {
-      ROS_ERROR_STREAM("Transform target pose to the mesh map frame '" << mesh_frame << "' failed!");
-      return false;
-    }
-  }
-
   // TODO implement
   return false;
 }
