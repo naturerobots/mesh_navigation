@@ -3,16 +3,15 @@ name: Noetic CI
 on: [push, pull_request]
 
 jobs:
-  industrial_ci:
-    strategy:
-      matrix:
-        env:
-          - {ROS_DISTRO: noetic, ROS_REPO: testing}
-          - {ROS_DISTRO: noetic, ROS_REPO: main}
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: ros-tooling/setup-ros@v0.1
         with:
-          submodules: recursive
-      - uses: 'ros-industrial/industrial_ci@master'
-        env: ${{matrix.env}}
+          required-ros-distributions: noetic
+      - uses: ros-tooling/action-ros-ci@v0.1
+        with:
+          package-name: mesh_navigation
+          target-ros1-distro: noetic
+          vcs-repo-file-url: ""
