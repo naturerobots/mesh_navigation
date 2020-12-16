@@ -2,6 +2,6 @@
 Changelog for package mbf_mesh_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.0 (2020-12-16)
+------------------
 * Initial release

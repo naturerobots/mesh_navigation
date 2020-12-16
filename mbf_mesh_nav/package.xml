@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mbf_mesh_nav</name>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <description>The mbf_mesh_nav package</description>
 
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
