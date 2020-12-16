@@ -3,16 +3,15 @@ name: Melodic CI
 on: [push, pull_request]
 
 jobs:
-  industrial_ci:
-    strategy:
-      matrix:
-        env:
-          - {ROS_DISTRO: melodic, ROS_REPO: testing}
-          - {ROS_DISTRO: melodic, ROS_REPO: main}
-    runs-on: ubuntu-latest
+  ci:
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+      - uses: ros-tooling/setup-ros@v0.1
         with:
-          submodules: recursive
-      - uses: 'ros-industrial/industrial_ci@master'
-        env: ${{matrix.env}}
+          required-ros-distributions: melodic
+      - uses: ros-tooling/action-ros-ci@v0.1
+        with:
+          package-name: mesh_navigation
+          target-ros1-distro: melodic
+          vcs-repo-file-url: ""
