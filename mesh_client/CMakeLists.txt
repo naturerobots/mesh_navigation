@@ -20,7 +20,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${LVR_INCLUDE_DIRS}
+  ${LVR2_INCLUDE_DIRS}
   ${JSONCPP_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${CURL_INCLUDE_DIRS}
