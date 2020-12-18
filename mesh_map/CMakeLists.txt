@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   xmlrpcpp
   mesh_client
   pluginlib
+  tf2_ros
   visualization_msgs
   mesh_msgs_conversions
 )
@@ -27,7 +28,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include 
   LIBRARIES mesh_map
-  CATKIN_DEPENDS geometry_msgs xmlrpcpp visualization_msgs dynamic_reconfigure pluginlib mesh_client mesh_msgs_conversions
+  CATKIN_DEPENDS geometry_msgs xmlrpcpp visualization_msgs dynamic_reconfigure pluginlib tf2_ros mesh_client mesh_msgs_conversions
   DEPENDS LVR2 Boost JSONCPP
 )
 

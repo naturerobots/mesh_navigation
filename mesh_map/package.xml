@@ -12,6 +12,7 @@
     <depend>dynamic_reconfigure</depend>
     <depend>geometry_msgs</depend>
     <depend>pluginlib</depend>
+    <depend>tf2_ros</depend>
     <depend>visualization_msgs</depend>
     <depend>mesh_client</depend>
     <depend>mesh_msgs_conversions</depend>

@@ -12,6 +12,7 @@
     <depend>roscpp</depend>
     <depend>mbf_mesh_core</depend>
     <depend>mbf_utility</depend>
+    <depend>mbf_msgs</depend>
     <depend>mesh_map</depend>
 
     <export>
