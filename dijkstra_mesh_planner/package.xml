@@ -8,12 +8,12 @@
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <buildtool_depend>catkin</buildtool_depend>
-
     <depend>roscpp</depend>
     <depend>mbf_mesh_core</depend>
     <depend>mbf_utility</depend>
     <depend>mbf_msgs</depend>
     <depend>mesh_map</depend>
+    <depend>dynamic_reconfigure</depend>
 
     <export>
         <mbf_mesh_core plugin="${prefix}/dijkstra_mesh_planner.xml"/>

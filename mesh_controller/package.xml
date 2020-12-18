@@ -17,6 +17,7 @@
     <depend>mbf_msgs</depend>
     <depend>mesh_map</depend>
     <depend>tf2_geometry_msgs</depend>
+    <depend>dynamic_reconfigure</depend>
 
     <export>
         <mbf_mesh_core plugin="${prefix}/mesh_controller.xml"/>
