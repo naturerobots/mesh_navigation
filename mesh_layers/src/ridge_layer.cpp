@@ -163,9 +163,7 @@ bool RidgeLayer::computeLayer()
     lvr2::BaseVector<float> reference = mesh_ptr->getVertexPosition(vH) + vertex_normals[vH];
     visitLocalVertexNeighborhood(*mesh_ptr.get(), invalid, vH, config.radius, [&](auto vertex) {
       lvr2::BaseVector<float> current_point = mesh_ptr->getVertexPosition(vertex) + vertex_normals[vertex];
-      value += sqrt((current_point.x - reference.x) * (current_point.x - reference.x) +
-                    (current_point.y - reference.y) * (current_point.y - reference.y) +
-                    (current_point.z - reference.z) * (current_point.z - reference.z));
+      value += (current_point - reference).length();
       num_neighbours++;
     });
 
