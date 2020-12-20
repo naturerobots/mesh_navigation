@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 2.8.3)
 project(mesh_client)
 
 set(CMAKE_CXX_STANDARD 14)
-find_package(CURL REQUIRED)
 
-find_package(catkin REQUIRED COMPONENTS roscpp)
+find_package(catkin REQUIRED COMPONENTS
+    roscpp
+)
+
 find_package(CURL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(LVR2 REQUIRED)
@@ -14,7 +16,8 @@ pkg_check_modules(JSONCPP jsoncpp)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES mesh_client
-  DEPENDS CURL EIGEN3 LVR2 JSONCPP
+  CATKIN_DEPENDS roscpp
+  DEPENDS CURL EIGEN3 LVR2
 )
 
 include_directories(

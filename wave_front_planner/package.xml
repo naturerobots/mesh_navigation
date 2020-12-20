@@ -14,6 +14,7 @@
     <depend>mbf_utility</depend>
     <depend>mbf_msgs</depend>
     <depend>mesh_map</depend>
+    <depend>dynamic_reconfigure</depend>
 
     <export>
         <mbf_mesh_core plugin="${prefix}/wave_front_planner.xml"/>

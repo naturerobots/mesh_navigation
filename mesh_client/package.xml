@@ -9,6 +9,7 @@
   <author email="spuetz@uos.de">Sebastian Pütz</author>
   <author email="mklpiening@uos.de">Malte kl. Piening</author>
 
+  <build_depend>pkg-config</build_depend>
   <depend>curl</depend>
   <depend>eigen</depend>
   <depend>libjsoncpp-dev</depend>
