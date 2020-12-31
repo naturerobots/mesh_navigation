@@ -5,15 +5,17 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
   dynamic_reconfigure
   geometry_msgs
-  xmlrpcpp
   mesh_client
+  mesh_msgs_conversions
   pluginlib
+  roscpp
+  tf2
+  tf2_geometry_msgs
   tf2_ros
   visualization_msgs
-  mesh_msgs_conversions
+  xmlrpcpp
 )
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -29,8 +31,21 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include 
   LIBRARIES mesh_map
-  CATKIN_DEPENDS roscpp geometry_msgs xmlrpcpp visualization_msgs dynamic_reconfigure pluginlib tf2_ros mesh_client mesh_msgs_conversions
-  DEPENDS LVR2 Boost
+  CATKIN_DEPENDS
+    dynamic_reconfigure
+    geometry_msgs
+    mesh_client
+    mesh_msgs_conversions
+    pluginlib
+    roscpp
+    tf2
+    tf2_geometry_msgs
+    tf2_ros
+    visualization_msgs
+    xmlrpcpp
+  DEPENDS
+    LVR2
+    Boost
 )
 
 include_directories(
