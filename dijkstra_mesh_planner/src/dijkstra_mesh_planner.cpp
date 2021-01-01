@@ -35,17 +35,11 @@
  *
  */
 
-// TODO fix lvr2 missing imports
-#include <lvr2/geometry/Handles.hpp>
-using namespace std;
-#include <unordered_set>
-
+#include <dijkstra_mesh_planner/dijkstra_mesh_planner.h>
 #include <lvr2/util/Meap.hpp>
 #include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.h>
-
-#include <dijkstra_mesh_planner/dijkstra_mesh_planner.h>
 
 PLUGINLIB_EXPORT_CLASS(dijkstra_mesh_planner::DijkstraMeshPlanner, mbf_mesh_core::MeshPlanner);
 

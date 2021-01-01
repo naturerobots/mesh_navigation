@@ -6,9 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
   mbf_mesh_core
   mbf_utility
+  mbf_msgs
   mesh_map
+  dynamic_reconfigure
 )
 
 find_package(PkgConfig REQUIRED)
@@ -19,9 +22,8 @@ generate_dynamic_reconfigure_options(
 )
 
 catkin_package(
-  INCLUDE_DIRS include
   LIBRARIES dijkstra_mesh_planner
-  CATKIN_DEPENDS mbf_mesh_core mesh_map
+  CATKIN_DEPENDS roscpp mbf_mesh_core mbf_msgs mesh_map dynamic_reconfigure
 )
 
 include_directories(

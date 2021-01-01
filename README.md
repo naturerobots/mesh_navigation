@@ -155,9 +155,13 @@ allow to publish, edit and inspect such maps within the existing ROS software st
 
 ## Demos
 
+In the following demo videos we used the developed VFP, i.e., the wavefront_propagatn_planner.
+It will be renamed soon to vector_field_planner.
+
 | Dataset and Description                  | Demo Video                                                                                                               |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
+| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acron19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
 
 ### Stone Quarry in the Forest in Brockum
 

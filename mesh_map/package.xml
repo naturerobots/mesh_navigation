@@ -1,20 +1,23 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mesh_map</name>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <description>The mesh_map package</description>
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
     <license>BSD 3-Clause</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
-    <depend>roscpp</depend>
     <buildtool_depend>catkin</buildtool_depend>
     <depend>dynamic_reconfigure</depend>
     <depend>geometry_msgs</depend>
-    <depend>pluginlib</depend>
-    <depend>visualization_msgs</depend>
     <depend>mesh_client</depend>
     <depend>mesh_msgs_conversions</depend>
+    <depend>pluginlib</depend>
+    <depend>roscpp</depend>
+    <depend>tf2</depend>
+    <depend>tf2_geometry_msgs</depend>
+    <depend>tf2_ros</depend>
+    <depend>visualization_msgs</depend>
     <depend>xmlrpcpp</depend>
 
 </package>

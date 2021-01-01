@@ -37,7 +37,10 @@
 
 #include <mesh_map/util.h>
 #include <std_msgs/ColorRGBA.h>
-#include <tf/transform_datatypes.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace mesh_map
 {
@@ -67,16 +70,16 @@ geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vec
   Normal ey = normal.cross(direction).normalized();
   Normal ex = ey.cross(normal).normalized();
 
-  tf::Matrix3x3 tf_basis(ex.x, ey.x, ez.x, ex.y, ey.y, ez.y, ex.z, ey.z, ez.z);
+  tf2::Matrix3x3 tf_basis(ex.x, ey.x, ez.x, ex.y, ey.y, ez.y, ex.z, ey.z, ez.z);
 
-  tf::Vector3 tf_origin(position.x, position.y, position.z);
+  tf2::Vector3 tf_origin(position.x, position.y, position.z);
 
-  tf::Pose tf_pose;
+  tf2::Transform tf_pose;
   tf_pose.setBasis(tf_basis);
   tf_pose.setRotation(tf_pose.getRotation().normalize());
   tf_pose.setOrigin(tf_origin);
   geometry_msgs::Pose pose;
-  tf::poseTFToMsg(tf_pose, pose);
+  tf2::toMsg(tf_pose, pose);
   return pose;
 }
 
