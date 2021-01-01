@@ -13,4 +13,4 @@ jobs:
       - name: docker setup and build
         run: docker build . -t mesh_nav/noetic -f ci/Dockerfile-noetic
       - name: catkin lint
-        run: docker run -it mesh_nav/noetic catkin_lint src
+        run: docker run mesh_nav/noetic catkin_lint src

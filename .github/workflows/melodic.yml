@@ -13,4 +13,4 @@ jobs:
       - name: docker setup and build
         run: docker build . -t mesh_nav/melodic -f ci/Dockerfile-melodic
       - name: catkin lint
-        run: docker run -it mesh_nav/melodic catkin_lint src
+        run: docker run mesh_nav/melodic catkin_lint src
