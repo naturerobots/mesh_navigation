@@ -3,15 +3,14 @@ name: Noetic CI
 on: [push, pull_request]
 
 jobs:
-  ci:
-    runs-on: ubuntu-20.04
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: ros-tooling/setup-ros@v0.1
         with:
-          required-ros-distributions: noetic
-      - uses: ros-tooling/action-ros-ci@v0.1
-        with:
-          package-name: mesh_navigation
-          target-ros1-distro: noetic
-          vcs-repo-file-url: ""
+          submodules: recursive
+      - name: docker setup and build
+        run: docker build . -t mesh_nav/noetic -f ci/Dockerfile-noetic
+      - name: catkin lint
+        run: docker run mesh_nav/noetic catkin_lint src

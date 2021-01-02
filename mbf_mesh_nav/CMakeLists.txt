@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
   mbf_mesh_core
   mbf_abstract_nav
   mesh_map
@@ -25,7 +26,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES mbf_mesh_server
-  CATKIN_DEPENDS mbf_mesh_core mesh_map dynamic_reconfigure mbf_abstract_nav pluginlib
+  CATKIN_DEPENDS roscpp mbf_mesh_core mesh_map dynamic_reconfigure mbf_abstract_nav pluginlib
   DEPENDS LVR2
 )
 
