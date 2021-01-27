@@ -346,6 +346,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
   auto layer_iter = layers.begin();
   for (; layer_iter != layers.end(); layer_iter++)
   {
+    // TODO add lethal and removae lethal sets
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
     // TODO merge with std::set_merge
     if (layer_iter->first == layer_name)
@@ -363,6 +364,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
   for (; layer_iter != layers.end(); layer_iter++)
   {
+    // TODO add lethal and remove lethal sets as param
     layer_iter->second->updateLethal(lethals, lethals);
 
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
