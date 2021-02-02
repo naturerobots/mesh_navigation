@@ -1,11 +1,8 @@
 # Mesh Navigation
 
-The *Mesh Navigation* bundle provides software to perform efficient robot navigation on 2D-manifolds in 3D represented 
-as triangular meshes. It allows to safely navigate in various complex outdoor environments by using a modular extendable
-layerd mesh map. Layers can be loaded as plugins and represent certain geometric or semantic metrics of the terrain.
-The layered mesh map is integrated with Move Base Flex (MBF) which provides a universal ROS action interface for path
-planning and motion control, as well as for recovery behaviours. Thus, additional planner and controller plugins running
-on the layered mesh map are provided.
+The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
+layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
+The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
 Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)  
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
