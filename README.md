@@ -9,6 +9,7 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
 * [Installation](#installation)
 * [Software Stack](#software-stack)
+* [Usage](#usage)
 * [Mesh Map](#mesh-map)
 * [Planners](#planners)
 * [Controllers](#controllers)
@@ -85,9 +86,21 @@ The package structure is as follows:
 
 - `mesh_client` Is an experimental package to load navigation meshes only from a mesh server.
 
+## Usage
+
+See the **[pluto_robot](https://github.com/uos/pluto_robot)** bundle for example configurations of the mesh navigatoin stack and usage.
+
+### Mesh map configuratoin
+
+TODO
+
+### Planner and Controller configurations
+
+TODO
+
 ### Path Planning and Motion Control
 
-Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz. 
+Use the *MeshGoal* tool from the MeshTools bundle to select a goal pose on the shown mesh in *RViz*. This can be added to the top panel *RViz*. 
 
 ## Mesh Map
 
