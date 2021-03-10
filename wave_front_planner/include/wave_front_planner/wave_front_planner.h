@@ -120,7 +120,7 @@ protected:
                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
   /**
-   * Fast Marching Method update step using the Hesse normal form to determine if the direction vector is cutting the current triangle
+   * Single source update step using the Hesse normal form to determine if the direction vector is cutting the current triangle
    * @param distances Distance map to the goal which stores the current state of all distances to the goal
    * @param edge_weights Distances assigned to each edge
    * @param v1 The first vertex of the triangle
@@ -132,9 +132,20 @@ protected:
                                    const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::VertexHandle& v1,
                                    const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
 
-
   /**
    * Fast Marching Method update step using the Law of Cosines to determine if the direction vector is cutting the current triangle
+   * @param distances Distance map to the goal which stores the current state of all distances to the goal
+   * @param edge_weights Distances assigned to each edge
+   * @param v1 The first vertex of the triangle
+   * @param v2 The second vertex of the triangle
+   * @param v3 The thrid vertex of the triangle
+   * @return true if the newly computed distance is shorter than before and if the current triangle is cut
+   */
+  inline bool waveFrontUpdateFMM(lvr2::DenseVertexMap<float>& distances, const lvr2::DenseEdgeMap<float>& edge_weights,
+                              const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
+
+  /**
+   * Single source update step using the Law of Cosines to determine if the direction vector is cutting the current triangle
    * @param distances Distance map to the goal which stores the current state of all distances to the goal
    * @param edge_weights Distances assigned to each edge
    * @param v1 The first vertex of the triangle

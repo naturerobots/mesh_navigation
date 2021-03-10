@@ -45,6 +45,7 @@
 #include "wave_front_planner/wave_front_planner.h"
 //#define DEBUG
 //#define USE_UPDATE_WITH_S
+//#define USE_UPDATE_FMM
 
 PLUGINLIB_EXPORT_CLASS(wave_front_planner::WaveFrontPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -520,6 +521,99 @@ inline bool WaveFrontPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& dista
   return false;
 }
 
+
+inline bool WaveFrontPlanner::waveFrontUpdateFMM(
+    lvr2::DenseVertexMap<float> &distances,
+    const lvr2::DenseEdgeMap<float> &edge_weights,
+    const lvr2::VertexHandle &v1tmp,
+    const lvr2::VertexHandle &v2tmp,
+    const lvr2::VertexHandle &v3)
+{
+  const auto& mesh = mesh_map->mesh();
+
+  bool v1_smaller = distances[v1tmp] < distances[v2tmp];
+  const lvr2::VertexHandle v1 = v1_smaller ? v1tmp : v2tmp;
+  const lvr2::VertexHandle v2 = v1_smaller ? v2tmp : v1tmp;
+
+  const double u1 = distances[v1];
+  const double u2 = distances[v2];
+  const double u3 = distances[v3];
+
+  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const double c = edge_weights[e12h.unwrap()];
+  const double c_sq = c * c;
+
+  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const double b = edge_weights[e13h.unwrap()];
+  const double b_sq = b * b;
+
+  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const double a = edge_weights[e23h.unwrap()];
+  const double a_sq = a * a;
+
+  const double delta_u = u2 - u1;
+  const double cos_theta = (a_sq + b_sq - c_sq) / (2 * a * b);
+
+  const double k0 = a_sq + b_sq - 2 * a * b * cos_theta;
+  const double k1 = 2 * b * delta_u * (a * cos_theta - b);
+  const double k2 = b_sq * (delta_u * delta_u - a_sq * (1 - cos_theta * cos_theta));
+
+  double t;
+  const double r = k1 * k1 - 4 * k0 * k2;
+  if(r < 0)
+  {
+    t = -k1 / (2 * k0);
+  }
+  else
+  {
+    t = (-k1 + sqrt(r)) / (2 * k0);
+  }
+
+  const double e = b * (t - delta_u) / t;
+
+  if(delta_u < t && (e < a / cos_theta) && (e > a * cos_theta))
+  {
+    const double u3_tmp = u1 + t;
+    if(u3_tmp < u3)
+    {
+      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+      cutting_faces.insert(v3, fH);
+      predecessors[v3] = v1;
+      distances[v3] = static_cast<float>(u3_tmp);
+      const double theta = acos(cos_theta);
+      const double phi = asin((e * sin(theta)) / sqrt(a_sq * e * e - 2 * a * cos_theta));
+      direction[v3] = theta + phi - M_PI_2;
+      return true;
+    }
+  }
+  else {
+    const double u1t = u1 + b;
+    const double u2t = u2 + a;
+
+    if (u1t < u2t) {
+      if (u1t < u3) {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v1;
+        distances[v3] = static_cast<float>(u1t);
+        direction[v3] = 0;
+        return true;
+      }
+    } else {
+      if (u2t < u3) {
+        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        cutting_faces.insert(v3, fH);
+        predecessors[v3] = v2;
+        distances[v3] = static_cast<float>(u2t);
+        direction[v3] = 0;
+        return true;
+      }
+    }
+  }
+
+return false;
+}
+
 uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original_start,
                                                 const mesh_map::Vector& original_goal,
                                                 const lvr2::DenseEdgeMap<float>& edge_weights,
@@ -658,8 +752,7 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
         // one vertex is not in the fixed set
         if (fixed[a] && fixed[b] && fixed[c])
         {
-// The face's vertices are already optimal
-// with respect to the distance
+          // All distance values of the face are already fixed
 #ifdef DEBUG
           mesh_map->publishDebugFace(fh, mesh_map::color(1, 0, 0), "fmm_fixed_" + std::to_string(fixed_cnt++));
 #endif
@@ -670,6 +763,8 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
           // c is free
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, a, b, c))
+#elif defined USE_UPDATE_FMM
+          if (waveFrontUpdateFMM(distances, edge_weights, a, b, c))
 #else
           if (waveFrontUpdate(distances, edge_weights, a, b, c))
 #endif
@@ -686,6 +781,8 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
           // b is free
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, c, a, b))
+#elif defined USE_UPDATE_FMM
+          if (waveFrontUpdateFMM(distances, edge_weights, c, a, b))
 #else
           if (waveFrontUpdate(distances, edge_weights, c, a, b))
 #endif
@@ -702,6 +799,8 @@ uint32_t WaveFrontPlanner::waveFrontPropagation(const mesh_map::Vector& original
           // a if free
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, b, c, a))
+#elif defined USE_UPDATE_FMM
+          if (waveFrontUpdateFMM(distances, edge_weights, b, c, a))
 #else
           if (waveFrontUpdate(distances, edge_weights, b, c, a))
 #endif
