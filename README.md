@@ -10,6 +10,7 @@ on the layered mesh map are provided.
 Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)  
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
+* [Publications](#publications)
 * [Installation](#installation)
 * [Software Stack](#software-stack)
 * [Mesh Map](#mesh-map)
@@ -19,9 +20,34 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 * [Demos](#demos)
 * [Build Status](#build-status)
 
-
-
 <img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600">
+
+## Publications
+Please reference the following papers when using the navigation stack in your scientific work.
+
+#### Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots
+```  
+@inproceedings{puetz21cvp,
+    author = {Pütz, Sebastian and Wiemann, Thomas and Kleine Piening, Malte and Hertzberg, Joachim},
+    title = {Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots},
+    booktitle = {2021 IEEE International Conference on Robotics and Automation (ICRA)},
+    year = 2021,
+    url = {https://github.com/uos/mesh_navigation},
+    note = {Software available at \url{https://github.com/uos/mesh_navigation}}
+}
+```
+#### Move Base Flex: A Highly Flexible Navigation Framework for Mobile Robots
+```  
+@inproceedings{puetz18mbf,
+    author = {Sebastian Pütz and Jorge Santos Simón and Joachim Hertzberg},
+    title = {{Move Base Flex}: A Highly Flexible Navigation Framework for Mobile Robots},
+    booktitle = {2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+    year = 2018,
+    month = {October},
+    url = {https://github.com/magazino/move_base_flex},
+    note = {Software available at \url{https://github.com/magazino/move_base_flex}}
+}
+```
 
 ## Installation
 
