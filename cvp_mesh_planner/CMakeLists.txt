@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(wave_front_planner)
+project(cvp_mesh_planner)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,7 +18,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
 generate_dynamic_reconfigure_options(
-  cfg/WaveFrontPlanner.cfg
+  cfg/CVPMeshPlanner.cfg
 )
 
 catkin_package(
@@ -32,7 +32,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-  src/wave_front_planner.cpp
+  src/cvp_mesh_planner.cpp
 )
 
 add_dependencies(${PROJECT_NAME}
@@ -52,7 +52,7 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(FILES wave_front_planner.xml
+install(FILES cvp_mesh_planner.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
