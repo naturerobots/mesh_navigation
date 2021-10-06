@@ -15,7 +15,7 @@ RUN apt install -q -y --no-install-recommends tzdata
 
 # setup ROS
 RUN apt install -q -y --no-install-recommends dirmngr gnupg2 curl openssl ca-certificates
-RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
 RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
 
 # barebones ros installation
