@@ -16,7 +16,7 @@ RUN apt install -q -y --no-install-recommends tzdata
 # setup ROS
 RUN apt install -q -y --no-install-recommends dirmngr gnupg2 curl
 RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
-RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
+RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
 
 # barebones ros installation
 # - we want all packages to be installed as dependencies of our packages
