@@ -108,7 +108,7 @@ The package structure is as follows:
   vertex to the goal pose can be computed. This leads in a sub-optimal potential field, which highly depends on the mesh 
   structure.
 
-- `wave_front_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account.
+- `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account.
   This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`,
   since it is not restricted to the edges or topology of the mesh. A comparison is shown below.
 
@@ -152,8 +152,8 @@ Currently the following planners are available:
 #### Vector Field Planner
 
 ```
-  - name: 'wave_front_planner'
-    type: 'wave_front_planner/WaveFrontPlanner'
+  - name: 'cvp_mesh_planner'
+    type: 'cvp_mesh_planner/CVPMeshPlanner'
 ```
 
 #### MMP Planner

@@ -14,7 +14,7 @@
     <exec_depend>mesh_controller</exec_depend>
     <exec_depend>mesh_layers</exec_depend>
     <exec_depend>mesh_map</exec_depend>
-    <exec_depend>wave_front_planner</exec_depend>
+    <exec_depend>cvp_mesh_planner</exec_depend>
     <exec_depend>dijkstra_mesh_planner</exec_depend>
 
     <export>

@@ -22,7 +22,7 @@ generate_dynamic_reconfigure_options(
 )
 
 catkin_package(
-  LIBRARIES mesh_planner
+  LIBRARIES cvp_mesh_planner
   CATKIN_DEPENDS roscpp mbf_mesh_core mbf_utility mbf_msgs mesh_map dynamic_reconfigure
 )
 
