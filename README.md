@@ -110,9 +110,10 @@ The package structure is as follows:
 
 - `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account.
   This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`,
-  since it is not restricted to the edges or topology of the mesh. A comparison is shown below.
+  since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper
+  `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots` which is stated above.
 
-- `mesh_client` Is an experimental package to load navigation meshes only from a mesh server.
+- `mesh_client` Is an experimental package to additionally load navigation meshes from a server.
 
 ### Path Planning and Motion Control
 
@@ -149,7 +150,7 @@ Currently the following planners are available:
     type: 'dijkstra_mesh_planner/DijkstraMeshPlanner'
 ```
 
-#### Vector Field Planner
+#### Continuous Vector Field Planner
 
 ```
   - name: 'cvp_mesh_planner'
