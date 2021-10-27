@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>mesh_navigation</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <description>The mesh_navigation package provides a layered mesh_map implementation, a Move Base Flex mesh navigation server, as well as mesh navigation plugins for path planning and navigation control.</description>
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
     <license>BSD-3</license>

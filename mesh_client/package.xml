@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>mesh_client</name>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <description>The mesh_client package</description>
 
   <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
     <name>cvp_mesh_planner</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <description>The Continuous Vector Field Planner (CVP) mesh planner package</description>
     <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
     <license>BSD 3-Clause</license>
