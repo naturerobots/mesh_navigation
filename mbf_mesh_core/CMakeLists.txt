@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.0.2)
 project(mbf_mesh_core)
-
 
 find_package(catkin REQUIRED COMPONENTS
   mbf_abstract_core
