@@ -232,4 +232,18 @@ void getRainbowColor(float value, float& r, float& g, float& b)
     r = 1, g = n, b = 0;
 }
 
+mesh_map::Normal poseToDirectionVector(const geometry_msgs::PoseStamped& pose, const tf2::Vector3& axis)
+{
+  tf2::Stamped<tf2::Transform> transform;
+  fromMsg(pose, transform);
+  tf2::Vector3 v = transform.getBasis() * axis;
+  return mesh_map::Normal(v.x(), v.y(), v.z());
+}
+
+
+mesh_map::Vector poseToPositionVector(const geometry_msgs::PoseStamped& pose)
+{
+  return mesh_map::Vector(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+}
+
 } /* namespace mesh_map */

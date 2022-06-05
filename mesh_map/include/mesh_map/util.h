@@ -40,11 +40,13 @@
 
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <lvr2/geometry/Handles.hpp>
 #include <lvr2/attrmaps/AttrMaps.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/geometry/Normal.hpp>
 #include <std_msgs/ColorRGBA.h>
+#include <tf2/LinearMath/Vector3.h>
 
 namespace mesh_map
 {
@@ -205,6 +207,24 @@ std_msgs::ColorRGBA getRainbowColor(const float value);
  * @param[out] b resultning blue value
  */
 void getRainbowColor(float value, float& r, float& g, float& b);
+
+/**
+ * Converts the orientation of a geometry_msgs/PoseStamped message to a direction vector
+ * @param pose      the pose to convert
+ * @return          direction normal vector
+ */
+mesh_map::Normal poseToDirectionVector(
+      const geometry_msgs::PoseStamped& pose,
+      const tf2::Vector3& axis=tf2::Vector3(1,0,0));
+
+
+/**
+ * Converts the position of a geometry_msgs/PoseStamped message to a position vector
+ * @param pose      the pose to convert
+ * @return          position vector
+ */
+  mesh_map::Vector poseToPositionVector(
+      const geometry_msgs::PoseStamped& pose);
 
 } /* namespace mesh_map */
 
