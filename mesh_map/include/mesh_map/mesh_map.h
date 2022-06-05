@@ -123,7 +123,7 @@ public:
   /**
    * @brief A method which combines all layer costs with the respective weightings
    */
-  void combineVertexCosts();
+  bool combineVertexCosts();
 
   /**
    * @brief Computes contours

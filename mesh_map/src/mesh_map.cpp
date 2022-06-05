@@ -216,6 +216,9 @@ bool MeshMap::readMap()
 
   mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
+  // publish vertex colors if available.
+  publishVertexColors();
+
   ROS_INFO_STREAM("Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
 
@@ -240,25 +243,20 @@ bool MeshMap::readMap()
     }
   }
 
-  ROS_INFO_STREAM("Load layer plugins...");
   if (!loadLayerPlugins())
   {
-    ROS_FATAL_STREAM("Could not load any layer plugin!");
+    ROS_WARN_STREAM("Error in the layers configuration!");
     return false;
   }
 
-  ROS_INFO_STREAM("Initialize layer plugins...");
   if (!initLayerPlugins())
   {
     ROS_FATAL_STREAM("Could not initialize plugins!");
     return false;
   }
 
-  sleep(1);
-
   combineVertexCosts();
   publishCostLayers();
-  publishVertexColors();
 
   map_loaded = true;
   return true;
@@ -274,8 +272,10 @@ bool MeshMap::loadLayerPlugins()
                     << private_nh.getNamespace()
                     << "\". \"layers\" must be must be a list of "
                        "tuples with a name and a type.");
-    return false;
+    return true;
   }
+
+  ROS_INFO_STREAM("Load layer plugins...");
 
   try
   {
@@ -317,6 +317,7 @@ bool MeshMap::loadLayerPlugins()
       {
         ROS_ERROR_STREAM("Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
                                                                             << "\"!");
+        return false;
       }
     }
   }
@@ -328,8 +329,8 @@ bool MeshMap::loadLayerPlugins()
     ROS_ERROR_STREAM(e.getMessage());
     return false;
   }
-  // is there any layer plugin loaded for the map?
-  return !layers.empty();
+
+  return true;
 }
 
 void MeshMap::layerChanged(const std::string& layer_name)
@@ -383,6 +384,13 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
 bool MeshMap::initLayerPlugins()
 {
+  if (layers.empty())
+  {
+    // no layers configured, all fine.
+    return true;
+  }
+  ROS_INFO_STREAM("Initialize layer plugins...");
+
   lethals.clear();
   lethal_indices.clear();
 
@@ -414,14 +422,20 @@ bool MeshMap::initLayerPlugins()
   return true;
 }
 
-void MeshMap::combineVertexCosts()
+bool MeshMap::combineVertexCosts()
 {
-  ROS_INFO_STREAM("Combining costs...");
-
   float combined_min = std::numeric_limits<float>::max();
   float combined_max = std::numeric_limits<float>::min();
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+
+  if (!layers.empty())
+  {
+    // no layers configured, nothing to combine, all fine.
+    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+    return true;
+  }
+  ROS_INFO_STREAM("Combining costs...");
 
   bool hasNaN = false;
   for (auto layer : layers)
