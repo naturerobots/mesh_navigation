@@ -40,6 +40,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <functional>
+#include <optional>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -1040,11 +1041,53 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
   return false;
 }
 
+boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+      std::array<float, 3>>> MeshMap::getContainingFaceArray(
+      Vector& position, const float& max_dist)
+{
+  // project start pose vector onto mesh map
+  auto opt_vH = getNearestVertexHandle(position);
+  if(opt_vH) {
+    typedef std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+        std::array<float, 3>> FaceArray;
+
+    std::map<float, FaceArray> faces;
+
+    for (auto fH: mesh_ptr->getFacesOfVertex(opt_vH.unwrap())) {
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      std::array<Vector, 3> face_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+      mesh_map::projectedBarycentricCoords(position, face_vertices, barycentric_coords, dist);
+      faces.insert(std::pair<float, FaceArray>(dist, FaceArray(fH, face_vertices, barycentric_coords)));
+    }
+
+    if(!faces.empty() && (faces.begin()->first <= max_dist || max_dist == 0))
+    {
+      return faces.begin()->second;
+    }
+  }
+  return boost::none;
+}
+
 lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
 {
-  auto search_result = searchContainingFace(position, max_dist);
-  if(search_result)
-    return std::get<0>(*search_result);
+
+  // project start pose vector onto mesh map
+  auto opt_vH = getNearestVertexHandle(position);
+  if(opt_vH) {
+    std::map<float, lvr2::FaceHandle> faces;
+    for (auto fH: mesh_ptr->getFacesOfVertex(opt_vH.unwrap())) {
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      projectedBarycentricCoords(position, fH, barycentric_coords, dist);
+      faces.insert(std::pair<float, lvr2::FaceHandle>(dist, fH));
+    }
+
+    if(!faces.empty() && (faces.begin()->first <= max_dist || max_dist == 0))
+    {
+      return faces.begin()->second;
+    }
+  }
   return lvr2::OptionalFaceHandle();
 }
 
