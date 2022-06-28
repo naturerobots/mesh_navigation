@@ -661,6 +661,25 @@ float MeshMap::costAtPosition(const lvr2::DenseVertexMap<float>& costs,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
+void MeshMap::publishDebugPose(const Vector& position, const Vector& orientation, const Normal& normal, const std_msgs::ColorRGBA& color, const std::string& name)
+{
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = mapFrame();
+  marker.header.stamp = ros::Time();
+  marker.ns = name;
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::ARROW;
+  marker.action = visualization_msgs::Marker::ADD;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.2;
+  scale.y = 0.07;
+  scale.z = 0.07;
+  marker.scale = scale;
+  marker.pose = calculatePoseFromDirection(position, orientation, normal);
+  marker.color = color;
+  marker_pub.publish(marker);
+}
+
 void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name)
 {
   visualization_msgs::Marker marker;
@@ -1048,6 +1067,8 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
   // project start pose vector onto mesh map
   auto opt_vH = getNearestVertexHandle(position);
   if(opt_vH) {
+    auto vertex  = mesh_ptr->getVertexPosition(opt_vH.unwrap());
+    ROS_INFO_STREAM("Found closest vertex at (" << vertex.x << ", " << vertex.y << ", " << vertex.z << ")" );
     typedef std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
         std::array<float, 3>> FaceArray;
 
@@ -1057,8 +1078,9 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
       std::array<float, 3> barycentric_coords;
       float dist;
       std::array<Vector, 3> face_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
-      mesh_map::projectedBarycentricCoords(position, face_vertices, barycentric_coords, dist);
-      faces.insert(std::pair<float, FaceArray>(dist, FaceArray(fH, face_vertices, barycentric_coords)));
+      if(mesh_map::projectedBarycentricCoords(position, face_vertices, barycentric_coords, dist)) {
+        faces.insert(std::pair<float, FaceArray>(dist, FaceArray(fH, face_vertices, barycentric_coords)));
+      }
     }
 
     if(!faces.empty() && (faces.begin()->first <= max_dist || max_dist == 0))

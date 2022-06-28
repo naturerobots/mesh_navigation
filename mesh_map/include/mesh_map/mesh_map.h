@@ -351,6 +351,10 @@ public:
    */
   void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
 
+
+  // TODO write description
+  void publishDebugPose(const Vector& position, const Vector& orientation, const Normal& normal, const std_msgs::ColorRGBA& color, const std::string& name);
+
   /**
    * @brief Publishes a position as marker. Used for debug purposes.
    * @param pos The position to publish as marker
