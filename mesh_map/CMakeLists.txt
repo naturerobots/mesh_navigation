@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   mesh_msgs_conversions
   pluginlib
   roscpp
-        organized_fast_mesh
+
         lvr_ros
   tf2
   tf2_geometry_msgs
@@ -52,7 +52,7 @@ catkin_package(
     Boost
         lvr_ros
         sensor_msgs
-        organized_fast_mesh
+
 )
 
 include_directories(
