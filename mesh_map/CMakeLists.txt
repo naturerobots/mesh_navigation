@@ -11,11 +11,14 @@ find_package(catkin REQUIRED COMPONENTS
   mesh_msgs_conversions
   pluginlib
   roscpp
+        organized_fast_mesh
+        lvr_ros
   tf2
   tf2_geometry_msgs
   tf2_ros
   visualization_msgs
   xmlrpcpp
+        sensor_msgs
 )
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -27,6 +30,7 @@ pkg_check_modules(JSONCPP jsoncpp)
 generate_dynamic_reconfigure_options(
   cfg/MeshMap.cfg
 )
+
 
 catkin_package(
   INCLUDE_DIRS include 
@@ -46,6 +50,9 @@ catkin_package(
   DEPENDS
     LVR2
     Boost
+        lvr_ros
+        sensor_msgs
+        organized_fast_mesh
 )
 
 include_directories(
@@ -71,6 +78,7 @@ link_libraries(${PROJECT_NAME}
   ${LVR2_LIBRARIES}
   ${JSONCPP_LIBRARIES}
 )
+
 
 install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

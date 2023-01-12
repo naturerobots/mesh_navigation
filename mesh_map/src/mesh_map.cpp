@@ -57,6 +57,7 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 
+
 namespace mesh_map
 {
 using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
