@@ -105,10 +105,9 @@ namespace mesh_map
         reconfigure_server_ptr->setCallback(config_callback);
 
     }
-/*
+
 void MeshMap::subToPointCloud(){
     lvr2::HalfEdgeMesh<Vector> mesh;
-    //cloud_sub_ = private_nh.subscribe<sensor_msgs::PointCloud2> ("/velodyne_points", 20, boost::bind(&MeshMap::createOFM, this, _1, mesh));
     cloud_sub_ = private_nh.subscribe("/velodyne_points", 20, &MeshMap::createOFM, this);
 }
 
@@ -127,7 +126,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
 
 }
 
-*/
+
 
     bool MeshMap::readMap()
     {
@@ -183,12 +182,12 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
             kd_tree_ptr->buildIndex();
             ROS_INFO_STREAM("The k-d tree has been build successfully!");
         }
-            /*
+
           else if (subscribe){
             subToPointCloud();
             mesh_opt=organizedMesh;
           }
-             */
+
         else
         {
             ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");

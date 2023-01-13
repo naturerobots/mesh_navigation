@@ -395,10 +395,10 @@ namespace mesh_map
          * @brief returns a shared pointer to the specified layer
          */
         mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
-        /*
+
         void subToPointCloud();
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
-         */
+
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
         std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 
