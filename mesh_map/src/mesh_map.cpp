@@ -104,14 +104,15 @@ namespace mesh_map
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
 
+        cloud_sub_ = private_nh.subscribe("/velodyne_points", 100, &MeshMap::createOFM, this);
+
+
     }
 
-void MeshMap::subToPointCloud(){
-    lvr2::HalfEdgeMesh<Vector> mesh;
-    cloud_sub_ = private_nh.subscribe("/velodyne_points", 20, &MeshMap::createOFM, this);
-}
+
 
 void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
+    ROS_INFO_STREAM("create OFM");
     lvr2::PointBuffer pointBuffer;
     lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
     OrganizedFastMeshGenerator ofmg(pointBuffer, cloud->height, cloud->width);
@@ -120,10 +121,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
     mesh_msgs::MeshVertexColorsStamped color_msg;
     ofmg.getMesh(*mesh_buffer_ptr, color_msg);
     lvr2::HalfEdgeMesh<Vector> temp (mesh_buffer_ptr);
-    organizedMesh=temp;
-
-
-
+    *mesh_ptr=temp;
 }
 
 
@@ -132,6 +130,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
     {
         ROS_INFO_STREAM("server url: " << srv_url);
         bool server = false;
+        bool subscribe = true;
 
         if (!srv_url.empty())
         {
@@ -153,12 +152,19 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
             hdf_5_mesh_io->setMeshName(mesh_part);
             mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
         }
+            // #TODO mesh_ptr is a point to a real object
+        else if (subscribe && mesh_ptr->numVertices()>0 ){
+                ROS_INFO_STREAM("add per sub1");
+                mesh_io_ptr->addMesh(*mesh_ptr);
+                ROS_INFO_STREAM("add per sub2");
+        }
+
+
         else
         {
             ROS_ERROR_STREAM("Could not open file or server connection!");
             return false;
         }
-
         if (server)
         {
             ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_url);
@@ -169,7 +175,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         }
 
         auto mesh_opt = mesh_io_ptr->getMesh();
-        bool subscribe = true;
+
         if (mesh_opt)
         {
             *mesh_ptr = mesh_opt.get();
@@ -183,10 +189,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
             ROS_INFO_STREAM("The k-d tree has been build successfully!");
         }
 
-          else if (subscribe){
-            subToPointCloud();
-            mesh_opt=organizedMesh;
-          }
+
 
         else
         {
