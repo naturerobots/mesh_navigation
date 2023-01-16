@@ -92,6 +92,7 @@ public:
 
 private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
+
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
   newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 
@@ -217,7 +218,10 @@ private:
   //! true, if the dynamic reconfigure has been setup
   bool setup_reconfigure_;
 
-  //! Shared pointer to the common global mesh
+  ros::NodeHandle nh_;
+  ros::Subscriber mesh_sub_;
+
+    //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
 
   //! Service Server to clear the mesh

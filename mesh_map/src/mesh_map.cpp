@@ -105,6 +105,7 @@ namespace mesh_map
         reconfigure_server_ptr->setCallback(config_callback);
 
         cloud_sub_ = private_nh.subscribe("/velodyne_points", 100, &MeshMap::createOFM, this);
+        mesh_pub_ = private_nh.advertise<mesh_msgs::MeshGeometry>("mesh_map",1);
 
 
     }
@@ -120,13 +121,17 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
     lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
     mesh_msgs::MeshVertexColorsStamped color_msg;
     ofmg.getMesh(*mesh_buffer_ptr, color_msg);
-    lvr2::HalfEdgeMesh<Vector> temp (mesh_buffer_ptr);
+    mesh_msgs::MeshGeometry mesh_map;
+    lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr,mesh_map);
+    mesh_pub_.publish(mesh_map);
+    lvr2::HalfEdgeMesh<lvr2::BaseVector<float>> temp (mesh_buffer_ptr);
     *mesh_ptr=temp;
+    this->readMap();
 }
 
 
 
-    bool MeshMap::readMap()
+    void MeshMap::readMap()
     {
         ROS_INFO_STREAM("server url: " << srv_url);
         bool server = false;
@@ -154,7 +159,11 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         }
             // #TODO mesh_ptr is a point to a real object
         else if (subscribe && mesh_ptr->numVertices()>0 ){
+
                 ROS_INFO_STREAM("add per sub1");
+                ROS_INFO_STREAM(mesh_ptr->numVertices());
+                ROS_INFO_STREAM("add per sub2");
+
                 mesh_io_ptr->addMesh(*mesh_ptr);
                 ROS_INFO_STREAM("add per sub2");
         }
@@ -163,7 +172,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         else
         {
             ROS_ERROR_STREAM("Could not open file or server connection!");
-            return false;
+            return;
         }
         if (server)
         {
@@ -194,7 +203,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         else
         {
             ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
-            return false;
+            return ;
         }
 
         vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
@@ -279,14 +288,14 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         if (!loadLayerPlugins())
         {
             ROS_FATAL_STREAM("Could not load any layer plugin!");
-            return false;
+            return ;
         }
 
         ROS_INFO_STREAM("Initialize layer plugins...");
         if (!initLayerPlugins())
         {
             ROS_FATAL_STREAM("Could not initialize plugins!");
-            return false;
+            return ;
         }
 
         sleep(1);
@@ -296,7 +305,7 @@ void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud){
         publishVertexColors();
 
         map_loaded = true;
-        return true;
+        return ;
     }
 
     bool MeshMap::loadLayerPlugins()

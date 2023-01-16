@@ -64,8 +64,7 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
 
-  ROS_INFO_STREAM("Reading map file...");
-  mesh_ptr_->readMap();
+
 
   // initialize all plugins
   initializeServerComponents();
@@ -73,6 +72,9 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   // start all action servers
   startActionServers();
 }
+
+
+
 
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)

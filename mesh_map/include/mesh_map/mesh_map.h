@@ -69,7 +69,7 @@ namespace mesh_map
          * @brief Reads in the mesh geometry, normals and cost values and publishes all as mesh_msgs
          * @return true f the mesh and its attributes have been load successfully.
          */
-        bool readMap();
+        void readMap();
 
         /**
          * @brief Loads all configures layer plugins
@@ -400,13 +400,14 @@ namespace mesh_map
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-        std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
+        std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
 
         lvr2::DenseVertexMap<bool> invalid;
 
     private:
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
+        ros::Publisher mesh_pub_;
 
         //! plugin class loader for for the layer plugins
         pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
