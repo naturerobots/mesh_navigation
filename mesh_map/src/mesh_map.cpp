@@ -153,11 +153,11 @@ namespace mesh_map {
         edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
 
         ROS_INFO_STREAM("Load layer plugins...");
-        if (!loadLayerPlugins()) {
+        /*if (!loadLayerPlugins()) {
             ROS_FATAL_STREAM("Could not load any layer plugin!");
             return;
         }
-
+*/
         ROS_INFO_STREAM("Initialize layer plugins...");
         if (!initLayerPlugins()) {
             ROS_FATAL_STREAM("Could not initialize plugins!");
