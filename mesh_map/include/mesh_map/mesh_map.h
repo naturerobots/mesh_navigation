@@ -66,10 +66,10 @@ namespace mesh_map
         MeshMap(tf2_ros::Buffer& tf);
 
         /**
-         * @brief Reads in the mesh geometry, normals and cost values and publishes all as mesh_msgs
+         * @brief Calculate normals and cost values and publishes all as mesh_msgs
          * @return true f the mesh and its attributes have been load successfully.
          */
-        void readMap();
+        void publish();
 
         /**
          * @brief Loads all configures layer plugins
@@ -397,6 +397,10 @@ namespace mesh_map
         mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
         void subToPointCloud();
+        /**
+         * @brief create a Organized Fast Mesh and write it to mesh_ptr
+         * @param cloud
+         */
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;

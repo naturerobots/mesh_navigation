@@ -116,13 +116,12 @@ namespace mesh_map {
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
-        this->readMap();
+        this->publish();
         this->vertex_colors_pub.publish(color_msg);
-
     }
 
 
-    void MeshMap::readMap() {
+    void MeshMap::publish() {
         ROS_INFO_STREAM("The mesh has been create successfully with " << mesh_ptr->numVertices() << " vertices and "
                                                                       << mesh_ptr->numFaces() << " faces and "
                                                                       << mesh_ptr->numEdges() << " edges.");
@@ -1004,30 +1003,30 @@ namespace mesh_map {
     }
 
     void MeshMap::publishVertexColors() {
-    /*    using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
+        /*    using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
 
-        using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
+            using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
 
-        VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->getDenseAttributeMap<VertexColorMap>("vertex_colors");
-        if (vertex_colors_opt) {
-            const VertexColorMap colors = vertex_colors_opt.get();
-            mesh_msgs::MeshVertexColorsStamped msg;
-            msg.header.frame_id = mapFrame();
-            msg.header.stamp = ros::Time::now();
-            msg.uuid = uuid_str;
-            msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
-            for (auto vH: colors) {
-                std_msgs::ColorRGBA color_rgba;
-                const auto &color_array = colors[vH];
-                color_rgba.a = 1;
-                color_rgba.r = color_array[0] / 255.0;
-                color_rgba.g = color_array[1] / 255.0;
-                color_rgba.b = color_array[2] / 255.0;
-                msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
+            VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->getDenseAttributeMap<VertexColorMap>("vertex_colors");
+            if (vertex_colors_opt) {
+                const VertexColorMap colors = vertex_colors_opt.get();
+                mesh_msgs::MeshVertexColorsStamped msg;
+                msg.header.frame_id = mapFrame();
+                msg.header.stamp = ros::Time::now();
+                msg.uuid = uuid_str;
+                msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
+                for (auto vH: colors) {
+                    std_msgs::ColorRGBA color_rgba;
+                    const auto &color_array = colors[vH];
+                    color_rgba.a = 1;
+                    color_rgba.r = color_array[0] / 255.0;
+                    color_rgba.g = color_array[1] / 255.0;
+                    color_rgba.b = color_array[2] / 255.0;
+                    msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
+                }
+                this->vertex_colors_pub.publish(msg);
             }
-            this->vertex_colors_pub.publish(msg);
-        }
-        */
+            */
     }
 
     void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg, uint32_t level) {

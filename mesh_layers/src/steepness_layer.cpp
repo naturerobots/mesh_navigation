@@ -80,16 +80,16 @@ bool SteepnessLayer::computeLayer()
 {
   ROS_INFO_STREAM("Computing steepness...");
 
-  lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
+  lvr2::DenseFaceMap<mesh_map::Normal> face_normals = map_ptr->faceNormals();
 
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+   /* face_normals = lvr2::calcFaceNormals(*mesh_ptr);
     ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
+*/
+
+  lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals = map_ptr->vertexNormals();
 
 
-  lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-
-
-  vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+  //vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
 
 
   steepness.reserve(mesh_ptr->nextVertexIndex());
