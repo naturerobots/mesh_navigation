@@ -48,36 +48,12 @@ namespace mesh_layers
 {
 bool InflationLayer::readLayer()
 {
-  // riskiness
-  ROS_INFO_STREAM("Try to read riskiness from map file...");
-  auto riskiness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("riskiness");
-
-  if (riskiness_opt)
-  {
-    ROS_INFO_STREAM("Riskiness has been read successfully.");
-    riskiness = riskiness_opt.get();
     return true;
-  }
-  else
-  {
-    return false;
-  }
 }
 
 bool InflationLayer::writeLayer()
 {
-  ROS_INFO_STREAM("Saving " << riskiness.numValues() << " riskiness values to map file...");
-
-  if (mesh_io_ptr->addDenseAttributeMap(riskiness, "riskiness"))
-  {
-    ROS_INFO_STREAM("Saved riskiness to map file.");
     return true;
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Could not save riskiness to map file!");
-    return false;
-  }
 }
 
 float InflationLayer::threshold()

@@ -52,14 +52,14 @@ class RoughnessLayer : public mesh_map::AbstractLayer
 {
   /**
    * @brief try read layer from map file
-   *
+   * not supportet
    * @return true if successul; else false
    */
   virtual bool readLayer();
 
   /**
    * @brief try to write layer to map file
-   *
+   * not supportet
    * @return true if successfull; else false
    */
   virtual bool writeLayer();

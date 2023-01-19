@@ -47,18 +47,9 @@ namespace mesh_layers
 {
 bool HeightDiffLayer::readLayer()
 {
-  ROS_INFO_STREAM("Try to read height differences from map file...");
-  auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
 
-  if (height_diff_opt)
-  {
-    ROS_INFO_STREAM("Height differences have been read successfully.");
-    height_diff = height_diff_opt.get();
 
-    return computeLethals();
-  }
-
-  return false;
+  return true;
 }
 
 bool HeightDiffLayer::computeLethals()
@@ -77,17 +68,7 @@ bool HeightDiffLayer::computeLethals()
 
 bool HeightDiffLayer::writeLayer()
 {
-  ROS_INFO_STREAM("Saving height_differences to map file...");
-  if (mesh_io_ptr->addDenseAttributeMap(height_diff, "height_diff"))
-  {
-    ROS_INFO_STREAM("Saved height differences to map file.");
-    return true;
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Could not save height differences to map file!");
-    return false;
-  }
+  return true;
 }
 
 float HeightDiffLayer::threshold()

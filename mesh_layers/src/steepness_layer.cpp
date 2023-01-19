@@ -48,30 +48,14 @@ namespace mesh_layers
 {
 bool SteepnessLayer::readLayer()
 {
-  ROS_INFO_STREAM("Try to read steepness from map file...");
-  auto steepness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("steepness");
-  if (steepness_opt)
-  {
-    ROS_INFO_STREAM("Successfully read steepness from map file.");
-    steepness = steepness_opt.get();
-    return computeLethals();
-  }
-
-  return false;
+  return true;
 }
 
 bool SteepnessLayer::writeLayer()
 {
-  if (mesh_io_ptr->addDenseAttributeMap(steepness, "steepness"))
-  {
-    ROS_INFO_STREAM("Saved steepness to map file.");
+
     return true;
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Could not save steepness to map file!");
-    return false;
-  }
+
 }
 
 bool SteepnessLayer::computeLethals()
@@ -98,51 +82,15 @@ bool SteepnessLayer::computeLayer()
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
-
-  if (face_normals_opt)
-  {
-    face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
-  }
-  else
-  {
-    ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh_ptr);
     ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
-    if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
-    {
-      ROS_INFO_STREAM("Saved face normals to map file.");
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
-      return false;
-    }
-  }
+
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-  auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
 
-  if (vertex_normals_opt)
-  {
-    vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues() << " vertex normals in map file!");
-  }
-  else
-  {
-    ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-    if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
-    {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
-      return false;
-    }
-  }
+
+  vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+
 
   steepness.reserve(mesh_ptr->nextVertexIndex());
 

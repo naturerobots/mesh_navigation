@@ -116,9 +116,9 @@ namespace mesh_map {
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
-
-
         this->readMap();
+        this->vertex_colors_pub.publish(color_msg);
+
     }
 
 
@@ -147,30 +147,30 @@ namespace mesh_map {
         mesh_geometry_pub.publish(
                 mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
-        ROS_INFO_STREAM("Try to read edge distances from map file...");
 
         ROS_INFO_STREAM("Computing edge distances...");
         edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
 
         ROS_INFO_STREAM("Load layer plugins...");
-        /*if (!loadLayerPlugins()) {
+        if (!loadLayerPlugins()) {
             ROS_FATAL_STREAM("Could not load any layer plugin!");
             return;
         }
-*/
+
+
         ROS_INFO_STREAM("Initialize layer plugins...");
         if (!initLayerPlugins()) {
             ROS_FATAL_STREAM("Could not initialize plugins!");
             return;
         }
-
+        //why ??
         sleep(1);
 
         combineVertexCosts();
         publishCostLayers();
-
+        /*nur Farben oder die Faces eingefärbt nach cost ?? problem wegen mesh_ptr_io zugriffe aber wenn nur farben easy
         publishVertexColors();
-
+        */
         map_loaded = true;
         return;
     }
@@ -293,7 +293,7 @@ namespace mesh_map {
 
             auto callback = [this](const std::string &layer_name) { layerChanged(layer_name); };
 
-            if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr)) {
+            if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr)) {
                 ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
                 return false;
             }
@@ -319,7 +319,6 @@ namespace mesh_map {
         vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
         bool hasNaN = false;
-
         for (auto layer: layers) {
             const auto &costs = layer.second->costs();
             float min, max;
@@ -1005,9 +1004,10 @@ namespace mesh_map {
     }
 
     void MeshMap::publishVertexColors() {
-        using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
+    /*    using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
 
         using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
+
         VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->getDenseAttributeMap<VertexColorMap>("vertex_colors");
         if (vertex_colors_opt) {
             const VertexColorMap colors = vertex_colors_opt.get();
@@ -1027,6 +1027,7 @@ namespace mesh_map {
             }
             this->vertex_colors_pub.publish(msg);
         }
+        */
     }
 
     void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg, uint32_t level) {
