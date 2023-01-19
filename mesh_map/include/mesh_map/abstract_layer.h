@@ -154,13 +154,15 @@ public:
    * @brief Initializes the layer plugin under the mesh_map namespace ans sets some basic attributes.
    */
   virtual bool initialize(const std::string& name, const notify_func notify_update,
-                          std::shared_ptr<mesh_map::MeshMap>& map, std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh)
+                          std::shared_ptr<mesh_map::MeshMap>& map, std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh,
+                          std::shared_ptr<lvr2::AttributeMeshIOBase>& io)
   {
     layer_name = name;
     private_nh = ros::NodeHandle("~/mesh_map/" + name);
     notify = notify_update;
     mesh_ptr = mesh;
     map_ptr = map;
+    mesh_io_ptr = io;
     return initialize(name);
   }
 
@@ -173,8 +175,8 @@ protected:
   std::string layer_name;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
   std::shared_ptr<mesh_map::MeshMap> map_ptr;
-
-  ros::NodeHandle private_nh;
+    std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
+    ros::NodeHandle private_nh;
 
 private:
   notify_func notify;

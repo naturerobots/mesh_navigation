@@ -116,62 +116,223 @@ namespace mesh_map {
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
-        this->publish();
+        this->readMap();
         this->vertex_colors_pub.publish(color_msg);
+
     }
 
+    bool MeshMap::readMap()
+    {
+       if (nosubscribe){
+           ROS_INFO_STREAM("server url: " << srv_url);
+           bool server = false;
 
-    void MeshMap::publish() {
-        ROS_INFO_STREAM("The mesh has been create successfully with " << mesh_ptr->numVertices() << " vertices and "
-                                                                      << mesh_ptr->numFaces() << " faces and "
-                                                                      << mesh_ptr->numEdges() << " edges.");
+           if (!srv_url.empty())
+           {
+               server = true;
 
-        adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
-        kd_tree_ptr = std::make_unique<KDTree>(3, *adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
-        kd_tree_ptr->buildIndex();
-        ROS_INFO_STREAM("The k-d tree has been build successfully!");
-        edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
-        invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
-        vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
-        // TODO read and write uuid
-        boost::uuids::random_generator gen;
-        boost::uuids::uuid uuid = gen();
-        uuid_str = boost::uuids::to_string(uuid);
+               mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
+                       new mesh_client::MeshClient(srv_url, srv_username, srv_password, mesh_layer));
+               auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
 
-        face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-        ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
+               mesh_client_ptr->setBoundingBox(bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z);
+               mesh_client_ptr->addFilter("roughness", min_roughness, max_roughness);
+               mesh_client_ptr->addFilter("height_diff", min_height_diff, max_height_diff);
+           }
+           else if (!mesh_file.empty() && !mesh_part.empty())
+           {
+               ROS_INFO_STREAM("Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+               HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
+               hdf_5_mesh_io->open(mesh_file);
+               hdf_5_mesh_io->setMeshName(mesh_part);
+               mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
+           }
+           else
+           {
+               ROS_ERROR_STREAM("Could not open file or server connection!");
+               return false;
+           }
 
-        vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+           if (server)
+           {
+               ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_url);
+           }
+           else
+           {
+               ROS_INFO_STREAM("Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
+           }
 
-        mesh_geometry_pub.publish(
-                mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+           auto mesh_opt = mesh_io_ptr->getMesh();
+
+           if (mesh_opt)
+           {
+               *mesh_ptr = mesh_opt.get();
+               ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh_ptr->numVertices() << " vertices and "
+                                                                             << mesh_ptr->numFaces() << " faces and "
+                                                                             << mesh_ptr->numEdges() << " edges.");
+
+               adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
+               kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+               kd_tree_ptr->buildIndex();
+               ROS_INFO_STREAM("The k-d tree has been build successfully!");
+           }
+           else
+           {
+               ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
+               return false;
+           }
+
+           vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+           edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
+           invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
+
+           // TODO read and write uuid
+           boost::uuids::random_generator gen;
+           boost::uuids::uuid uuid = gen();
+           uuid_str = boost::uuids::to_string(uuid);
+
+           auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>("face_normals");
+
+           if (face_normals_opt)
+           {
+               face_normals = face_normals_opt.get();
+               ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
+           }
+           else
+           {
+               ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
+               face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+               ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
+               if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
+               {
+                   ROS_INFO_STREAM("Saved face normals to map file.");
+               }
+               else
+               {
+                   ROS_ERROR_STREAM("Could not save face normals to map file!");
+               }
+           }
+
+           auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<Normal>>("vertex_normals");
+
+           if (vertex_normals_opt)
+           {
+               vertex_normals = vertex_normals_opt.get();
+               ROS_INFO_STREAM("Found " << vertex_normals.numValues() << " vertex normals in map file!");
+           }
+           else
+           {
+               ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
+               vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+               if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
+               {
+                   ROS_INFO_STREAM("Saved vertex normals to map file.");
+               }
+               else
+               {
+                   ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+               }
+           }
+
+           mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+
+           ROS_INFO_STREAM("Try to read edge distances from map file...");
+           auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
+
+           if (edge_distances_opt)
+           {
+               ROS_INFO_STREAM("Vertex distances have been read successfully.");
+               edge_distances = edge_distances_opt.get();
+           }
+           else
+           {
+               ROS_INFO_STREAM("Computing edge distances...");
+               edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
+               ROS_INFO_STREAM("Saving " << edge_distances.numValues() << " edge distances to map file...");
+
+               if (mesh_io_ptr->addAttributeMap(edge_distances, "edge_distances"))
+               {
+                   ROS_INFO_STREAM("Saved edge distances to map file.");
+               }
+               else
+               {
+                   ROS_ERROR_STREAM("Could not save edge distances to map file!");
+               }
+           }
+
+           ROS_INFO_STREAM("Load layer plugins...");
+           if (!loadLayerPlugins())
+           {
+               ROS_FATAL_STREAM("Could not load any layer plugin!");
+               return false;
+           }
+
+           ROS_INFO_STREAM("Initialize layer plugins...");
+           if (!initLayerPlugins())
+           {
+               ROS_FATAL_STREAM("Could not initialize plugins!");
+               return false;
+           }
+
+           sleep(1);
+
+           combineVertexCosts();
+           publishCostLayers();
+           publishVertexColors();
+
+           map_loaded = true;
+           return true;
+       }
+
+       else{
+           ROS_INFO_STREAM("The mesh has been create successfully with " << mesh_ptr->numVertices() << " vertices and "
+                                                                         << mesh_ptr->numFaces() << " faces and "
+                                                                         << mesh_ptr->numEdges() << " edges.");
+
+           adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
+           kd_tree_ptr = std::make_unique<KDTree>(3, *adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+           kd_tree_ptr->buildIndex();
+           ROS_INFO_STREAM("The k-d tree has been build successfully!");
+           edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
+           invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
+           vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+           // TODO read and write uuid
+           boost::uuids::random_generator gen;
+           boost::uuids::uuid uuid = gen();
+           uuid_str = boost::uuids::to_string(uuid);
+
+           face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+           ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
+
+           vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+
+           mesh_geometry_pub.publish(
+                   mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
 
-        ROS_INFO_STREAM("Computing edge distances...");
-        edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
+           ROS_INFO_STREAM("Computing edge distances...");
+           edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
 
-        ROS_INFO_STREAM("Load layer plugins...");
-        if (!loadLayerPlugins()) {
-            ROS_FATAL_STREAM("Could not load any layer plugin!");
-            return;
-        }
+           ROS_INFO_STREAM("Load layer plugins...");
+           if (!loadLayerPlugins()) {
+               ROS_FATAL_STREAM("Could not load any layer plugin!");
+               return false;
+           }
 
 
-        ROS_INFO_STREAM("Initialize layer plugins...");
-        if (!initLayerPlugins()) {
-            ROS_FATAL_STREAM("Could not initialize plugins!");
-            return;
-        }
-        //why ??
-        sleep(1);
+           ROS_INFO_STREAM("Initialize layer plugins...");
+           if (!initLayerPlugins()) {
+               ROS_FATAL_STREAM("Could not initialize plugins!");
+               return false;
+           }
+           //why ??
+           sleep(1);
 
-        combineVertexCosts();
-        publishCostLayers();
-        /*nur Farben oder die Faces eingefärbt nach cost ?? problem wegen mesh_ptr_io zugriffe aber wenn nur farben easy
-        publishVertexColors();
-        */
-        map_loaded = true;
-        return;
+           combineVertexCosts();
+           publishCostLayers();
+           map_loaded = true;
+           return true;
+       }
     }
 
     bool MeshMap::loadLayerPlugins() {
@@ -292,7 +453,7 @@ namespace mesh_map {
 
             auto callback = [this](const std::string &layer_name) { layerChanged(layer_name); };
 
-            if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr)) {
+            if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr)) {
                 ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
                 return false;
             }
