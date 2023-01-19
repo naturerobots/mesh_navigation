@@ -82,8 +82,6 @@ bool RidgeLayer::computeLayer()
   ROS_INFO_STREAM("Computing ridge...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
-
-
   ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
   face_normals = lvr2::calcFaceNormals(*mesh_ptr);
   ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
@@ -91,9 +89,8 @@ bool RidgeLayer::computeLayer()
 
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-
   ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+  vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
 
 
   ridge.reserve(mesh_ptr->nextVertexIndex());

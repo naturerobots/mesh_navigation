@@ -399,7 +399,6 @@ namespace mesh_map
         void subToPointCloud();
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
-        std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
 
         lvr2::DenseVertexMap<bool> invalid;
