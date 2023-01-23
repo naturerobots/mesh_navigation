@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>mesh_layers</name>
+    <version>1.0.1</version>
+    <description>The mesh_layers package</description>
+
+    <maintainer email="spuetz@uos.de">Sebastian Pütz</maintainer>
+
+    <license>BSD-3</license>
+    <author email="spuetz@uos.de">Sebastian Pütz</author>
+
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>mesh_map</depend>
+    <depend>dynamic_reconfigure</depend>
+
+    <export>
+        <mesh_map plugin="${prefix}/mesh_layers.xml"/>
+    </export>
+</package>
