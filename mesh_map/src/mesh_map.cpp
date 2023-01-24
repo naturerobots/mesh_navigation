@@ -306,8 +306,7 @@ namespace mesh_map {
 
            vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
 
-           mesh_geometry_pub.publish(
-                   mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+
 
 
            ROS_INFO_STREAM("Computing edge distances...");
@@ -346,8 +345,9 @@ namespace mesh_map {
 
 
 
-           sleep(1);
            combineVertexCosts();
+           mesh_geometry_pub.publish(
+                   mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
            publishCostLayers();
            map_loaded = true;
            return true;
@@ -1174,10 +1174,10 @@ namespace mesh_map {
         ROS_INFO_STREAM("Start publishing");
         for (auto &layer: layers) {
             ROS_INFO_STREAM( "Layer \"" << layer.first << "\" try to publish!" ) ;
-            ROS_INFO_STREAM( layer.second->defaultValue() ) ;
-            ROS_INFO_STREAM( layer.first ) ;
-            ROS_INFO_STREAM( mesh_ptr->numVertices() ) ;
-
+            mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+                                                       layer.second->defaultValue(), layer.first, global_frame,
+                                                       uuid_str);
+            ROS_INFO_STREAM("after");
             vertex_costs_pub.publish(
                     mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
                                                                 layer.second->defaultValue(), layer.first, global_frame,
@@ -1185,6 +1185,7 @@ namespace mesh_map {
             ROS_INFO_STREAM("all");
 
         }
+
         ROS_INFO_STREAM("Publish Layers");
         vertex_costs_pub.publish(
                 mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));

@@ -619,6 +619,8 @@ bool InflationLayer::computeLayer(bool hasIO )
   //                    std::numeric_limits<float>::infinity());
   // config.lethal_value);
 
+
+
   return true;
 }
 lvr2::VertexMap<float>& InflationLayer::costs()
