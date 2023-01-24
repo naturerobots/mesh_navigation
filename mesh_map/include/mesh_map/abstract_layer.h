@@ -89,7 +89,7 @@ public:
    * layer information could not be loaded or if another layer triggered an update
    * @return true, if the layer costs have been computed successfully.
    */
-  virtual bool computeLayer() = 0;
+  virtual bool computeLayer(bool hasIO = true ) = 0;
 
   /**
    * @brief Returns a vertex map, which associates a cost to each vertex handle.

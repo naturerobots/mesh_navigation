@@ -608,7 +608,7 @@ void InflationLayer::lethalCostInflation(const std::set<lvr2::VertexHandle>& let
   ROS_INFO_STREAM("lethal cost inflation finished.");
 }
 
-bool InflationLayer::computeLayer()
+bool InflationLayer::computeLayer(bool hasIO )
 {
   /*waveCostInflation(lethal_vertices, config.inflation_radius,
                       config.inscribed_radius, config.inscribed_value,

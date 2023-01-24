@@ -186,7 +186,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return true if successfull; else false
    */
-  virtual bool computeLayer();
+  virtual bool computeLayer(bool hasIO = true);
 
   /**
    * @brief deliver the current costmap

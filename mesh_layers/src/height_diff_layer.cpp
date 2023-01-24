@@ -95,7 +95,7 @@ float HeightDiffLayer::threshold()
   return config.threshold;
 }
 
-bool HeightDiffLayer::computeLayer()
+bool HeightDiffLayer::computeLayer(bool hasIO )
 {
   height_diff = lvr2::calcVertexHeightDifferences(*mesh_ptr, config.radius);
   return computeLethals();

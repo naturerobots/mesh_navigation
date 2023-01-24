@@ -283,7 +283,7 @@ namespace mesh_map {
            map_loaded = true;
            return true;
        }
-
+       //create and compute Layers for a subscribet Mesh
        else{
            ROS_INFO_STREAM("The mesh has been create successfully with " << mesh_ptr->numVertices() << " vertices and "
                                                                          << mesh_ptr->numFaces() << " faces and "
@@ -313,21 +313,40 @@ namespace mesh_map {
            ROS_INFO_STREAM("Computing edge distances...");
            edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
 
-           ROS_INFO_STREAM("Load layer plugins...");
-           if (!loadLayerPlugins()) {
-               ROS_FATAL_STREAM("Could not load any layer plugin!");
-               return false;
+           //Load (create) and init new Layers if new layer createt for this map
+           if(!map_loaded) {
+               ROS_INFO_STREAM("Load layer plugins...");
+               if (!loadLayerPlugins()) {
+                   ROS_FATAL_STREAM("Could not load any layer plugin!");
+                   return false;
+               }
+
+
+               ROS_INFO_STREAM("Initialize layer plugins...");
+               if (!initLayerPlugins()) {
+                   ROS_FATAL_STREAM("Could not initialize plugins!");
+                   return false;
+               }
+           }
+           //if the layers are created befor compute new layercosts
+           else{
+               lethals.clear();
+               lethal_indices.clear();
+
+               for (auto &layer: layers) {
+                   auto &layer_plugin = layer.second;
+                   const auto &layer_name = layer.first;
+                   std::set<lvr2::VertexHandle> empty;
+                   layer_plugin->updateLethal(lethals, empty);
+                   layer_plugin->computeLayer(nosubscribe);
+                   lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
+                   lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
+               }
            }
 
 
-           ROS_INFO_STREAM("Initialize layer plugins...");
-           if (!initLayerPlugins()) {
-               ROS_FATAL_STREAM("Could not initialize plugins!");
-               return false;
-           }
-           //why ??
+
            sleep(1);
-
            combineVertexCosts();
            publishCostLayers();
            map_loaded = true;
@@ -354,7 +373,7 @@ namespace mesh_map {
                 std::string type = elem["type"];
 
                 typename AbstractLayer::Ptr plugin_ptr;
-
+                ROS_INFO_STREAM(name);
                 if (layer_names.find(name) != layer_names.end()) {
                     ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
                     return false;
@@ -460,8 +479,13 @@ namespace mesh_map {
 
             std::set<lvr2::VertexHandle> empty;
             layer_plugin->updateLethal(lethals, empty);
-            if (!layer_plugin->readLayer()) {
-                layer_plugin->computeLayer();
+            if(nosubscribe) {
+                if (!layer_plugin->readLayer()) {
+                    layer_plugin->computeLayer(nosubscribe);
+                }
+            }
+            else{
+                layer_plugin->computeLayer(nosubscribe);
             }
 
             lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
@@ -1147,14 +1171,25 @@ namespace mesh_map {
     }
 
     void MeshMap::publishCostLayers() {
+        ROS_INFO_STREAM("Start publishing");
         for (auto &layer: layers) {
+            ROS_INFO_STREAM( "Layer \"" << layer.first << "\" try to publish!" ) ;
+            ROS_INFO_STREAM( layer.second->defaultValue() ) ;
+            ROS_INFO_STREAM( layer.first ) ;
+            ROS_INFO_STREAM( mesh_ptr->numVertices() ) ;
+
             vertex_costs_pub.publish(
                     mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
                                                                 layer.second->defaultValue(), layer.first, global_frame,
                                                                 uuid_str));
+            ROS_INFO_STREAM("all");
+
         }
+        ROS_INFO_STREAM("Publish Layers");
         vertex_costs_pub.publish(
                 mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+
+        ROS_INFO_STREAM("Publish successfully");
     }
 
     void MeshMap::publishVertexCosts(const lvr2::VertexMap<float> &costs, const std::string &name) {
@@ -1164,7 +1199,7 @@ namespace mesh_map {
     }
 
     void MeshMap::publishVertexColors() {
-        /*    using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
+          using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
 
             using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
 
@@ -1187,7 +1222,7 @@ namespace mesh_map {
                 }
                 this->vertex_colors_pub.publish(msg);
             }
-            */
+
     }
 
     void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg, uint32_t level) {
