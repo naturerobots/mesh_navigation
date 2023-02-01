@@ -63,13 +63,13 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   // abstract server parameters
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
+  mesh_ptr_->subscribe=true;
 
-  bool nosubscribe = false;
-  if(nosubscribe) {
+    if(!mesh_ptr_->subscribe) {
       ROS_INFO_STREAM("Reading map file...");
       mesh_ptr_->readMap();
   }
-  mesh_ptr_->nosubscribe =nosubscribe;
+
 
 
 

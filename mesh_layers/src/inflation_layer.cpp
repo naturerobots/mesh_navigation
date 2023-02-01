@@ -190,6 +190,7 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 
   const float d31 = u3tmp - u1;
   const float d32 = u3tmp - u2;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> tmpcutting_faces;
 
   if (u1 == 0 && u2 == 0)
   {
@@ -198,12 +199,12 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
     const auto& v3 = mesh_ptr->getVertexPosition(v3h);
     const auto& dir = ((v3 - v2) + (v3 - v1)).normalized();
     const auto& face_normals = map_ptr->faceNormals();
-    cutting_faces.insert(v1h, fh);
-    cutting_faces.insert(v2h, fh);
-    cutting_faces.insert(v3h, fh);
+    tmpcutting_faces.insert(v1h, fh);
+    tmpcutting_faces.insert(v2h, fh);
+    tmpcutting_faces.insert(v3h, fh);
     vector_map[v1h] = (vector_map[v1h] + dir).normalized();
     vector_map[v2h] = (vector_map[v2h] + dir).normalized();
-    //vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
+    //vector_map[v3h] = (tmpvector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
     vector_map[v3h] = (vector_map[v3h] + dir).normalized();
   }
 
@@ -213,11 +214,12 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 
     if (u1 != 0 || u2 != 0)
     {
-      cutting_faces.insert(v3h, fh);
+      tmpcutting_faces.insert(v3h, fh);
       vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
     }
+    cutting_faces=tmpcutting_faces;
 
-    if (d31 < d32)
+      if (d31 < d32)
     {
       predecessors.insert(v3h, v1h);
     }
@@ -229,6 +231,7 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
     // backToSource(v3h, predecessors, vector_map);
     return u1 <= max_distance && u2 <= max_distance;
   }
+  cutting_faces=tmpcutting_faces;
   return false;
 }
 
@@ -405,12 +408,13 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
     }
 
     ROS_INFO_STREAM("Finished inflation wave front propagation.");
-
+    lvr2::DenseVertexMap<float> tmp;
+    tmp.reserve(mesh_ptr->nextVertexIndex());
     for (auto vH : mesh_ptr->vertices())
     {
-      riskiness.insert(vH, fading(distances[vH]));
+      tmp.insert(vH, fading(distances[vH]));
     }
-
+    riskiness=tmp;
     map_ptr->publishVectorField("inflation", vector_map, distances,
                                 std::bind(&InflationLayer::fading, this, std::placeholders::_1));
   }
@@ -577,48 +581,49 @@ void InflationLayer::lethalCostInflation(const std::set<lvr2::VertexHandle>& let
       }
     }
   }
-
-  for (auto vH : mesh_ptr->vertices())
+    lvr2::DenseVertexMap<float> tmpriskiness;
+    tmpriskiness.reserve(mesh_ptr->nextVertexIndex());
+    for (auto vH : mesh_ptr->vertices())
   {
     if (distances[vH] > inflation_radius_squared)
     {
-      riskiness.insert(vH, 0);
+        tmpriskiness.insert(vH, 0);
     }
-
     // Inflation radius
     else if (distances[vH] > inscribed_radius_squared)
     {
       float alpha = (sqrt(distances[vH]) - inscribed_radius) / (inflation_radius - inscribed_radius) * M_PI;
-      riskiness.insert(vH, inscribed_value * (cos(alpha) + 1) / 2.0);
+      tmpriskiness.insert(vH, inscribed_value * (cos(alpha) + 1) / 2.0);
     }
 
     // Inscribed radius
     else if (distances[vH] > 0)
     {
-      riskiness.insert(vH, inscribed_value);
+      tmpriskiness.insert(vH, inscribed_value);
     }
 
     // Lethality
     else
     {
-      riskiness.insert(vH, lethal_value);
+      tmpriskiness.insert(vH, lethal_value);
     }
   }
+    riskiness=tmpriskiness;
 
   ROS_INFO_STREAM("lethal cost inflation finished.");
 }
 
 bool InflationLayer::computeLayer(bool hasIO )
 {
-  /*waveCostInflation(lethal_vertices, config.inflation_radius,
+  waveCostInflation(lethal_vertices, config.inflation_radius,
                       config.inscribed_radius, config.inscribed_value,
                       std::numeric_limits<float>::infinity());
-  */
-  // lethalCostInflation(lethal_vertices, config.inflation_radius,
-  //                    config.inscribed_radius, config.inscribed_value,
-  //                    std::numeric_limits<float>::infinity());
-  // config.lethal_value);
 
+  /*lethalCostInflation(lethal_vertices, config.inflation_radius,
+                        config.inscribed_radius, config.inscribed_value,
+                        std::numeric_limits<float>::infinity());
+  // config.lethal_value);
+*/
 
 
   return true;

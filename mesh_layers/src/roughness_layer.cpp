@@ -134,7 +134,7 @@ namespace mesh_layers {
         }
         else{
             vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-            face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+
         }
 
         roughness =

@@ -85,6 +85,7 @@ namespace mesh_map {
         private_nh.param<std::string>("mesh_file", mesh_file, "");
         private_nh.param<std::string>("mesh_part", mesh_part, "");
         private_nh.param<std::string>("global_frame", global_frame, "map");
+        private_nh.param<bool>("subscribe", subscribe, false);
         ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
         marker_pub = private_nh.advertise<visualization_msgs::Marker>("marker", 100, true);
@@ -123,7 +124,7 @@ namespace mesh_map {
 
     bool MeshMap::readMap()
     {
-       if (nosubscribe){
+       if (!subscribe){
            ROS_INFO_STREAM("server url: " << srv_url);
            bool server = false;
 
@@ -337,7 +338,7 @@ namespace mesh_map {
                    const auto &layer_name = layer.first;
                    std::set<lvr2::VertexHandle> empty;
                    layer_plugin->updateLethal(lethals, empty);
-                   layer_plugin->computeLayer(nosubscribe);
+                   layer_plugin->computeLayer(!subscribe);
                    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
                    lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
                }
@@ -425,6 +426,7 @@ namespace mesh_map {
         // TODO pre-compute combined lethals upto a layer level
         auto layer_iter = layers.begin();
         for (; layer_iter != layers.end(); layer_iter++) {
+            ROS_INFO_STREAM("Layer \"" << layer_name << "\" published.");
             // TODO add lethal and removae lethal sets
             lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
             // TODO merge with std::set_merge
@@ -479,13 +481,13 @@ namespace mesh_map {
 
             std::set<lvr2::VertexHandle> empty;
             layer_plugin->updateLethal(lethals, empty);
-            if(nosubscribe) {
+            if(!subscribe) {
                 if (!layer_plugin->readLayer()) {
-                    layer_plugin->computeLayer(nosubscribe);
+                    layer_plugin->computeLayer(!subscribe);
                 }
             }
             else{
-                layer_plugin->computeLayer(nosubscribe);
+                layer_plugin->computeLayer(!subscribe);
             }
 
             lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
@@ -1174,16 +1176,18 @@ namespace mesh_map {
         ROS_INFO_STREAM("Start publishing");
         for (auto &layer: layers) {
             ROS_INFO_STREAM( "Layer \"" << layer.first << "\" try to publish!" ) ;
-            mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                       layer.second->defaultValue(), layer.first, global_frame,
-                                                       uuid_str);
-            ROS_INFO_STREAM("after");
-            vertex_costs_pub.publish(
-                    mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                                layer.second->defaultValue(), layer.first, global_frame,
-                                                                uuid_str));
-            ROS_INFO_STREAM("all");
-
+            ROS_INFO_STREAM( layer.second->costs().numValues() ) ;
+            ROS_INFO_STREAM(  mesh_ptr->numVertices()) ;
+            if( layer.second->costs().numValues()== mesh_ptr->numVertices()) {
+                mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+                                                            layer.second->defaultValue(), layer.first, global_frame,
+                                                            uuid_str);
+                vertex_costs_pub.publish(
+                        mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+                                                                    layer.second->defaultValue(), layer.first,
+                                                                    global_frame,
+                                                                    uuid_str));
+            }
         }
 
         ROS_INFO_STREAM("Publish Layers");
@@ -1246,5 +1250,7 @@ namespace mesh_map {
     const std::string MeshMap::getGlobalFrameID() {
         return global_frame;
     }
+
+
 
 } /* namespace mesh_map */

@@ -405,14 +405,15 @@ namespace mesh_map
 
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-
+        bool subscribe;
         lvr2::DenseVertexMap<bool> invalid;
-        bool nosubscribe;
+
+
     private:
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
         ros::Publisher mesh_pub_;
-
+        std::string point_cloud;
         //! plugin class loader for for the layer plugins
         pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -526,6 +527,9 @@ namespace mesh_map
 
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
+
+
+
     };
 
 } /* namespace mesh_map */
