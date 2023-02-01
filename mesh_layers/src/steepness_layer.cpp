@@ -128,10 +128,6 @@ namespace mesh_layers {
 
             vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
         }
-
-
-        ROS_INFO_STREAM("vertex \"" << mesh_ptr->numVertices() << "\" vertex num");
-        ROS_INFO_STREAM("vertex \"" << mesh_ptr->nextVertexIndex() << "\" vertex index");
         lvr2::DenseVertexMap<float> tmp;
         tmp.reserve(mesh_ptr->nextVertexIndex());
 
@@ -144,8 +140,7 @@ namespace mesh_layers {
             tmp.insert(vH, acos(vertex_normals[vH].z));
         }
         steepness=tmp;
-        ROS_INFO_STREAM("Steepness \"" << steepness.numValues() << "\" vertex num");
-        ROS_INFO_STREAM("test \"" << tmp.numValues() << "\" vertex num");
+
         return computeLethals();
     }
 
