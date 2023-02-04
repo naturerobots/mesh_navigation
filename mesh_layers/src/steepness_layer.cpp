@@ -140,7 +140,9 @@ namespace mesh_layers {
             tmp.insert(vH, acos(vertex_normals[vH].z));
         }
         steepness=tmp;
-
+        ROS_INFO_STREAM("in steppness");
+        ROS_INFO_STREAM(steepness.numValues());
+        ROS_INFO_STREAM(mesh_ptr->nextVertexIndex());
         return computeLethals();
     }
 

@@ -142,15 +142,15 @@ bool RidgeLayer::computeLayer(bool hasIO)
   }
 
 
-
-  ridge.reserve(mesh_ptr->nextVertexIndex());
+    lvr2::DenseVertexMap<float> tmpridge;
+    tmpridge.reserve(mesh_ptr->nextVertexIndex());
 
   for (size_t i = 0; i < mesh_ptr->nextVertexIndex(); i++)
   {
     auto vH = lvr2::VertexHandle(i);
     if (!mesh_ptr->containsVertex(vH))
     {
-      ridge.insert(vH, config.threshold + 0.1);
+      tmpridge.insert(vH, config.threshold + 0.1);
       continue;
     }
 
@@ -167,13 +167,13 @@ bool RidgeLayer::computeLayer(bool hasIO)
 
     if (num_neighbours == 0)
     {
-      ridge.insert(vH, config.threshold + 0.1);
+      tmpridge.insert(vH, config.threshold + 0.1);
       continue;
     }
 
-    ridge.insert(vH, value / num_neighbours);
+    tmpridge.insert(vH, value / num_neighbours);
   }
-
+  ridge=tmpridge;
   return computeLethals();
 }
 
