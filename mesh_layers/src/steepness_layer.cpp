@@ -124,9 +124,8 @@ namespace mesh_layers {
                 }
             }
         } else {
-            face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-
-            vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+            face_normals = map_ptr->faceNormals();
+            vertex_normals = map_ptr->vertexNormals();
         }
         lvr2::DenseVertexMap<float> tmp;
         tmp.reserve(mesh_ptr->nextVertexIndex());

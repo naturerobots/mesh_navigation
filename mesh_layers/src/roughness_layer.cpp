@@ -133,7 +133,9 @@ namespace mesh_layers {
             }
         }
         else{
-            vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
+
+            face_normals = map_ptr->faceNormals();
+            vertex_normals = map_ptr->vertexNormals();
 
         }
 
