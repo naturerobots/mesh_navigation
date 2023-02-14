@@ -43,101 +43,85 @@
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::HeightDiffLayer, mesh_map::AbstractLayer)
 
-namespace mesh_layers
-{
-bool HeightDiffLayer::readLayer()
-{
-  ROS_INFO_STREAM("Try to read height differences from map file...");
-  auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
+namespace mesh_layers {
+    bool HeightDiffLayer::readLayer() {
+        ROS_INFO_STREAM("Try to read height differences from map file...");
+        auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
 
-  if (height_diff_opt)
-  {
-    ROS_INFO_STREAM("Height differences have been read successfully.");
-    height_diff = height_diff_opt.get();
+        if (height_diff_opt) {
+            ROS_INFO_STREAM("Height differences have been read successfully.");
+            height_diff = height_diff_opt.get();
 
-    return computeLethals();
-  }
+            return computeLethals();
+        }
 
-  return false;
-}
+        return false;
+    }
 
-bool HeightDiffLayer::computeLethals()
-{
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold "
-                                           << config.threshold);
-  lethal_vertices.clear();
-  for (auto vH : height_diff)
-  {
-    if (height_diff[vH] > config.threshold)
-      lethal_vertices.insert(vH);
-  }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
-  return true;
-}
+    bool HeightDiffLayer::computeLethals() {
+        ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold "
+                                                 << config.threshold);
+        lethal_vertices.clear();
+        for (auto vH: height_diff) {
+            if (height_diff[vH] > config.threshold)
+                lethal_vertices.insert(vH);
+        }
+        ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+        return true;
+    }
 
-bool HeightDiffLayer::writeLayer()
-{
-  ROS_INFO_STREAM("Saving height_differences to map file...");
-  if (mesh_io_ptr->addDenseAttributeMap(height_diff, "height_diff"))
-  {
-    ROS_INFO_STREAM("Saved height differences to map file.");
-    return true;
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Could not save height differences to map file!");
-    return false;
-  }
-}
+    bool HeightDiffLayer::writeLayer() {
+        ROS_INFO_STREAM("Saving height_differences to map file...");
+        if (mesh_io_ptr->addDenseAttributeMap(height_diff, "height_diff")) {
+            ROS_INFO_STREAM("Saved height differences to map file.");
+            return true;
+        } else {
+            ROS_ERROR_STREAM("Could not save height differences to map file!");
+            return false;
+        }
+    }
 
-float HeightDiffLayer::threshold()
-{
-  return config.threshold;
-}
+    float HeightDiffLayer::threshold() {
+        return config.threshold;
+    }
 
-bool HeightDiffLayer::computeLayer(bool hasIO )
-{
-  height_diff = lvr2::calcVertexHeightDifferences(*mesh_ptr, config.radius);
-  return computeLethals();
-}
+    bool HeightDiffLayer::computeLayer(bool hasIO) {
+        height_diff = lvr2::calcVertexHeightDifferences(*mesh_ptr, config.radius);
+        return computeLethals();
+    }
 
-lvr2::VertexMap<float>& HeightDiffLayer::costs()
-{
-  return height_diff;
-}
+    lvr2::VertexMap<float> &HeightDiffLayer::costs() {
+        return height_diff;
+    }
 
-void HeightDiffLayer::reconfigureCallback(mesh_layers::HeightDiffLayerConfig& cfg, uint32_t level)
-{
-  bool notify = false;
-  ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
+    void HeightDiffLayer::reconfigureCallback(mesh_layers::HeightDiffLayerConfig &cfg, uint32_t level) {
+        bool notify = false;
+        ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
 
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
-  }
+        if (first_config) {
+            config = cfg;
+            first_config = false;
+            return;
+        }
 
-  if (config.threshold != cfg.threshold)
-  {
-    computeLethals();
-    notify = true;
-  }
+        if (config.threshold != cfg.threshold) {
+            computeLethals();
+            notify = true;
+        }
 
-  config = cfg;
-  if (notify)
-    notifyChange();
-}
+        config = cfg;
+        if (notify)
+            notifyChange();
+    }
 
-bool HeightDiffLayer::initialize(const std::string& name)
-{
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(private_nh));
+    bool HeightDiffLayer::initialize(const std::string &name) {
+        first_config = true;
+        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
+                new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(private_nh));
 
-  config_callback = boost::bind(&HeightDiffLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
-  return true;
-}
+        config_callback = boost::bind(&HeightDiffLayer::reconfigureCallback, this, _1, _2);
+        reconfigure_server_ptr->setCallback(config_callback);
+        return true;
+    }
 
 } /* namespace mesh_layers */
