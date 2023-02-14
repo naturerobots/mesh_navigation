@@ -443,6 +443,8 @@ namespace mesh_map
 
         std::string mesh_layer;
 
+
+
         float min_roughness;
         float max_roughness;
         float min_height_diff;

@@ -1178,7 +1178,7 @@ namespace mesh_map {
             ROS_INFO_STREAM( "Layer \"" << layer.first << "\" try to publish!" ) ;
             ROS_INFO_STREAM( layer.second->costs().numValues() ) ;
             ROS_INFO_STREAM(  mesh_ptr->numVertices()) ;
-            if( layer.second->costs().numValues()== mesh_ptr->numVertices()) {
+
                 mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
                                                             layer.second->defaultValue(), layer.first, global_frame,
                                                             uuid_str);
@@ -1187,7 +1187,7 @@ namespace mesh_map {
                                                                     layer.second->defaultValue(), layer.first,
                                                                     global_frame,
                                                                     uuid_str));
-            }
+
         }
 
         ROS_INFO_STREAM("Publish Layers");

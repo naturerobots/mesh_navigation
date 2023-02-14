@@ -113,7 +113,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return true if successful; else false
    */
-  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float>& distances,
+  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float>& tmpdistances, lvr2::DenseVertexMap<lvr2::BaseVector<float>>& tmpvector_map,
                               lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors, const float& max_distance,
                               const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::FaceHandle& fh,
                               const lvr2::BaseVector<float>& normal, const lvr2::VertexHandle& v1,
