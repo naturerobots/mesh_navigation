@@ -104,7 +104,11 @@ public:
    * @param max_dist The maximum distance to the triangle
    * @return Optional face handle, the optional is valid if a corresponding triangle has been found.
    */
-  lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
+  lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist = 0);
+
+  // TODO: write description.
+  boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+      std::array<float, 3>>> getContainingFaceArray(Vector& position, const float& max_dist = 0);
 
   /**
    * @brief Searches for a triangle which contains the given position with respect to the maximum distance
@@ -123,7 +127,7 @@ public:
   /**
    * @brief A method which combines all layer costs with the respective weightings
    */
-  void combineVertexCosts();
+  bool combineVertexCosts();
 
   /**
    * @brief Computes contours
@@ -346,6 +350,10 @@ public:
    * @brief Stores the given vector map
    */
   void setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
+
+
+  // TODO write description
+  void publishDebugPose(const Vector& position, const Vector& orientation, const Normal& normal, const std_msgs::ColorRGBA& color, const std::string& name);
 
   /**
    * @brief Publishes a position as marker. Used for debug purposes.

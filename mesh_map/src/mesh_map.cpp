@@ -40,6 +40,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <functional>
+#include <optional>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -216,6 +217,9 @@ bool MeshMap::readMap()
 
   mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
+  // publish vertex colors if available.
+  publishVertexColors();
+
   ROS_INFO_STREAM("Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
 
@@ -240,25 +244,20 @@ bool MeshMap::readMap()
     }
   }
 
-  ROS_INFO_STREAM("Load layer plugins...");
   if (!loadLayerPlugins())
   {
-    ROS_FATAL_STREAM("Could not load any layer plugin!");
+    ROS_WARN_STREAM("Error in the layers configuration!");
     return false;
   }
 
-  ROS_INFO_STREAM("Initialize layer plugins...");
   if (!initLayerPlugins())
   {
     ROS_FATAL_STREAM("Could not initialize plugins!");
     return false;
   }
 
-  sleep(1);
-
   combineVertexCosts();
   publishCostLayers();
-  publishVertexColors();
 
   map_loaded = true;
   return true;
@@ -274,8 +273,10 @@ bool MeshMap::loadLayerPlugins()
                     << private_nh.getNamespace()
                     << "\". \"layers\" must be must be a list of "
                        "tuples with a name and a type.");
-    return false;
+    return true;
   }
+
+  ROS_INFO_STREAM("Load layer plugins...");
 
   try
   {
@@ -317,6 +318,7 @@ bool MeshMap::loadLayerPlugins()
       {
         ROS_ERROR_STREAM("Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
                                                                             << "\"!");
+        return false;
       }
     }
   }
@@ -328,8 +330,8 @@ bool MeshMap::loadLayerPlugins()
     ROS_ERROR_STREAM(e.getMessage());
     return false;
   }
-  // is there any layer plugin loaded for the map?
-  return !layers.empty();
+
+  return true;
 }
 
 void MeshMap::layerChanged(const std::string& layer_name)
@@ -383,6 +385,13 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
 bool MeshMap::initLayerPlugins()
 {
+  if (layers.empty())
+  {
+    // no layers configured, all fine.
+    return true;
+  }
+  ROS_INFO_STREAM("Initialize layer plugins...");
+
   lethals.clear();
   lethal_indices.clear();
 
@@ -414,14 +423,20 @@ bool MeshMap::initLayerPlugins()
   return true;
 }
 
-void MeshMap::combineVertexCosts()
+bool MeshMap::combineVertexCosts()
 {
-  ROS_INFO_STREAM("Combining costs...");
-
   float combined_min = std::numeric_limits<float>::max();
   float combined_max = std::numeric_limits<float>::min();
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
+
+  if (!layers.empty())
+  {
+    // no layers configured, nothing to combine, all fine.
+    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+    return true;
+  }
+  ROS_INFO_STREAM("Combining costs...");
 
   bool hasNaN = false;
   for (auto layer : layers)
@@ -644,6 +659,25 @@ float MeshMap::costAtPosition(const lvr2::DenseVertexMap<float>& costs,
     return mesh_map::linearCombineBarycentricCoords(costs, barycentric_coords);
   }
   return std::numeric_limits<float>::quiet_NaN();
+}
+
+void MeshMap::publishDebugPose(const Vector& position, const Vector& orientation, const Normal& normal, const std_msgs::ColorRGBA& color, const std::string& name)
+{
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = mapFrame();
+  marker.header.stamp = ros::Time();
+  marker.ns = name;
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::ARROW;
+  marker.action = visualization_msgs::Marker::ADD;
+  geometry_msgs::Vector3 scale;
+  scale.x = 0.2;
+  scale.y = 0.07;
+  scale.z = 0.07;
+  marker.scale = scale;
+  marker.pose = calculatePoseFromDirection(position, orientation, normal);
+  marker.color = color;
+  marker_pub.publish(marker);
 }
 
 void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name)
@@ -1026,11 +1060,56 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
   return false;
 }
 
+boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+      std::array<float, 3>>> MeshMap::getContainingFaceArray(
+      Vector& position, const float& max_dist)
+{
+  // project start pose vector onto mesh map
+  auto opt_vH = getNearestVertexHandle(position);
+  if(opt_vH) {
+    auto vertex  = mesh_ptr->getVertexPosition(opt_vH.unwrap());
+    ROS_INFO_STREAM("Found closest vertex at (" << vertex.x << ", " << vertex.y << ", " << vertex.z << ")" );
+    typedef std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
+        std::array<float, 3>> FaceArray;
+
+    std::map<float, FaceArray> faces;
+
+    for (auto fH: mesh_ptr->getFacesOfVertex(opt_vH.unwrap())) {
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      std::array<Vector, 3> face_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+      if(mesh_map::projectedBarycentricCoords(position, face_vertices, barycentric_coords, dist)) {
+        faces.insert(std::pair<float, FaceArray>(dist, FaceArray(fH, face_vertices, barycentric_coords)));
+      }
+    }
+
+    if(!faces.empty() && (faces.begin()->first <= max_dist || max_dist == 0))
+    {
+      return faces.begin()->second;
+    }
+  }
+  return boost::none;
+}
+
 lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
 {
-  auto search_result = searchContainingFace(position, max_dist);
-  if(search_result)
-    return std::get<0>(*search_result);
+
+  // project start pose vector onto mesh map
+  auto opt_vH = getNearestVertexHandle(position);
+  if(opt_vH) {
+    std::map<float, lvr2::FaceHandle> faces;
+    for (auto fH: mesh_ptr->getFacesOfVertex(opt_vH.unwrap())) {
+      std::array<float, 3> barycentric_coords;
+      float dist;
+      projectedBarycentricCoords(position, fH, barycentric_coords, dist);
+      faces.insert(std::pair<float, lvr2::FaceHandle>(dist, fH));
+    }
+
+    if(!faces.empty() && (faces.begin()->first <= max_dist || max_dist == 0))
+    {
+      return faces.begin()->second;
+    }
+  }
   return lvr2::OptionalFaceHandle();
 }
 
