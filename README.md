@@ -61,7 +61,7 @@ All dependencies can be installed using rosdep
 
 As explicit dependencies we refer to the following ROS packages, which are also developed by us:
 
-* **[lvr2](https://github.com/uos/lvr2)**
+* **[lvr2](https://github.com/uos/lvr2)* **
 * **[mesh_tools](https://github.com/uos/mesh_tools/)**
 * **[move_base_flex](https://github.com/magazino/move_base_flex/)**
 
