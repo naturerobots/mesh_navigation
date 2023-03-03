@@ -100,7 +100,7 @@ namespace mesh_map {
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
 
-        cloud_sub_ = private_nh.subscribe("/velodyne_points", 100, &MeshMap::createOFM, this);
+        cloud_sub_ = private_nh.subscribe("/ouster/destaggeredpoints", 100, &MeshMap::createOFM, this);
 
 
     }
@@ -110,8 +110,8 @@ namespace mesh_map {
         ROS_INFO_STREAM("create OFM");
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        OrganizedFastMeshGenerator ofmg(pointBuffer, cloud->height, cloud->width);
-        ofmg.setEdgeThreshold(0.7);
+        OrganizedFastMeshGenerator ofmg(pointBuffer, cloud->height, cloud->width,5,1,0.4);
+        ofmg.setEdgeThreshold(0.8);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
         ofmg.getMesh(*mesh_buffer_ptr, color_msg);
@@ -122,6 +122,8 @@ namespace mesh_map {
         this->vertex_colors_pub.publish(color_msg);
 
     }
+
+
 
     bool MeshMap::readMap() {
         if (!subscribe) {
