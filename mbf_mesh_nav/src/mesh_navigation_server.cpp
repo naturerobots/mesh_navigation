@@ -80,9 +80,7 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   startActionServers();
 }
 
-
-
-
+//auch mit gloabel map ???
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {

@@ -38,6 +38,7 @@
 
 namespace mbf_mesh_nav
 {
+
 MeshControllerExecution::MeshControllerExecution(const std::string name,
                                                  const mbf_mesh_core::MeshController::Ptr& controller_ptr,
                                                  const ros::Publisher& vel_pub, const ros::Publisher& goal_pub,

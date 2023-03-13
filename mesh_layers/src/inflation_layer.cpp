@@ -239,8 +239,7 @@ namespace mesh_layers {
         if (mesh_ptr) {
             auto const &mesh = *mesh_ptr;
 
-            ROS_INFO_STREAM("inflation radius:" << inflation_radius);
-            ROS_INFO_STREAM("Init wave inflation.");
+
 
             lvr2::DenseVertexMap<bool> seen(mesh_ptr->nextVertexIndex(), false);
             tmpdistances = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(),
@@ -268,7 +267,6 @@ namespace mesh_layers {
                 fixed[vH] = true;
                 pq.insert(vH, 0);
             }
-            ROS_INFO_STREAM("Start inflation wave front propagation");
 
             while (!pq.isEmpty()) {
                 lvr2::VertexHandle current_vh = pq.popMin().key();
@@ -357,7 +355,6 @@ namespace mesh_layers {
                 }
             }
 
-            ROS_INFO_STREAM("Finished inflation wave front propagation.");
 
             for (auto vH: mesh_ptr->vertices()) {
                 tmpriskiness.insert(vH, fading(tmpdistances[vH]));

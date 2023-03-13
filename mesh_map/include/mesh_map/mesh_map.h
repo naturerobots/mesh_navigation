@@ -55,6 +55,7 @@
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 #include <sensor_msgs/PointCloud2.h>
+#include <organized_fast_mesh_generator.h>
 
 namespace mesh_map
 {
@@ -407,8 +408,8 @@ namespace mesh_map
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
         bool subscribe;
         lvr2::DenseVertexMap<bool> invalid;
-
-
+        void publishSpeed(unsigned int iterations, std::vector<int> start_x , float alpha);
+        std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
     private:
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
@@ -480,6 +481,9 @@ namespace mesh_map
         //! publisher for vertex costs
         ros::Publisher vertex_costs_pub;
 
+        //! publisher for speed
+        ros::Publisher speed_pub;
+
         //! publisher for vertex colors
         ros::Publisher vertex_colors_pub;
 
@@ -529,7 +533,6 @@ namespace mesh_map
 
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
-
 
 
     };

@@ -57,8 +57,8 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <organized_fast_mesh.h>
-#include <organized_fast_mesh_generator.h>
 #include <lvr_ros/conversions.h>
+#include "std_msgs/Float64.h"
 
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
@@ -94,27 +94,24 @@ namespace mesh_map {
         vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
         vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>("vertex_colors", 1, true);
         vector_field_pub = private_nh.advertise<visualization_msgs::Marker>("vector_field", 1, true);
+        speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
-
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
-
         cloud_sub_ = private_nh.subscribe("/ouster/destaggeredpoints", 100, &MeshMap::createOFM, this);
-
-
     }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        ROS_INFO_STREAM("create OFM");
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        OrganizedFastMeshGenerator ofmg(pointBuffer, cloud->height, cloud->width,5,1,0.4);
-        ofmg.setEdgeThreshold(0.8);
+        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width, 3, 5, 0.1, 0.3, 0.785398,
+                                                -0.012271846303);
+        ofmg_ptr->setEdgeThreshold(0.8);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
-        ofmg.getMesh(*mesh_buffer_ptr, color_msg);
+        ofmg_ptr->getMesh(*mesh_buffer_ptr, color_msg);
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
@@ -122,7 +119,6 @@ namespace mesh_map {
         this->vertex_colors_pub.publish(color_msg);
 
     }
-
 
 
     bool MeshMap::readMap() {
@@ -269,7 +265,6 @@ namespace mesh_map {
             adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
             kd_tree_ptr = std::make_unique<KDTree>(3, *adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
             kd_tree_ptr->buildIndex();
-            ROS_INFO_STREAM("The k-d tree has been build successfully!");
             edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
             invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
             vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
@@ -279,24 +274,15 @@ namespace mesh_map {
             uuid_str = boost::uuids::to_string(uuid);
 
             face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-            ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
-
             vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-
-
-            ROS_INFO_STREAM("Computing edge distances...");
             edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
 
             //Load (create) and init new Layers if new layer createt for this map
             if (!map_loaded) {
-                ROS_INFO_STREAM("Load layer plugins...");
                 if (!loadLayerPlugins()) {
                     ROS_FATAL_STREAM("Could not load any layer plugin!");
                     return false;
                 }
-
-
-                ROS_INFO_STREAM("Initialize layer plugins...");
                 if (!initLayerPlugins()) {
                     ROS_FATAL_STREAM("Could not initialize plugins!");
                     return false;
@@ -348,7 +334,6 @@ namespace mesh_map {
                 std::string type = elem["type"];
 
                 typename AbstractLayer::Ptr plugin_ptr;
-                ROS_INFO_STREAM(name);
                 if (layer_names.find(name) != layer_names.end()) {
                     ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
                     return false;
@@ -485,9 +470,7 @@ namespace mesh_map {
             const float norm = max - min;
             const float factor = private_nh.param<float>(layer.first + "/factor", 1.0);
             const float norm_factor = factor / norm;
-            ROS_INFO_STREAM(
-                    "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
-                               << " factor: " << factor << " norm factor: " << norm_factor);
+
 
             const float default_value = layer.second->defaultValue();
             hasNaN = false;
@@ -516,7 +499,6 @@ namespace mesh_map {
 
         hasNaN = false;
 
-        ROS_INFO_STREAM("Layer weighting factor is: " << config.layer_factor);
         for (auto eH: mesh_ptr->edges()) {
             // Get both Vertices of the current Edge
             std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
@@ -541,6 +523,8 @@ namespace mesh_map {
                 edge_weights[eH] = edge_distances[eH];
             }
         }
+        //siehze docs
+
 
         ROS_INFO("Successfully combined costs!");
     }
@@ -1222,5 +1206,59 @@ namespace mesh_map {
         return global_frame;
     }
 
+    void MeshMap::publishSpeed(unsigned int iterations, std::vector<int> start_x, float alpha) {
+        float sum = 0;
+        std::vector<float> sum_per_start;
+        for (int i = 0; i < start_x.size(); i++) {
+            uint32_t ind = ofmg_ptr->toIndex(start_x[i], iterations);
+            lvr2::VertexHandle vh(ind);
+            lvr2::BaseVector<float> startPoint = mesh_ptr->getVertexPosition(vh);
+            sum_per_start[i] = *(vertex_costs.get(vh));
+
+            int zero_points = 0;
+            for (int j = 0; j < iterations - 1; j++) {
+
+                ind = ofmg_ptr->toIndex(start_x[i], iterations);
+                if (ind == -1) {
+                    while (ind == -1) {
+                        ind = ofmg_ptr->toIndex(start_x[i] - 1, iterations);
+                    }
+                }
+                lvr2::VertexHandle vh(ind);
+                lvr2::BaseVector<float> newPoint = mesh_ptr->getVertexPosition(vh);
+                if (std::abs(startPoint.y - newPoint.y) <= alpha) {
+                    sum_per_start[i] += *(vertex_costs.get(vh));
+                } else if (startPoint.y < newPoint.y) {
+                    while (std::abs(newPoint.y - startPoint.y) > alpha || startPoint.y > newPoint.y) {
+                        ind = ofmg_ptr->toIndex(start_x[i] - 1, iterations);
+                        if (ind != -1) {
+                            lvr2::VertexHandle vh(ind);
+                            newPoint = mesh_ptr->getVertexPosition(vh);
+                        }
+                    }
+                    sum_per_start[i] += *(vertex_costs.get(vh));
+                } else if (startPoint.y < newPoint.y) {
+                    while (std::abs(newPoint.y - startPoint.y) > alpha || startPoint.y < newPoint.y) {
+                        ind = ofmg_ptr->toIndex(start_x[i] + 1, iterations);
+                        if (ind != -1) {
+                            lvr2::VertexHandle vh(ind);
+                            newPoint = mesh_ptr->getVertexPosition(vh);
+                        }
+                    }
+                    sum_per_start[i] += *(vertex_costs.get(vh));
+                }
+            }
+            sum_per_start[i] = sum_per_start[i] / (iterations - zero_points);
+        }
+        std::vector<float>::iterator result;
+        result = std::max_element(sum_per_start.begin(), sum_per_start.end());
+        float speed = *result;
+        //wilde normierungsaktion
+        std_msgs::Float64 speed_msg;
+        speed_msg.data = speed;
+        ROS_INFO_STREAM("speed");
+        ROS_INFO_STREAM(speed);
+        speed_pub.publish(speed_msg);
+    }
 
 } /* namespace mesh_map */
