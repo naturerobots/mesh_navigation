@@ -73,8 +73,8 @@ public:
    * @param cleanup_fn          A cleanup function called after execution
    */
   MeshControllerExecution(const std::string name, const mbf_mesh_core::MeshController::Ptr& controller_ptr,
-                          const ros::Publisher& vel_pub, const ros::Publisher& goal_pub, const TFPtr& tf_listener_ptr,
-                          const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config);
+                          const mbf_utility::RobotInformation &robot_info, const ros::Publisher& vel_pub,
+                          const ros::Publisher& goal_pub, const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config);
 
   /**
    * @brief Destructor

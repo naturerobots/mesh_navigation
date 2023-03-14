@@ -66,7 +66,8 @@ public:
    * @param local_mesh Shared pointer to the local mesh.
    */
   MeshRecoveryExecution(const std::string name, const mbf_mesh_core::MeshRecovery::Ptr& recovery_ptr,
-                        const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config);
+                        const mbf_utility::RobotInformation &robot_info, const MeshPtr& mesh_ptr,
+                        const MoveBaseFlexConfig& config);
   /**
    * Destructor
    */

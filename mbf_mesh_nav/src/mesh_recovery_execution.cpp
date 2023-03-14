@@ -38,11 +38,10 @@
 
 namespace mbf_mesh_nav
 {
-MeshRecoveryExecution::MeshRecoveryExecution(const std::string name,
-                                             const mbf_mesh_core::MeshRecovery::Ptr& recovery_ptr,
-                                             const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr,
+MeshRecoveryExecution::MeshRecoveryExecution(const std::string name, const mbf_mesh_core::MeshRecovery::Ptr& recovery_ptr,
+                                             const mbf_utility::RobotInformation &robot_info, const MeshPtr& mesh_ptr,
                                              const MoveBaseFlexConfig& config)
-  : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config)), mesh_ptr_(mesh_ptr)
+  : AbstractRecoveryExecution(name, recovery_ptr, robot_info, toAbstract(config)), mesh_ptr_(mesh_ptr)
 {
 }
 

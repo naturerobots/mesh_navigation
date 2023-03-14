@@ -64,7 +64,8 @@ public:
    * threads
    * @param mesh Shared pointer to the mesh.
    */
-  MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr, const MeshPtr& mesh,
+  MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr,
+                       const mbf_utility::RobotInformation &robot_info, const MeshPtr& mesh,
                        const MoveBaseFlexConfig& config);
 
   /**

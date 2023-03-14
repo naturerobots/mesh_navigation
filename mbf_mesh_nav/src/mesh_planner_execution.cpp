@@ -38,9 +38,10 @@
 
 namespace mbf_mesh_nav
 {
-MeshPlannerExecution::MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr,
-                                           const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config)
-  : AbstractPlannerExecution(name, planner_ptr, toAbstract(config)), mesh_ptr_(mesh_ptr)
+MeshPlannerExecution::MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr, 
+                                           const mbf_utility::RobotInformation &robot_info, const MeshPtr& mesh_ptr,
+                                           const MoveBaseFlexConfig& config)
+  : AbstractPlannerExecution(name, planner_ptr, robot_info, toAbstract(config)), mesh_ptr_(mesh_ptr)
 {
   ros::NodeHandle private_nh("~");
   private_nh.param("planner_lock_mesh", lock_mesh_, true);

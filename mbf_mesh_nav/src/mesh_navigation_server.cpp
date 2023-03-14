@@ -78,23 +78,21 @@ mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlanner
     const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), robot_info_, mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newControllerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshControllerExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
-      tf_listener_ptr_, mesh_ptr_, last_config_);
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), robot_info_, vel_pub_, goal_pub_, mesh_ptr_, last_config_);
 }
 
 mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecoveryExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
 {
   return boost::make_shared<mbf_mesh_nav::MeshRecoveryExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
-      boost::ref(mesh_ptr_), last_config_);
+      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), robot_info_, boost::ref(mesh_ptr_), last_config_);
 }
 
 mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(const std::string& planner_type)

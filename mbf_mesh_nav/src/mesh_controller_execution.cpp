@@ -40,10 +40,10 @@ namespace mbf_mesh_nav
 {
 MeshControllerExecution::MeshControllerExecution(const std::string name,
                                                  const mbf_mesh_core::MeshController::Ptr& controller_ptr,
+                                                 const mbf_utility::RobotInformation &robot_info,
                                                  const ros::Publisher& vel_pub, const ros::Publisher& goal_pub,
-                                                 const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr,
-                                                 const MoveBaseFlexConfig& config)
-  : AbstractControllerExecution(name, controller_ptr, vel_pub, goal_pub, tf_listener_ptr, toAbstract(config))
+                                                 const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config)
+  : AbstractControllerExecution(name, controller_ptr, robot_info, vel_pub, goal_pub, toAbstract(config))
   , mesh_ptr_(mesh_ptr)
 {
   ros::NodeHandle private_nh("~");
