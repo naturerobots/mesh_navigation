@@ -104,8 +104,8 @@ namespace mesh_map {
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int rowstep =2;
-        int calstep =2;
+        int rowstep =5;
+        int calstep =5;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
         this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-0.7,0.0,0.785398,-0.012271846303,2.5, 4,6.28319,-0.006108652);
@@ -119,10 +119,10 @@ namespace mesh_map {
         this->readMap();
         this->vertex_colors_pub.publish(color_msg);
         std::pair<int,int> l1 {480,120};
-        std::pair<int,int> l2 {460,120};
+        std::pair<int,int> l2 {450,120};
 
         std::vector<pair<int,int>> vec = {l1,l2};
-        publishSpeed(20,vec,rowstep,calstep,100);
+        publishSpeed(5,vec,rowstep,calstep,20);
     }
 
 
@@ -1218,6 +1218,7 @@ namespace mesh_map {
 
 
         for (int i = 0; i < start_lines.size(); i++) {
+            int lostpoints =0;
             int orientation_scanline = start_lines[i].first;
             int oldind_start =  start_lines[i].second* (int) ofmg_ptr->getwidth() + orientation_scanline;
             int ind_start = ofmg_ptr->index_map[oldind_start];
@@ -1241,55 +1242,46 @@ namespace mesh_map {
                 for(int j=1;j<iterations;j++) {
                     std::vector<float> diff;
                     std::vector<lvr2::VertexHandle> vec_vh;
-                    int middle_oldind =  (start_lines[i].second -(j*calstep))* (int) ofmg_ptr->getwidth() + orientation_scanline;
+                    int middle_oldind =
+                            (start_lines[i].second - (j * calstep)) * (int) ofmg_ptr->getwidth() + orientation_scanline;
 
                     int ind_middle = ofmg_ptr->index_map[middle_oldind];
-                    if(ind_middle != -1){
+                    if (ind_middle != -1) {
 
                         lvr2::VertexHandle vh(ind_middle);
-                        diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                        diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
                         vec_vh.push_back(vh);
-                        if(j==iterations-1){
-                            ROS_INFO_STREAM("max y");
-                            ROS_INFO_STREAM(start_y);
-                            ROS_INFO_STREAM(mesh_ptr->getVertexPosition(vh).y);
-                            ROS_INFO_STREAM(std::abs(mesh_ptr->getVertexPosition(vh).y-start_y));
-                        }
-                    }
-                    else{
-                        lvr2::VertexHandle vh(1);
+                    } else {
+                        lvr2::VertexHandle vh(0);
                         diff.push_back(std::numeric_limits<float>::infinity());
                         vec_vh.push_back(vh);
 
                     }
 
-                    for(int m =1;m<size_of_expansion;m++){
+                    for (int m = 1; m < size_of_expansion; m++) {
 
-                        int current_right_oldind = middle_oldind+(rowstep*m);
+                        int current_right_oldind = middle_oldind + (rowstep * m);
                         int current_right_ind = ofmg_ptr->index_map[current_right_oldind];
-                        if(current_right_ind != -1){
+                        if (current_right_ind != -1) {
                             lvr2::VertexHandle vh(current_right_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
                             vec_vh.push_back(vh);
 
-                        }
-                        else{
-
-                            lvr2::VertexHandle vh(1);
+                        } else {
+                            lvr2::VertexHandle vh(0);
                             diff.push_back(std::numeric_limits<float>::infinity());
                             vec_vh.push_back(vh);
 
                         }
-                        int current_left_oldind = middle_oldind-(rowstep*m);;
+                        int current_left_oldind = middle_oldind - (rowstep * m);;
                         int current_left_ind = ofmg_ptr->index_map[current_left_oldind];
 
-                        if(current_left_ind !=-1){
+                        if (current_left_ind != -1) {
 
                             lvr2::VertexHandle vh(current_left_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
                             vec_vh.push_back(vh);
-                        }
-                        else{
+                        } else {
 
                             lvr2::VertexHandle vh(1);
                             diff.push_back(std::numeric_limits<float>::infinity());
@@ -1299,39 +1291,80 @@ namespace mesh_map {
                     }
 
 
+                    std::vector<float>::iterator result = std::min_element(diff.begin(), diff.end());
+                    int index = std::distance(diff.begin(), result);
 
-                    std::vector<float>::iterator result = std::min_element( diff.begin(), diff.end());
-                    if(*result>worstdiff){
-                        worstdiff=*result;
-                        if(worstdiff<0.1){
-                            ROS_INFO_STREAM("under");
-                            ROS_INFO_STREAM(j);
+                    if (*result != std::numeric_limits<float>::infinity()) {
+                        if (*result > worstdiff) {
+                            worstdiff = *result;
+
+                        }
+                        if (index == 0) {
+                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()){
+                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
+                            }
+                            else{
+                                if(*result<0.1){
+                                    ROS_INFO_STREAM("close leathle object ");
+                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
+                                }
+                                else{
+                                    lostpoints++;
+                                }
+                            }
+                        }
+                            //left case
+                        else if (index % 2 == 0) {
+                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
+                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
+                                orientation_scanline -= rowstep * ((index) / 2);
+                            }
+                            else{
+                                if(*result<0.1){
+                                    ROS_INFO_STREAM("close leathle object ");
+                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
+                                }
+                                else{
+                                lostpoints++;
+                                }
+                            }
+
+                        } //right case
+                        else {
+                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
+
+                                orientation_scanline += rowstep * ((index + 1) / 2);
+                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
+                            }
+                            else{
+                                if(*result<0.1){
+                                    ROS_INFO_STREAM("close leathle object ");
+                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
+                                }
+                                else{
+                                    lostpoints++;
+                                }
+                            }
                         }
                     }
-                    int index = std::distance(diff.begin(), result);
-                    if(index==0){
-                        sum_per_start[i] += (1-(0.1*(*result))) * vertex_costs[vec_vh[index]];
+                    else {
+                        lostpoints++;
                     }
-                    //left case
-                    else if(index%2==0){
-                        sum_per_start[i] += (1-(0.1*(*result))) *vertex_costs[vec_vh[index]];
-                    } //right case
-                    else{
-                        orientation_scanline += rowstep*((index+1)/2);
-                        sum_per_start[i] += (1-(0.1*(*result))) *vertex_costs[vec_vh[index]];
-                    }
+
+
+
 
 
                 }
             }
-            //fraglcih
-            //sum_per_start[i]=sum_per_start[i]/iterations;
+            sum_per_start[i]=sum_per_start[i]/(iterations-lostpoints);
         }
 
         ROS_INFO_STREAM("max deviation from wheel track is");
         ROS_INFO_STREAM(worstdiff);
         std::vector<float>::iterator result;
         result = std::max_element(sum_per_start.begin(), sum_per_start.end());
+        ROS_INFO_STREAM(*result);
         float speed = 1-(0.1*(*result));
 
         //wilde normierungsaktion
