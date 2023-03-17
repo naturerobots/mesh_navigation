@@ -68,14 +68,12 @@ namespace mesh_layers {
     }
 
     bool SteepnessLayer::computeLethals() {
-        ROS_INFO_STREAM(
-                "Compute lethals for \"" << layer_name << "\" (Steepness Layer) with threshold " << config.threshold);
+
         lethal_vertices.clear();
         for (auto vH: steepness) {
             if (steepness[vH] > config.threshold)
                 lethal_vertices.insert(vH);
         }
-        ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
         return true;
     }
 
