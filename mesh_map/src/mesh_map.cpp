@@ -44,7 +44,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <mesh_client/mesh_client.h>
-
+#include <cmath>
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
@@ -104,10 +104,11 @@ namespace mesh_map {
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
+        int rowstep =2;
+        int calstep =2;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width, 3, 5, 0.1, 0.3, 0.785398,
-                                                -0.012271846303);
+        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-0.7,0.0,0.785398,-0.012271846303,2.5, 4,6.28319,-0.006108652);
         ofmg_ptr->setEdgeThreshold(0.8);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
@@ -117,7 +118,11 @@ namespace mesh_map {
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
         this->readMap();
         this->vertex_colors_pub.publish(color_msg);
+        std::pair<int,int> l1 {480,120};
+        std::pair<int,int> l2 {460,120};
 
+        std::vector<pair<int,int>> vec = {l1,l2};
+        publishSpeed(20,vec,rowstep,calstep,100);
     }
 
 
@@ -509,7 +514,7 @@ namespace mesh_map {
             if (config.layer_factor != 0) {
                 if (std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2])) {
                     edge_weights[eH] = edge_distances[eH];
-                    // edge_weights[eH] = std::numeric_limits<float>::infinity();
+                    edge_weights[eH] = std::numeric_limits<float>::infinity();
                 } else {
                     float cost_diff = std::fabs(vertex_costs[vH1] - vertex_costs[vH2]);
 
@@ -523,7 +528,7 @@ namespace mesh_map {
                 edge_weights[eH] = edge_distances[eH];
             }
         }
-        //siehze docs
+
 
 
         ROS_INFO("Successfully combined costs!");
@@ -1206,53 +1211,129 @@ namespace mesh_map {
         return global_frame;
     }
 
-    void MeshMap::publishSpeed(unsigned int iterations, std::vector<int> start_x, float alpha) {
-        float sum = 0;
+    void MeshMap::publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines, int rowstep,int calstep,int size_of_expansion) {
+        float worstdiff =0;
         std::vector<float> sum_per_start;
-        for (int i = 0; i < start_x.size(); i++) {
-            uint32_t ind = ofmg_ptr->toIndex(start_x[i], iterations);
-            lvr2::VertexHandle vh(ind);
-            lvr2::BaseVector<float> startPoint = mesh_ptr->getVertexPosition(vh);
-            sum_per_start[i] = *(vertex_costs.get(vh));
 
-            int zero_points = 0;
-            for (int j = 0; j < iterations - 1; j++) {
 
-                ind = ofmg_ptr->toIndex(start_x[i], iterations);
-                if (ind == -1) {
-                    while (ind == -1) {
-                        ind = ofmg_ptr->toIndex(start_x[i] - 1, iterations);
-                    }
+
+        for (int i = 0; i < start_lines.size(); i++) {
+            int orientation_scanline = start_lines[i].first;
+            int oldind_start =  start_lines[i].second* (int) ofmg_ptr->getwidth() + orientation_scanline;
+            int ind_start = ofmg_ptr->index_map[oldind_start];
+            if (ind_start == -1) {
+                ROS_INFO_STREAM("point not find set to inf");
+                sum_per_start.push_back(std::numeric_limits<float>::infinity());
+            }
+            else{
+
+                lvr2::VertexHandle vh(ind_start);
+                float start_x = mesh_ptr->getVertexPosition(vh).x;
+                float start_y = mesh_ptr->getVertexPosition(vh).y;
+                if(vertex_costs[vh] == std::numeric_limits<float>::infinity()){
+                    ROS_INFO_STREAM("ing");
+                    sum_per_start.push_back(0);
+                }else {
+                    sum_per_start.push_back(vertex_costs[vh]);
                 }
-                lvr2::VertexHandle vh(ind);
-                lvr2::BaseVector<float> newPoint = mesh_ptr->getVertexPosition(vh);
-                if (std::abs(startPoint.y - newPoint.y) <= alpha) {
-                    sum_per_start[i] += *(vertex_costs.get(vh));
-                } else if (startPoint.y < newPoint.y) {
-                    while (std::abs(newPoint.y - startPoint.y) > alpha || startPoint.y > newPoint.y) {
-                        ind = ofmg_ptr->toIndex(start_x[i] - 1, iterations);
-                        if (ind != -1) {
-                            lvr2::VertexHandle vh(ind);
-                            newPoint = mesh_ptr->getVertexPosition(vh);
+                //immer die Punkt zwei punkt rechts und links und mittig nehmen und entscheiden welcher passt das dann immer vom vohirgen orientiert aus weiter machen
+                ROS_INFO_STREAM("point");
+                for(int j=1;j<iterations;j++) {
+                    std::vector<float> diff;
+                    std::vector<lvr2::VertexHandle> vec_vh;
+                    int middle_oldind =  (start_lines[i].second -(j*calstep))* (int) ofmg_ptr->getwidth() + orientation_scanline;
+
+                    int ind_middle = ofmg_ptr->index_map[middle_oldind];
+                    if(ind_middle != -1){
+
+                        lvr2::VertexHandle vh(ind_middle);
+                        diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                        vec_vh.push_back(vh);
+                        if(j==iterations-1){
+                            ROS_INFO_STREAM("max y");
+                            ROS_INFO_STREAM(start_y);
+                            ROS_INFO_STREAM(mesh_ptr->getVertexPosition(vh).y);
+                            ROS_INFO_STREAM(std::abs(mesh_ptr->getVertexPosition(vh).y-start_y));
                         }
                     }
-                    sum_per_start[i] += *(vertex_costs.get(vh));
-                } else if (startPoint.y < newPoint.y) {
-                    while (std::abs(newPoint.y - startPoint.y) > alpha || startPoint.y < newPoint.y) {
-                        ind = ofmg_ptr->toIndex(start_x[i] + 1, iterations);
-                        if (ind != -1) {
-                            lvr2::VertexHandle vh(ind);
-                            newPoint = mesh_ptr->getVertexPosition(vh);
+                    else{
+                        lvr2::VertexHandle vh(1);
+                        diff.push_back(std::numeric_limits<float>::infinity());
+                        vec_vh.push_back(vh);
+
+                    }
+
+                    for(int m =1;m<size_of_expansion;m++){
+
+                        int current_right_oldind = middle_oldind+(rowstep*m);
+                        int current_right_ind = ofmg_ptr->index_map[current_right_oldind];
+                        if(current_right_ind != -1){
+                            lvr2::VertexHandle vh(current_right_ind);
+                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                            vec_vh.push_back(vh);
+
+                        }
+                        else{
+
+                            lvr2::VertexHandle vh(1);
+                            diff.push_back(std::numeric_limits<float>::infinity());
+                            vec_vh.push_back(vh);
+
+                        }
+                        int current_left_oldind = middle_oldind-(rowstep*m);;
+                        int current_left_ind = ofmg_ptr->index_map[current_left_oldind];
+
+                        if(current_left_ind !=-1){
+
+                            lvr2::VertexHandle vh(current_left_ind);
+                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x-start_x));
+                            vec_vh.push_back(vh);
+                        }
+                        else{
+
+                            lvr2::VertexHandle vh(1);
+                            diff.push_back(std::numeric_limits<float>::infinity());
+                            vec_vh.push_back(vh);
+
                         }
                     }
-                    sum_per_start[i] += *(vertex_costs.get(vh));
+
+
+
+                    std::vector<float>::iterator result = std::min_element( diff.begin(), diff.end());
+                    if(*result>worstdiff){
+                        worstdiff=*result;
+                        if(worstdiff<0.1){
+                            ROS_INFO_STREAM("under");
+                            ROS_INFO_STREAM(j);
+                        }
+                    }
+                    int index = std::distance(diff.begin(), result);
+                    if(index==0){
+                        sum_per_start[i] += (1-(0.1*(*result))) * vertex_costs[vec_vh[index]];
+                    }
+                    //left case
+                    else if(index%2==0){
+                        sum_per_start[i] += (1-(0.1*(*result))) *vertex_costs[vec_vh[index]];
+                    } //right case
+                    else{
+                        orientation_scanline += rowstep*((index+1)/2);
+                        sum_per_start[i] += (1-(0.1*(*result))) *vertex_costs[vec_vh[index]];
+                    }
+
+
                 }
             }
-            sum_per_start[i] = sum_per_start[i] / (iterations - zero_points);
+            //fraglcih
+            //sum_per_start[i]=sum_per_start[i]/iterations;
         }
+
+        ROS_INFO_STREAM("max deviation from wheel track is");
+        ROS_INFO_STREAM(worstdiff);
         std::vector<float>::iterator result;
         result = std::max_element(sum_per_start.begin(), sum_per_start.end());
-        float speed = *result;
+        float speed = 1-(0.1*(*result));
+
         //wilde normierungsaktion
         std_msgs::Float64 speed_msg;
         speed_msg.data = speed;

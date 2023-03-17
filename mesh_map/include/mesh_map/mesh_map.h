@@ -408,7 +408,7 @@ namespace mesh_map
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
         bool subscribe;
         lvr2::DenseVertexMap<bool> invalid;
-        void publishSpeed(unsigned int iterations, std::vector<int> start_x , float alpha);
+        void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
         std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
     private:
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
