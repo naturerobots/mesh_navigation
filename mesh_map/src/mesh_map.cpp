@@ -108,7 +108,7 @@ namespace mesh_map {
         int calstep =5;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-0.7,0.0,0.785398,-0.012271846303,2.5, 4,6.28319,-0.006108652);
+        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep);
         ofmg_ptr->setEdgeThreshold(0.8);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
@@ -122,7 +122,8 @@ namespace mesh_map {
         std::pair<int,int> l2 {450,120};
 
         std::vector<pair<int,int>> vec = {l1,l2};
-        publishSpeed(5,vec,rowstep,calstep,20);
+        //publishSpeed(5,vec,rowstep,calstep,20);
+        publishSpeedoverAllVertex(-0);
     }
 
 
@@ -1374,5 +1375,56 @@ namespace mesh_map {
         ROS_INFO_STREAM(speed);
         speed_pub.publish(speed_msg);
     }
+
+
+    void MeshMap::publishSpeedoverAllVertex(float softcap){
+        int bad=0;
+        int ok=0;
+        float result =0;
+        if (vertex_costs.numValues() ==0){
+            float speed = 0;
+            //wilde normierungsaktion
+            std_msgs::Float64 speed_msg;
+            speed_msg.data = speed;
+            ROS_INFO_STREAM("speed");
+            ROS_INFO_STREAM(speed);
+            speed_pub.publish(speed_msg);
+
+        }
+        else {
+            for (int i = 0; i < vertex_costs.numValues(); i++) {
+                lvr2::VertexHandle vh(i);
+                if (vertex_costs[vh] == std::numeric_limits<float>::infinity()) {
+                    if (abs(mesh_ptr->getVertexPosition(vh).y) > softcap) {
+                        result += 100;
+                        ok++;
+                    } else {
+                        ROS_INFO_STREAM(mesh_ptr->getVertexPosition(vh).y);
+                        result += vertex_costs[vh];
+                        bad++;
+                    }
+
+                } else if (vertex_costs[vh] != -std::numeric_limits<float>::infinity()) {
+                    result += vertex_costs[vh];
+
+                }
+
+            }
+            ROS_INFO_STREAM(result);
+            ROS_INFO_STREAM(bad);
+            ROS_INFO_STREAM(ok);
+            result /= vertex_costs.numValues();
+            float speed = 1 - (0.1 * (result));
+
+            //wilde normierungsaktion
+            std_msgs::Float64 speed_msg;
+            speed_msg.data = speed;
+            ROS_INFO_STREAM("speed");
+            ROS_INFO_STREAM(speed);
+            speed_pub.publish(speed_msg);
+        }
+    }
+
+
 
 } /* namespace mesh_map */

@@ -409,7 +409,9 @@ namespace mesh_map
         bool subscribe;
         lvr2::DenseVertexMap<bool> invalid;
         void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
+        void publishSpeedoverAllVertex(float softcap);
         std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
+
     private:
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
