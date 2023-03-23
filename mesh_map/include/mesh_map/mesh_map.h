@@ -407,6 +407,7 @@ namespace mesh_map
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
         bool subscribe;
+
         lvr2::DenseVertexMap<bool> invalid;
         void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
         void publishSpeedoverAllVertex(float softcap);
