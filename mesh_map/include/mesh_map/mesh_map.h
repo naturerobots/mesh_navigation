@@ -397,7 +397,6 @@ namespace mesh_map
          */
         mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
-        void subToPointCloud();
         /**
          * @brief create a Organized Fast Mesh and write it to mesh_ptr
          * @param cloud
@@ -410,7 +409,7 @@ namespace mesh_map
 
         lvr2::DenseVertexMap<bool> invalid;
         void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
-        void publishSpeedoverAllVertex(float softcap);
+        void publishSpeedoverAllVertex();
         std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
 
     private:

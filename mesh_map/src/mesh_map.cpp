@@ -99,17 +99,17 @@ namespace mesh_map {
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
-        cloud_sub_ = private_nh.subscribe("/ouster/destaggeredpoints", 100, &MeshMap::createOFM, this);
+        cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
     }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int rowstep =1;
-        int calstep =1;
+        int rowstep = config.rowstep;
+        int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
         this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep);
-        ofmg_ptr->setEdgeThreshold(10);
+        ofmg_ptr->setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
         ofmg_ptr->getMesh(*mesh_buffer_ptr, color_msg);
@@ -121,7 +121,7 @@ namespace mesh_map {
 
 
         //publishSpeed(5,vec,rowstep,calstep,20);
-        publishSpeedoverAllVertex(-0);
+        publishSpeedoverAllVertex();
 
     }
 
@@ -1376,8 +1376,10 @@ namespace mesh_map {
     }
 
 
-    void MeshMap::publishSpeedoverAllVertex(float softcap){
-        float threshold = 10;
+    void MeshMap::publishSpeedoverAllVertex(){
+        float softcap = config.softcap;
+        float threshold = config.threshouldSpeed;
+        float min=config.minDinstanceSpeed;
         int bad =0;
         int nice =0;
         float result =0;
@@ -1395,19 +1397,23 @@ namespace mesh_map {
                 lvr2::VertexHandle vh(i);
                 lvr2::BaseVector<float> point =mesh_ptr->getVertexPosition(vh);
                 float distance = sqrt(pow(point.x,2)+pow(abs(point.y)-0.5,2));
-
-                if (vertex_costs[vh] == std::numeric_limits<float>::infinity() || vertex_costs[vh] ==  -(std::numeric_limits<float>::infinity())) {
-                    if(lethals.find(vh)!=lethals.end()) {
-                        if (distance >= softcap && distance < threshold) {
-                            result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
-                        } else if (distance < softcap) {
-                            result += vertex_costs[vh];
+                if(distance<min) {
+                    if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
+                        vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
+                        bad++;
+                        if (lethals.find(vh) != lethals.end()) {
+                            if (distance >= softcap && distance < threshold) {
+                                result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
+                            } else if (distance < softcap) {
+                                result += vertex_costs[vh];
+                            }
+                            nice++;
                         }
-                    }
 
-                } else if (distance<threshold) {
-                    result=(result*distance/threshold)+(vertex_costs[vh]*(1-(distance/threshold)));
-                    nice++;
+                    } else if (distance < threshold) {
+                        result = (result * distance / threshold) + (vertex_costs[vh] * (1 - (distance / threshold)));
+                        nice++;
+                    }
                 }
 
             }
@@ -1419,11 +1425,12 @@ namespace mesh_map {
             //wilde normierungsaktion
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
-            ROS_INFO_STREAM(nice);
-            ROS_INFO_STREAM(bad);
 
+            ROS_INFO_STREAM(result);
             ROS_INFO_STREAM("speed");
             ROS_INFO_STREAM(speed);
+            ROS_INFO_STREAM(nice);
+            ROS_INFO_STREAM(bad);
             speed_pub.publish(speed_msg);
         }
 
