@@ -118,7 +118,7 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    * @param added_lethal vertices to be marked as lethal
    * @param removed_lethal vertices to be removed from the set of lethal vertices
    */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal){};
+  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal, bool hasIO){};
 
   /**
    * @brief initializes this layer plugin

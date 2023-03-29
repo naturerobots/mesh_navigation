@@ -111,7 +111,7 @@ public:
    * @param removed_lethal  Old "lethal" obstacle vertex handles, i.e. vertices which are no "lethal" obstacles anymore.
    */
   virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                            std::set<lvr2::VertexHandle>& removed_lethal) = 0;
+                            std::set<lvr2::VertexHandle>& removed_lethal, bool hasIO=true) = 0;
 
   /**
    * @brief Optional method if the layer computes vectors. Computes a vector within a triangle using barycentric coordinates.
