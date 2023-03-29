@@ -39,7 +39,6 @@
 #include <mbf_abstract_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
-
 #include "mbf_mesh_nav/mesh_navigation_server.h"
 
 namespace mbf_mesh_nav
@@ -74,10 +73,6 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   if(subscirbe_to_live_scan){
       live_mesh_ptr->readMap();
   }
-
-
-
-
 
   // initialize all plugins
   initializeServerComponents();
@@ -181,7 +176,7 @@ bool MeshNavigationServer::initializeControllerPlugin(const std::string& name,
 
   mbf_mesh_core::MeshController::Ptr mesh_controller_ptr =
       boost::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
-  mesh_controller_ptr->initialize(name, tf_listener_ptr_, live_mesh_ptr);
+  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_);
   ROS_DEBUG_STREAM("Controller plugin \"" << name << "\" initialized.");
   return true;
 }
@@ -225,7 +220,7 @@ bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
   }
 
   mbf_mesh_core::MeshRecovery::Ptr behavior = boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
-  behavior->initialize(name, tf_listener_ptr_, live_mesh_ptr);
+  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_);
   ROS_DEBUG_STREAM("Recovery behavior plugin \"" << name << "\" initialized.");
   return true;
 }

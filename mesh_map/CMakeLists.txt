@@ -70,6 +70,7 @@ include_directories(
 add_library(${PROJECT_NAME}
         src/mesh_map.cpp
         src/util.cpp
+        src/live_mesh_map.cpp
         )
 add_dependencies(${PROJECT_NAME}
         ${${PROJECT_NAME}_EXPORTED_TARGETS}
