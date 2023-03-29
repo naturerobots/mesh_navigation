@@ -218,10 +218,7 @@ private:
   //! true, if the dynamic reconfigure has been setup
   bool setup_reconfigure_;
 
-  ros::NodeHandle nh_;
-  ros::Subscriber mesh_sub_;
-
-    //! Shared pointer to the common global mesh
+  //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
 
   //! Service Server to clear the mesh

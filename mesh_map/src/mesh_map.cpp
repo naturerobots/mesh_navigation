@@ -99,7 +99,9 @@ namespace mesh_map {
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
-        cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
+        if(this->subscribe) {
+            cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
+        }
     }
 
 
@@ -108,7 +110,7 @@ namespace mesh_map {
         int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep);
+        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-config.right_wheel,config.right_wheel,config.delta,config.min_x, config.max_z);
         ofmg_ptr->setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
@@ -1385,7 +1387,6 @@ namespace mesh_map {
         float result =0;
         if (vertex_costs.numValues() ==0){
             float speed = 0;
-            //wilde normierungsaktion
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
             ROS_INFO_STREAM("speed");
@@ -1396,26 +1397,22 @@ namespace mesh_map {
             for (int i = 0; i < vertex_costs.numValues(); i++) {
                 lvr2::VertexHandle vh(i);
                 lvr2::BaseVector<float> point =mesh_ptr->getVertexPosition(vh);
-                float distance = sqrt(pow(point.x,2)+pow(abs(point.y)-0.5,2));
-                if(distance<min) {
+                float distance = sqrt(pow(point.x,2)+pow(abs(point.y)-config.right_wheel,2));
+
+                if(distance>min) {
                     if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
                         vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
-                        bad++;
                         if (lethals.find(vh) != lethals.end()) {
                             if (distance >= softcap && distance < threshold) {
                                 result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
                             } else if (distance < softcap) {
                                 result += vertex_costs[vh];
                             }
-                            nice++;
                         }
-
                     } else if (distance < threshold) {
                         result = (result * distance / threshold) + (vertex_costs[vh] * (1 - (distance / threshold)));
-                        nice++;
                     }
                 }
-
             }
 
             float speed = 1 - (0.1 * (result));
