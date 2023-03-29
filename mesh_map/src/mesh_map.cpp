@@ -64,8 +64,8 @@ namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
 
-    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
-            : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true), map_loaded(false),
+    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener, string node_name)
+            : tf_buffer(tf_buffer), private_nh(node_name), first_config(true), map_loaded(false),
               layer_loader("mesh_map", "mesh_map::AbstractLayer"), mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
         private_nh.param<std::string>("server_url", srv_url, "");
         private_nh.param<std::string>("server_username", srv_username, "");
@@ -94,40 +94,17 @@ namespace mesh_map {
         vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
         vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>("vertex_colors", 1, true);
         vector_field_pub = private_nh.advertise<visualization_msgs::Marker>("vector_field", 1, true);
-        speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
+
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
-        cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
     }
 
 
-    void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int rowstep = config.rowstep;
-        int calstep = config.calstep;
-        lvr2::PointBuffer pointBuffer;
-        lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-config.right_wheel,config.right_wheel,config.delta,config.min_x, config.max_z);
-        ofmg_ptr->setEdgeThreshold(config.edgeThreshold);
-        lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
-        mesh_msgs::MeshVertexColorsStamped color_msg;
-        ofmg_ptr->getMesh(*mesh_buffer_ptr, color_msg);
-        mesh_msgs::MeshGeometry mesh_map;
-        lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
-        *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
-        this->readMap();
-        this->vertex_colors_pub.publish(color_msg);
-
-
-        //publishSpeed(5,vec,rowstep,calstep,20);
-        publishSpeedoverAllVertex();
-
-    }
 
 
     bool MeshMap::readMap() {
-        if (!subscribe) {
             ROS_INFO_STREAM("server url: " << srv_url);
             bool server = false;
 
@@ -253,72 +230,17 @@ namespace mesh_map {
             }
 
             sleep(1);
-
-            combineVertexCosts();
-            publishCostLayers();
             publishVertexColors();
 
-            map_loaded = true;
-            return true;
-        }
-            //create and compute Layers for a subscribet Mesh
-        else {
-            ROS_INFO_STREAM("The mesh has been create successfully with " << mesh_ptr->numVertices() << " vertices and "
-                                                                          << mesh_ptr->numFaces() << " faces and "
-                                                                          << mesh_ptr->numEdges() << " edges.");
-
-            adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
-            kd_tree_ptr = std::make_unique<KDTree>(3, *adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
-            kd_tree_ptr->buildIndex();
-            edge_weights = lvr2::DenseEdgeMap<float>(mesh_ptr->nextEdgeIndex(), 0);
-            invalid = lvr2::DenseVertexMap<bool>(mesh_ptr->nextVertexIndex(), false);
-            vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
-            // TODO read and write uuid
-            boost::uuids::random_generator gen;
-            boost::uuids::uuid uuid = gen();
-            uuid_str = boost::uuids::to_string(uuid);
-
-            face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-            vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-            edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
-
-            //Load (create) and init new Layers if new layer createt for this map
-            if (!map_loaded) {
-                if (!loadLayerPlugins()) {
-                    ROS_FATAL_STREAM("Could not load any layer plugin!");
-                    return false;
-                }
-                if (!initLayerPlugins()) {
-                    ROS_FATAL_STREAM("Could not initialize plugins!");
-                    return false;
-                }
-            }
-                //if the layers are created befor compute new layercosts
-            else {
-                lethals.clear();
-                lethal_indices.clear();
-
-                for (auto &layer: layers) {
-                    auto &layer_plugin = layer.second;
-                    const auto &layer_name = layer.first;
-                    std::set<lvr2::VertexHandle> empty;
-                    layer_plugin->updateLethal(lethals, empty);
-                    layer_plugin->computeLayer(!subscribe);
-                    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
-                    lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
-                }
-            }
-
 
             combineVertexCosts();
-            mesh_geometry_pub.publish(
-                    mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str,
-                                                                        vertex_normals));
             publishCostLayers();
             map_loaded = true;
             return true;
-        }
+
     }
+
+
 
     bool MeshMap::loadLayerPlugins() {
         XmlRpc::XmlRpcValue plugin_param_list;
@@ -427,7 +349,7 @@ namespace mesh_map {
         // TODO new lethals old lethals -> renew potential field! around this areas
     }
 
-    bool MeshMap::initLayerPlugins() {
+    bool MeshMap::initLayerPlugins( bool hasIO) {
         lethals.clear();
         lethal_indices.clear();
 
@@ -445,12 +367,12 @@ namespace mesh_map {
 
             std::set<lvr2::VertexHandle> empty;
             layer_plugin->updateLethal(lethals, empty);
-            if (!subscribe) {
+            if (hasIO) {
                 if (!layer_plugin->readLayer()) {
-                    layer_plugin->computeLayer(!subscribe);
+                    layer_plugin->computeLayer(hasIO);
                 }
             } else {
-                layer_plugin->computeLayer(!subscribe);
+                layer_plugin->computeLayer(hasIO);
             }
 
             lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
@@ -1211,228 +1133,7 @@ namespace mesh_map {
         return global_frame;
     }
 
-    void MeshMap::publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines, int rowstep,int calstep,int size_of_expansion) {
-        float worstdiff =0;
-        std::vector<float> sum_per_start;
 
-
-
-        for (int i = 0; i < start_lines.size(); i++) {
-            int lostpoints =0;
-            int orientation_scanline = start_lines[i].first;
-            int oldind_start =  start_lines[i].second* (int) ofmg_ptr->getwidth() + orientation_scanline;
-            int ind_start = ofmg_ptr->index_map[oldind_start];
-            if (ind_start == -1) {
-                ROS_INFO_STREAM("point not find set to inf");
-                sum_per_start.push_back(std::numeric_limits<float>::infinity());
-            }
-            else{
-
-                lvr2::VertexHandle vh(ind_start);
-                float start_x = mesh_ptr->getVertexPosition(vh).x;
-                float start_y = mesh_ptr->getVertexPosition(vh).y;
-                if(vertex_costs[vh] == std::numeric_limits<float>::infinity()){
-                    ROS_INFO_STREAM("ing");
-                    sum_per_start.push_back(0);
-                }else {
-                    sum_per_start.push_back(vertex_costs[vh]);
-                }
-                //immer die Punkt zwei punkt rechts und links und mittig nehmen und entscheiden welcher passt das dann immer vom vohirgen orientiert aus weiter machen
-                ROS_INFO_STREAM("point");
-                for(int j=1;j<iterations;j++) {
-                    std::vector<float> diff;
-                    std::vector<lvr2::VertexHandle> vec_vh;
-                    int middle_oldind =
-                            (start_lines[i].second - (j * calstep)) * (int) ofmg_ptr->getwidth() + orientation_scanline;
-
-                    int ind_middle = ofmg_ptr->index_map[middle_oldind];
-                    if (ind_middle != -1) {
-
-                        lvr2::VertexHandle vh(ind_middle);
-                        diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                        vec_vh.push_back(vh);
-                    } else {
-                        lvr2::VertexHandle vh(0);
-                        diff.push_back(std::numeric_limits<float>::infinity());
-                        vec_vh.push_back(vh);
-
-                    }
-
-                    for (int m = 1; m < size_of_expansion; m++) {
-
-                        int current_right_oldind = middle_oldind + (rowstep * m);
-                        int current_right_ind = ofmg_ptr->index_map[current_right_oldind];
-                        if (current_right_ind != -1) {
-                            lvr2::VertexHandle vh(current_right_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                            vec_vh.push_back(vh);
-
-                        } else {
-                            lvr2::VertexHandle vh(0);
-                            diff.push_back(std::numeric_limits<float>::infinity());
-                            vec_vh.push_back(vh);
-
-                        }
-                        int current_left_oldind = middle_oldind - (rowstep * m);;
-                        int current_left_ind = ofmg_ptr->index_map[current_left_oldind];
-
-                        if (current_left_ind != -1) {
-
-                            lvr2::VertexHandle vh(current_left_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                            vec_vh.push_back(vh);
-                        } else {
-
-                            lvr2::VertexHandle vh(1);
-                            diff.push_back(std::numeric_limits<float>::infinity());
-                            vec_vh.push_back(vh);
-
-                        }
-                    }
-
-
-                    std::vector<float>::iterator result = std::min_element(diff.begin(), diff.end());
-                    int index = std::distance(diff.begin(), result);
-
-                    if (*result != std::numeric_limits<float>::infinity()) {
-                        if (*result > worstdiff) {
-                            worstdiff = *result;
-
-                        }
-                        if (index == 0) {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()){
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                    lostpoints++;
-                                }
-                            }
-                        }
-                            //left case
-                        else if (index % 2 == 0) {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                                orientation_scanline -= rowstep * ((index) / 2);
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                lostpoints++;
-                                }
-                            }
-
-                        } //right case
-                        else {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
-
-                                orientation_scanline += rowstep * ((index + 1) / 2);
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                    lostpoints++;
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        lostpoints++;
-                    }
-
-
-
-
-
-                }
-            }
-            sum_per_start[i]=sum_per_start[i]/(iterations-lostpoints);
-        }
-
-        ROS_INFO_STREAM("max deviation from wheel track is");
-        ROS_INFO_STREAM(worstdiff);
-        std::vector<float>::iterator result;
-        result = std::max_element(sum_per_start.begin(), sum_per_start.end());
-        ROS_INFO_STREAM(*result);
-        float speed = 1-(0.1*(*result));
-
-        //wilde normierungsaktion
-        std_msgs::Float64 speed_msg;
-        speed_msg.data = speed;
-        ROS_INFO_STREAM("speed");
-        ROS_INFO_STREAM(speed);
-        speed_pub.publish(speed_msg);
-    }
-
-
-    void MeshMap::publishSpeedoverAllVertex(){
-        float softcap = config.softcap;
-        float threshold = config.threshouldSpeed;
-        float min=config.minDinstanceSpeed;
-        int bad =0;
-        int nice =0;
-        float result =0;
-        if (vertex_costs.numValues() ==0){
-            float speed = 0;
-            std_msgs::Float64 speed_msg;
-            speed_msg.data = speed;
-            ROS_INFO_STREAM("speed");
-            ROS_INFO_STREAM(speed);
-            speed_pub.publish(speed_msg);
-        }
-        else {
-            for (int i = 0; i < vertex_costs.numValues(); i++) {
-                lvr2::VertexHandle vh(i);
-                lvr2::BaseVector<float> point =mesh_ptr->getVertexPosition(vh);
-                float distance = sqrt(pow(point.x,2)+pow(abs(point.y)-config.right_wheel,2));
-
-                if(distance>min) {
-                    if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
-                        vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
-                        if (lethals.find(vh) != lethals.end()) {
-                            if (distance >= softcap && distance < threshold) {
-                                result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
-                            } else if (distance < softcap) {
-                                result += vertex_costs[vh];
-                            }
-                        }
-                    } else if (distance < threshold) {
-                        result = (result * distance / threshold) + (vertex_costs[vh] * (1 - (distance / threshold)));
-                    }
-                }
-            }
-
-            float speed = 1 - (0.1 * (result));
-            if(speed<0){
-                speed=0;
-            }
-            //wilde normierungsaktion
-            std_msgs::Float64 speed_msg;
-            speed_msg.data = speed;
-
-            ROS_INFO_STREAM(result);
-            ROS_INFO_STREAM("speed");
-            ROS_INFO_STREAM(speed);
-            ROS_INFO_STREAM(nice);
-            ROS_INFO_STREAM(bad);
-            speed_pub.publish(speed_msg);
-        }
-
-
-
-
-    }
 
 
 

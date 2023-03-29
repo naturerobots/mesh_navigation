@@ -50,8 +50,11 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   , controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController")
   , planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner")
   , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_))
+  , live_mesh_ptr(new live_mesh_map::LiveMeshMap(*tf_listener_ptr_))
   , setup_reconfigure_(false)
 {
+
+
   // advertise services and current goal topic
   check_pose_cost_srv_ =
       private_nh_.advertiseService("check_pose_cost", &MeshNavigationServer::callServiceCheckPoseCost, this);
@@ -63,12 +66,15 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   // abstract server parameters
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
-  mesh_ptr_->subscribe=true;
-
-    if(!mesh_ptr_->subscribe) {
-      ROS_INFO_STREAM("Reading map file...");
+  bool load_gloable_map = true;
+  bool subscirbe_to_live_scan = false;
+  if(load_gloable_map) {
       mesh_ptr_->readMap();
   }
+  if(subscirbe_to_live_scan){
+      live_mesh_ptr->readMap();
+  }
+
 
 
 
@@ -175,7 +181,7 @@ bool MeshNavigationServer::initializeControllerPlugin(const std::string& name,
 
   mbf_mesh_core::MeshController::Ptr mesh_controller_ptr =
       boost::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
-  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_);
+  mesh_controller_ptr->initialize(name, tf_listener_ptr_, live_mesh_ptr);
   ROS_DEBUG_STREAM("Controller plugin \"" << name << "\" initialized.");
   return true;
 }
@@ -219,7 +225,7 @@ bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
   }
 
   mbf_mesh_core::MeshRecovery::Ptr behavior = boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
-  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_);
+  behavior->initialize(name, tf_listener_ptr_, live_mesh_ptr);
   ROS_DEBUG_STREAM("Recovery behavior plugin \"" << name << "\" initialized.");
   return true;
 }
@@ -287,7 +293,7 @@ bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request
 
 bool MeshNavigationServer::callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
 {
-  mesh_ptr_->resetLayers();
+    mesh_ptr_->resetLayers();
   return true;
 }
 

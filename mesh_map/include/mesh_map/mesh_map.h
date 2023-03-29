@@ -64,7 +64,7 @@ namespace mesh_map
     public:
         typedef boost::shared_ptr<MeshMap> Ptr;
 
-        MeshMap(tf2_ros::Buffer& tf);
+        MeshMap(tf2_ros::Buffer& tf, string node_name = "~/mesh_map/");
 
         /**
          * @brief Calculate normals and cost values and publishes all as mesh_msgs
@@ -82,7 +82,7 @@ namespace mesh_map
          * @brief Initialized all loaded layer plugins
          * @return true if the loaded layer plugins have been initialized successfully.
          */
-        bool initLayerPlugins();
+        bool initLayerPlugins(bool hasIO =true );
 
         /**
          * @brief Return and optional vertex handle of to the closest vertex to the given position
@@ -397,43 +397,69 @@ namespace mesh_map
          */
         mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
-        /**
-         * @brief create a Organized Fast Mesh and write it to mesh_ptr
-         * @param cloud
-         */
-        void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
-
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-        bool subscribe;
 
         lvr2::DenseVertexMap<bool> invalid;
-        void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
-        void publishSpeedoverAllVertex();
-        std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
 
-    private:
-        lvr2::HalfEdgeMesh<Vector> organizedMesh;
-        ros::Subscriber cloud_sub_;
-        ros::Publisher mesh_pub_;
-        std::string point_cloud;
-        //! plugin class loader for for the layer plugins
-        pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+    protected:
+        //! private node handle within the mesh map namespace
+        ros::NodeHandle private_nh;
+        //! publisher for vertex colors
+        ros::Publisher vertex_colors_pub;
+        //! k-d tree nano flann mesh adaptor to access mesh data
+        std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
 
-        //! mapping from name to layer instance
-        std::map<std::string, mesh_map::AbstractLayer::Ptr> layer_names;
+        //! k-d tree type for 3D with a custom mesh adaptor
+        typedef nanoflann::KDTreeSingleIndexAdaptor<
+                nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
+                NanoFlannMeshAdaptor, 3> KDTree;
 
-        //! vector of name and layer instances
-        std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> layers;
+        //! k-d tree to query mesh vertices in logarithmic time
+        std::unique_ptr<KDTree> kd_tree_ptr;
+        //! edge weights
+        lvr2::DenseEdgeMap<float> edge_weights;
+        //! combined layer costs
+        lvr2::DenseVertexMap<float> vertex_costs;
+        //! uuid for the load mesh map
+        std::string uuid_str;
+        //! vertex distance for each edge
+        lvr2::DenseEdgeMap<float> edge_distances;
+
+        //! triangle normals
+        lvr2::DenseFaceMap<Normal> face_normals;
+
+        //! vertex normals
+        lvr2::DenseVertexMap<Normal> vertex_normals;
+
+
+        //! indicates whether the map has been loaded
+        bool map_loaded;
 
         //! each layer maps to a set of impassable indices
         std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
 
         //! all impassable vertices
         std::set<lvr2::VertexHandle> lethals;
+        //! vector of name and layer instances
+        std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> layers;
+
+        //! publisher for the mesh geometry
+        ros::Publisher mesh_geometry_pub;
+
 
         //! global frame / coordinate system id
         std::string global_frame;
+
+    private:
+
+        //! plugin class loader for for the layer plugins
+        pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+
+        //! mapping from name to layer instance
+        std::map<std::string, mesh_map::AbstractLayer::Ptr> layer_names;
+
+
 
         //! server url
         std::string srv_url;
@@ -462,35 +488,16 @@ namespace mesh_map
         std::string mesh_file;
         std::string mesh_part;
 
-        //! combined layer costs
-        lvr2::DenseVertexMap<float> vertex_costs;
+
 
         //! stored vector map to share between planner and controller
         lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-        //! vertex distance for each edge
-        lvr2::DenseEdgeMap<float> edge_distances;
 
-        //! edge weights
-        lvr2::DenseEdgeMap<float> edge_weights;
-
-        //! triangle normals
-        lvr2::DenseFaceMap<Normal> face_normals;
-
-        //! vertex normals
-        lvr2::DenseVertexMap<Normal> vertex_normals;
 
         //! publisher for vertex costs
         ros::Publisher vertex_costs_pub;
 
-        //! publisher for speed
-        ros::Publisher speed_pub;
-
-        //! publisher for vertex colors
-        ros::Publisher vertex_colors_pub;
-
-        //! publisher for the mesh geometry
-        ros::Publisher mesh_geometry_pub;
 
         //! publisher for the debug markers
         ros::Publisher marker_pub;
@@ -507,34 +514,23 @@ namespace mesh_map
         //! first reconfigure call
         bool first_config;
 
-        //! indicates whether the map has been loaded
-        bool map_loaded;
 
         //! current mesh map configuration
         MeshMapConfig config;
 
-        //! private node handle within the mesh map namespace
-        ros::NodeHandle private_nh;
+
 
         //! transformation buffer
         tf2_ros::Buffer& tf_buffer;
 
-        //! uuid for the load mesh map
-        std::string uuid_str;
+
 
         //! layer mutex to handle simultaneous layer changes
         std::mutex layer_mtx;
 
-        //! k-d tree type for 3D with a custom mesh adaptor
-        typedef nanoflann::KDTreeSingleIndexAdaptor<
-                nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
-                NanoFlannMeshAdaptor, 3> KDTree;
 
-        //! k-d tree nano flann mesh adaptor to access mesh data
-        std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
 
-        //! k-d tree to query mesh vertices in logarithmic time
-        std::unique_ptr<KDTree> kd_tree_ptr;
+
 
 
     };

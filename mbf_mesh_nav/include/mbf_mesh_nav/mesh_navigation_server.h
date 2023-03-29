@@ -50,6 +50,7 @@
 #include <std_srvs/Empty.h>
 
 #include <pluginlib/class_loader.h>
+#include "mesh_map/live_mesh_map.h"
 
 namespace mbf_mesh_nav
 {
@@ -74,6 +75,7 @@ class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
 {
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
+  typedef boost::shared_ptr<live_mesh_map::LiveMeshMap> LiveMeshPtr;
 
   typedef boost::shared_ptr<MeshNavigationServer> Ptr;
 
@@ -219,11 +221,11 @@ private:
   bool setup_reconfigure_;
 
   ros::NodeHandle nh_;
-  ros::Subscriber mesh_sub_;
 
     //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
-
+    //! Shared pointer to the common local mesh
+    LiveMeshPtr live_mesh_ptr;
   //! Service Server to clear the mesh
   ros::ServiceServer clear_mesh_srv_;
 
