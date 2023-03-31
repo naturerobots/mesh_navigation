@@ -64,7 +64,7 @@ namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
 
-    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener)
+    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener,bool subscribe)
             : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true), map_loaded(false),
               layer_loader("mesh_map", "mesh_map::AbstractLayer"), mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
         private_nh.param<std::string>("server_url", srv_url, "");
@@ -94,13 +94,15 @@ namespace mesh_map {
         vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
         vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>("vertex_colors", 1, true);
         vector_field_pub = private_nh.advertise<visualization_msgs::Marker>("vector_field", 1, true);
-        speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
         reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
+        this->subscribe=subscribe;
         if(this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
+            speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
+
         }
     }
 
@@ -110,19 +112,16 @@ namespace mesh_map {
         int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-config.right_wheel,config.right_wheel,config.delta,config.min_x, config.max_z);
-        ofmg_ptr->setEdgeThreshold(config.edgeThreshold);
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,rowstep,calstep,-config.right_wheel,config.right_wheel,config.delta,config.min_x, config.max_z);
+        ofmg.setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
-        ofmg_ptr->getMesh(*mesh_buffer_ptr, color_msg);
+        ofmg.getMesh(*mesh_buffer_ptr, color_msg);
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
         this->readMap();
         this->vertex_colors_pub.publish(color_msg);
-
-
-        //publishSpeed(5,vec,rowstep,calstep,20);
         publishSpeedoverAllVertex();
 
     }
@@ -485,7 +484,13 @@ namespace mesh_map {
                 const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
                 if (std::isnan(cost))
                     hasNaN = true;
-                vertex_costs[vH] += factor * cost;
+                if(layer.first!="height_diff" && mesh_ptr->getVertexPosition(vH).x<=100 && subscribe){
+                    vertex_costs[vH] += 0;
+
+                }else{                vertex_costs[vH] += factor * cost;
+
+
+                }
                 if (std::isfinite(cost)) {
                     combined_max = std::max(combined_max, vertex_costs[vH]);
                     combined_min = std::min(combined_min, vertex_costs[vH]);
@@ -1213,169 +1218,6 @@ namespace mesh_map {
         return global_frame;
     }
 
-    void MeshMap::publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines, int rowstep,int calstep,int size_of_expansion) {
-        float worstdiff =0;
-        std::vector<float> sum_per_start;
-
-
-
-        for (int i = 0; i < start_lines.size(); i++) {
-            int lostpoints =0;
-            int orientation_scanline = start_lines[i].first;
-            int oldind_start =  start_lines[i].second* (int) ofmg_ptr->getwidth() + orientation_scanline;
-            int ind_start = ofmg_ptr->index_map[oldind_start];
-            if (ind_start == -1) {
-                ROS_INFO_STREAM("point not find set to inf");
-                sum_per_start.push_back(std::numeric_limits<float>::infinity());
-            }
-            else{
-
-                lvr2::VertexHandle vh(ind_start);
-                float start_x = mesh_ptr->getVertexPosition(vh).x;
-                float start_y = mesh_ptr->getVertexPosition(vh).y;
-                if(vertex_costs[vh] == std::numeric_limits<float>::infinity()){
-                    ROS_INFO_STREAM("ing");
-                    sum_per_start.push_back(0);
-                }else {
-                    sum_per_start.push_back(vertex_costs[vh]);
-                }
-                //immer die Punkt zwei punkt rechts und links und mittig nehmen und entscheiden welcher passt das dann immer vom vohirgen orientiert aus weiter machen
-                ROS_INFO_STREAM("point");
-                for(int j=1;j<iterations;j++) {
-                    std::vector<float> diff;
-                    std::vector<lvr2::VertexHandle> vec_vh;
-                    int middle_oldind =
-                            (start_lines[i].second - (j * calstep)) * (int) ofmg_ptr->getwidth() + orientation_scanline;
-
-                    int ind_middle = ofmg_ptr->index_map[middle_oldind];
-                    if (ind_middle != -1) {
-
-                        lvr2::VertexHandle vh(ind_middle);
-                        diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                        vec_vh.push_back(vh);
-                    } else {
-                        lvr2::VertexHandle vh(0);
-                        diff.push_back(std::numeric_limits<float>::infinity());
-                        vec_vh.push_back(vh);
-
-                    }
-
-                    for (int m = 1; m < size_of_expansion; m++) {
-
-                        int current_right_oldind = middle_oldind + (rowstep * m);
-                        int current_right_ind = ofmg_ptr->index_map[current_right_oldind];
-                        if (current_right_ind != -1) {
-                            lvr2::VertexHandle vh(current_right_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                            vec_vh.push_back(vh);
-
-                        } else {
-                            lvr2::VertexHandle vh(0);
-                            diff.push_back(std::numeric_limits<float>::infinity());
-                            vec_vh.push_back(vh);
-
-                        }
-                        int current_left_oldind = middle_oldind - (rowstep * m);;
-                        int current_left_ind = ofmg_ptr->index_map[current_left_oldind];
-
-                        if (current_left_ind != -1) {
-
-                            lvr2::VertexHandle vh(current_left_ind);
-                            diff.push_back(std::abs(mesh_ptr->getVertexPosition(vh).x - start_x));
-                            vec_vh.push_back(vh);
-                        } else {
-
-                            lvr2::VertexHandle vh(1);
-                            diff.push_back(std::numeric_limits<float>::infinity());
-                            vec_vh.push_back(vh);
-
-                        }
-                    }
-
-
-                    std::vector<float>::iterator result = std::min_element(diff.begin(), diff.end());
-                    int index = std::distance(diff.begin(), result);
-
-                    if (*result != std::numeric_limits<float>::infinity()) {
-                        if (*result > worstdiff) {
-                            worstdiff = *result;
-
-                        }
-                        if (index == 0) {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()){
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                    lostpoints++;
-                                }
-                            }
-                        }
-                            //left case
-                        else if (index % 2 == 0) {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                                orientation_scanline -= rowstep * ((index) / 2);
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                lostpoints++;
-                                }
-                            }
-
-                        } //right case
-                        else {
-                            if(vertex_costs[vec_vh[index]] != std::numeric_limits<float>::infinity()) {
-
-                                orientation_scanline += rowstep * ((index + 1) / 2);
-                                sum_per_start[i] += (1 - (0.1 * (*result))) * vertex_costs[vec_vh[index]];
-                            }
-                            else{
-                                if(*result<0.1){
-                                    ROS_INFO_STREAM("close leathle object ");
-                                    sum_per_start[i] = vertex_costs[vec_vh[index]];
-                                }
-                                else{
-                                    lostpoints++;
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        lostpoints++;
-                    }
-
-
-
-
-
-                }
-            }
-            sum_per_start[i]=sum_per_start[i]/(iterations-lostpoints);
-        }
-
-        ROS_INFO_STREAM("max deviation from wheel track is");
-        ROS_INFO_STREAM(worstdiff);
-        std::vector<float>::iterator result;
-        result = std::max_element(sum_per_start.begin(), sum_per_start.end());
-        ROS_INFO_STREAM(*result);
-        float speed = 1-(0.1*(*result));
-
-        //wilde normierungsaktion
-        std_msgs::Float64 speed_msg;
-        speed_msg.data = speed;
-        ROS_INFO_STREAM("speed");
-        ROS_INFO_STREAM(speed);
-        speed_pub.publish(speed_msg);
-    }
 
 
     void MeshMap::publishSpeedoverAllVertex(){
@@ -1389,8 +1231,7 @@ namespace mesh_map {
             float speed = 0;
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
-            ROS_INFO_STREAM("speed");
-            ROS_INFO_STREAM(speed);
+            ROS_INFO_STREAM("The calculated speed suggestion in percent is 0%, because the created mesh has no vertices");
             speed_pub.publish(speed_msg);
         }
         else {
@@ -1423,17 +1264,17 @@ namespace mesh_map {
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
 
-            ROS_INFO_STREAM(result);
-            ROS_INFO_STREAM("speed");
-            ROS_INFO_STREAM(speed);
-            ROS_INFO_STREAM(nice);
-            ROS_INFO_STREAM(bad);
+            ROS_INFO("The calculated speed suggestion in percent is %f" , (speed*100)  ,"%");
+
             speed_pub.publish(speed_msg);
         }
 
 
 
 
+    }
+    bool MeshMap::getsubscribe() {
+        return this->subscribe;
     }
 
 

@@ -64,7 +64,7 @@ namespace mesh_map
     public:
         typedef boost::shared_ptr<MeshMap> Ptr;
 
-        MeshMap(tf2_ros::Buffer& tf);
+        MeshMap(tf2_ros::Buffer& tf, bool subscribe =false);
 
         /**
          * @brief Calculate normals and cost values and publishes all as mesh_msgs
@@ -403,16 +403,24 @@ namespace mesh_map
          */
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
+        /**
+         *  @brief calculate and publish a speed estimation
+         */
+        void publishSpeedoverAllVertex();
+        /**
+         * Retrun the subscribe value
+         * @return subscribe
+         */
+        bool getsubscribe();
         std::shared_ptr<lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>> mesh_ptr;
         std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-        bool subscribe;
 
         lvr2::DenseVertexMap<bool> invalid;
-        void publishSpeed(unsigned int iterations, std::vector<pair<int,int>> start_lines,int rowstep,int calstep,int size_of_expansion);
-        void publishSpeedoverAllVertex();
-        std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
+
 
     private:
+        bool subscribe;
+
         lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
         ros::Publisher mesh_pub_;
