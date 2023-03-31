@@ -417,7 +417,6 @@ namespace mesh_map
 
         lvr2::DenseVertexMap<bool> invalid;
 
-
     private:
         bool subscribe;
 
