@@ -421,7 +421,6 @@ namespace mesh_map
     private:
         bool subscribe;
 
-        lvr2::HalfEdgeMesh<Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
         ros::Publisher mesh_pub_;
         std::string point_cloud;
