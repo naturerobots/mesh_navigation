@@ -36,8 +36,6 @@ class LiveMeshMap : public mesh_map::MeshMap {
         void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
     private:
-        std::shared_ptr<OrganizedFastMeshGenerator> ofmg_ptr;
-        lvr2::HalfEdgeMesh<mesh_map::Vector> organizedMesh;
         ros::Subscriber cloud_sub_;
         ros::Publisher mesh_pub_;
         ros::Publisher speed_pub;

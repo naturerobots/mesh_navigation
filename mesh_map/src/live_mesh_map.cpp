@@ -15,6 +15,7 @@
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
+#include <organized_fast_mesh_generator.h>
 namespace live_mesh_map {
     LiveMeshMap::LiveMeshMap(tf2_ros::Buffer &tf_listener)
     :MeshMap(tf_listener){
@@ -28,11 +29,11 @@ namespace live_mesh_map {
         int calstep = 1;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        this->ofmg_ptr = std::make_shared<OrganizedFastMeshGenerator>(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-0.5,0.5,0.3,0.1, 0.5);
-        ofmg_ptr->setEdgeThreshold(1);
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width,rowstep,calstep,-0.5,0.5,0.3,0.1, 0.5);
+        ofmg.setEdgeThreshold(1);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
-        ofmg_ptr->getMesh(*mesh_buffer_ptr, color_msg);
+        ofmg.getMesh(*mesh_buffer_ptr, color_msg);
         mesh_msgs::MeshGeometry mesh_map;
         lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
