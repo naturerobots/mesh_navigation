@@ -1224,8 +1224,6 @@ namespace mesh_map {
         float softcap = config.softcap;
         float threshold = config.threshouldSpeed;
         float min=config.minDinstanceSpeed;
-        int bad =0;
-        int nice =0;
         float result =0;
         if (vertex_costs.numValues() ==0){
             float speed = 0;
