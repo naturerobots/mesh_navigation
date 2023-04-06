@@ -59,7 +59,9 @@
 #include <organized_fast_mesh.h>
 #include <lvr_ros/conversions.h>
 #include "std_msgs/Float64.h"
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include <tf2_ros/transform_listener.h>
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
@@ -104,10 +106,16 @@ namespace mesh_map {
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
 
         }
+        std::fstream file("/home/lukas/test/speedtests/mesh_map/test4.txt",std::ios::app);
+        file << "cal =1, row =1, high, rough radius 0.02, infltion" << std::endl;
+        file.close();
     }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
+        std::fstream file("/home/lukas/test/speedtests/mesh_map/test4.txt",std::ios::app);
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        result=0;
         global_frame = "os_sensor";
         int rowstep = config.rowstep;
         int calstep = config.calstep;
@@ -125,7 +133,9 @@ namespace mesh_map {
         this->readMap();
         this->vertex_colors_pub.publish(color_msg);
         publishSpeedoverAllVertex();
-
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        file<<std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << std::endl;
+        file.close();
     }
 
     void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer){
@@ -1249,12 +1259,30 @@ namespace mesh_map {
             speed_pub.publish(speed_msg);
         }
         else {
+            geometry_msgs::PoseStamped right_in;
+            right_in.pose.position.x=0;
+            right_in.pose.position.y=config.right_wheel;
+            right_in.pose.position.z=0;
+            geometry_msgs::PoseStamped right_out;
+            geometry_msgs::PoseStamped left_in;
+            left_in.pose.position.x=0;
+            left_in.pose.position.y=config.left_wheel;
+            left_in.pose.position.z=0;
+            geometry_msgs::PoseStamped left_out;
+            tf2_ros::Buffer tf_buffer;
+            tf2_ros::TransformListener tf2_listener(tf_buffer);
+            geometry_msgs::TransformStamped base_footprint_to_os_sensor;
+            base_footprint_to_os_sensor = tf_buffer.lookupTransform("os_sensor", "base_footprint", ros::Time(0), ros::Duration(1.0) );
+            tf2::doTransform(right_in, right_out, base_footprint_to_os_sensor);
             for (int i = 0; i < vertex_costs.numValues(); i++) {
                 lvr2::VertexHandle vh(i);
                 lvr2::BaseVector<float> point =mesh_ptr->getVertexPosition(vh);
-                float distance = sqrt(pow(point.x,2)+pow(abs(point.y)-config.right_wheel,2));
 
-                if(distance>min) {
+
+                float left_distance = sqrt(pow(abs(point.x)-abs(right_out.pose.position.x),2)+pow(abs(point.y)- abs(right_out.pose.position.y),2)+pow(abs(point.z)-abs(right_out.pose.position.z),2));
+                float right_distance = sqrt(pow(abs(point.x)-abs(left_out.pose.position.x),2)+pow(abs(point.y)- abs(left_out.pose.position.y),2)+pow(abs(point.z)-abs(left_out.pose.position.z),2));
+                float distance = std::min(left_distance,right_distance);
+                if(distance>0) {
                     if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
                         vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
                         if (lethals.find(vh) != lethals.end()) {
@@ -1262,14 +1290,16 @@ namespace mesh_map {
                                 result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
                             } else if (distance < softcap) {
                                 result += vertex_costs[vh];
+
                             }
                         }
                     } else if (distance < threshold) {
                         result = (result * distance / threshold) + (vertex_costs[vh] * (1 - (distance / threshold)));
+
                     }
+
                 }
             }
-
             float speed = 1 - (0.1 * (result));
             if(speed<0){
                 speed=0;

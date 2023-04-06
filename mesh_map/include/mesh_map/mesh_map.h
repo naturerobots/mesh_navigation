@@ -454,7 +454,7 @@ namespace mesh_map
         std::string mesh_layer;
 
 
-        float result=0;
+        float result;
         float min_roughness;
         float max_roughness;
         float min_height_diff;
