@@ -1307,7 +1307,9 @@ namespace mesh_map {
             //wilde normierungsaktion
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
-
+            std::fstream file("home/lukas/test/test.txt", std::ios::out | std::ios::app);
+            file << speed << std::endl;
+            file.close();
             ROS_INFO("The calculated speed suggestion in percent is %f" , (speed*100)  ,"%");
 
             speed_pub.publish(speed_msg);
