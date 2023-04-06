@@ -108,11 +108,13 @@ namespace mesh_map {
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
+        global_frame = "os_sensor";
         int rowstep = config.rowstep;
         int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,rowstep,calstep,-config.right_wheel,config.right_wheel,config.delta,config.min_x, config.max_z);
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,1,-0.5,0.5,0.3,1.0,0.5);
+        checkleathleObjectsbetweenWheels(pointBuffer);
         ofmg.setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
         mesh_msgs::MeshVertexColorsStamped color_msg;
@@ -125,6 +127,24 @@ namespace mesh_map {
         publishSpeedoverAllVertex();
 
     }
+
+    void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer){
+        lvr2::floatArr cloudPoints = cloudBuffer.getPointArray();
+        float threshold =config.threshouldSpeed;
+        for (int i = 0; i < cloudBuffer.numPoints() * 3; i += 3) {
+
+            if(cloudPoints[i+1]>= -config.left_wheel && cloudPoints[i+1]<= -config.right_wheel){
+                float distance = sqrt(pow(cloudPoints[i],2)+pow(abs(cloudPoints[i+1])-config.right_wheel,2));
+                if(cloudPoints[i+2]<=config.softcap){
+                    result=std::numeric_limits<float>::infinity();
+                }
+                else{
+                    result = (result * distance / threshold) + (10 * (1 - (distance / threshold)));
+                }
+                }
+            }
+        }
+
 
 
     bool MeshMap::readMap() {
@@ -484,13 +504,10 @@ namespace mesh_map {
                 const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
                 if (std::isnan(cost))
                     hasNaN = true;
-                if(layer.first!="height_diff" && mesh_ptr->getVertexPosition(vH).x<=100 && subscribe){
-                    vertex_costs[vH] += 0;
-
-                }else{                vertex_costs[vH] += factor * cost;
+                vertex_costs[vH] += factor * cost;
 
 
-                }
+
                 if (std::isfinite(cost)) {
                     combined_max = std::max(combined_max, vertex_costs[vH]);
                     combined_min = std::min(combined_min, vertex_costs[vH]);
@@ -1224,7 +1241,6 @@ namespace mesh_map {
         float softcap = config.softcap;
         float threshold = config.threshouldSpeed;
         float min=config.minDinstanceSpeed;
-        float result =0;
         if (vertex_costs.numValues() ==0){
             float speed = 0;
             std_msgs::Float64 speed_msg;

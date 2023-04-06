@@ -418,6 +418,7 @@ namespace mesh_map
         lvr2::DenseVertexMap<bool> invalid;
 
     private:
+        void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
         bool subscribe;
 
         ros::Subscriber cloud_sub_;
@@ -453,7 +454,7 @@ namespace mesh_map
         std::string mesh_layer;
 
 
-
+        float result=0;
         float min_roughness;
         float max_roughness;
         float min_height_diff;
