@@ -106,22 +106,17 @@ namespace mesh_map {
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
 
         }
-        std::fstream file("/home/lukas/test/speedtests/mesh_map/test4.txt",std::ios::app);
-        file << "cal =1, row =1, high, rough radius 0.02, infltion" << std::endl;
-        file.close();
-    }
+      }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        std::fstream file("/home/lukas/test/speedtests/mesh_map/test4.txt",std::ios::app);
-        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         result=0;
         global_frame = "os_sensor";
         int rowstep = config.rowstep;
         int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,1,-0.5,0.5,0.3,1.0,0.5);
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,2,-0.5,0.5,0.3,1.0,0.5);
         checkleathleObjectsbetweenWheels(pointBuffer);
         ofmg.setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
@@ -132,11 +127,7 @@ namespace mesh_map {
         *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
         this->readMap();
         this->vertex_colors_pub.publish(color_msg);
-        publishSpeedoverAllVertex();
-        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        file<<std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << std::endl;
-        file.close();
-    }
+        publishSpeedoverAllVertex();    }
 
     void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer){
         lvr2::floatArr cloudPoints = cloudBuffer.getPointArray();
