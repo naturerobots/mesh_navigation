@@ -116,7 +116,31 @@ namespace mesh_map {
         int calstep = config.calstep;
         lvr2::PointBuffer pointBuffer;
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,2,-0.5,0.5,0.3,1.0,0.5);
+
+
+        lvr2::BaseVector<float> left_wheel[8];
+        lvr2::BaseVector<float> right_wheel[8];
+        left_wheel[0]= lvr2::BaseVector<float>(10,0,-0.8);
+        left_wheel[1]= lvr2::BaseVector<float>(-0,0,-0.5);
+        left_wheel[2]= lvr2::BaseVector<float>(10,15,-0.8);
+        left_wheel[3]= lvr2::BaseVector<float>(-0,15,-0.5);
+
+        left_wheel[4]= lvr2::BaseVector<float>(10,0,-0.8);
+        left_wheel[5]= lvr2::BaseVector<float>(-0,0,-0.5);
+        left_wheel[6]= lvr2::BaseVector<float>(10,15,-0.8);
+        left_wheel[7]= lvr2::BaseVector<float>(-0,15,-0.5);
+
+        right_wheel[0]= lvr2::BaseVector<float>(-0,0,0.8);
+        right_wheel[1]= lvr2::BaseVector<float>(10,0,0.5);
+        right_wheel[2]= lvr2::BaseVector<float>(0,15,0.8);
+        right_wheel[3]= lvr2::BaseVector<float>(10,15,0.5);
+
+        right_wheel[4]= lvr2::BaseVector<float>(-0,0,0.8);
+        right_wheel[5]= lvr2::BaseVector<float>(10,0,0.5);
+        right_wheel[6]= lvr2::BaseVector<float>(0,15,0.8);
+        right_wheel[7]= lvr2::BaseVector<float>(10,15,0.5);
+
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,1, right_wheel, left_wheel);
         checkleathleObjectsbetweenWheels(pointBuffer);
         ofmg.setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
