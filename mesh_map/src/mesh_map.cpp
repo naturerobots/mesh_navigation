@@ -104,7 +104,6 @@ namespace mesh_map {
         if(this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
-
         }
       }
 
@@ -120,25 +119,24 @@ namespace mesh_map {
 
         lvr2::BaseVector<float> left_wheel[8];
         lvr2::BaseVector<float> right_wheel[8];
-        left_wheel[0]= lvr2::BaseVector<float>(10,0,-0.8);
-        left_wheel[1]= lvr2::BaseVector<float>(-0,0,-0.5);
-        left_wheel[2]= lvr2::BaseVector<float>(10,15,-0.8);
-        left_wheel[3]= lvr2::BaseVector<float>(-0,15,-0.5);
+        left_wheel[0]= lvr2::BaseVector<float>(10,-0.8,0);
+        left_wheel[1]= lvr2::BaseVector<float>(-0,-0.3,0);
+        left_wheel[2]= lvr2::BaseVector<float>(10,-0.8,-15);
+        left_wheel[3]= lvr2::BaseVector<float>(-0,-0.3,-15);
+        left_wheel[4]= lvr2::BaseVector<float>(10,-0.8,-0);
+        left_wheel[5]= lvr2::BaseVector<float>(-0,-0.3,-0);
+        left_wheel[6]= lvr2::BaseVector<float>(10,-0.8,-15);
+        left_wheel[7]= lvr2::BaseVector<float>(-0,-0.3,-15);
 
-        left_wheel[4]= lvr2::BaseVector<float>(10,0,-0.8);
-        left_wheel[5]= lvr2::BaseVector<float>(-0,0,-0.5);
-        left_wheel[6]= lvr2::BaseVector<float>(10,15,-0.8);
-        left_wheel[7]= lvr2::BaseVector<float>(-0,15,-0.5);
+        right_wheel[0]= lvr2::BaseVector<float>(-0,0.8,0);
+        right_wheel[1]= lvr2::BaseVector<float>(10,0.3,0);
+        right_wheel[2]= lvr2::BaseVector<float>(0,0.8,-15);
+        right_wheel[3]= lvr2::BaseVector<float>(10,0.3,-15);
 
-        right_wheel[0]= lvr2::BaseVector<float>(-0,0,0.8);
-        right_wheel[1]= lvr2::BaseVector<float>(10,0,0.5);
-        right_wheel[2]= lvr2::BaseVector<float>(0,15,0.8);
-        right_wheel[3]= lvr2::BaseVector<float>(10,15,0.5);
-
-        right_wheel[4]= lvr2::BaseVector<float>(-0,0,0.8);
-        right_wheel[5]= lvr2::BaseVector<float>(10,0,0.5);
-        right_wheel[6]= lvr2::BaseVector<float>(0,15,0.8);
-        right_wheel[7]= lvr2::BaseVector<float>(10,15,0.5);
+        right_wheel[4]= lvr2::BaseVector<float>(-0,0.8,0);
+        right_wheel[5]= lvr2::BaseVector<float>(10,0.5,0);
+        right_wheel[6]= lvr2::BaseVector<float>(0,0.8,-15);
+        right_wheel[7]= lvr2::BaseVector<float>(10,0.5,-15);
 
         OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,1,1, right_wheel, left_wheel);
         checkleathleObjectsbetweenWheels(pointBuffer);
