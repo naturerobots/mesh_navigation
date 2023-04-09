@@ -118,6 +118,7 @@ namespace mesh_map {
 
 
         lvr2::BaseVector<float> left_wheel[8];
+
         lvr2::BaseVector<float> right_wheel[8];
         left_wheel[0]= lvr2::BaseVector<float>(10,-0.8,0);
         left_wheel[1]= lvr2::BaseVector<float>(-0,-0.3,0);
