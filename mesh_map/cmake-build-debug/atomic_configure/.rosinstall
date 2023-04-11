@@ -1,2 +1,0 @@
-- setup-file:
-    local-name: /home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug/devel/setup.sh
