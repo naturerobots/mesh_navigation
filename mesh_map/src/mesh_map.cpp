@@ -107,11 +107,12 @@ namespace mesh_map {
             tf2_ros::Buffer buffer_;
             tf2_ros::TransformListener listener_(buffer_);
 
-
-
-            left_wheel =  lvr2::BaseVector<float> (0,0,-0.5);
-            right_wheel = lvr2::BaseVector<float> (0,0,0.5);
-            width_of_intresst =lvr2::BaseVector<float> (0,0,0.5);
+            geometry_msgs::TransformStamped base_footprint_to_os_sensor;
+            base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0), ros::Duration(1.0));
+            transform = lvr2::Quaternion<lvr2::BaseVector<float>>(base_footprint_to_os_sensor.transform.rotation.x,base_footprint_to_os_sensor.transform.rotation.y,base_footprint_to_os_sensor.transform.rotation.z,base_footprint_to_os_sensor.transform.rotation.w);
+            left_wheel =  transform*lvr2::BaseVector<float> (0,1,0)*-(config.left_wheel);
+            right_wheel = transform*lvr2::BaseVector<float> (0,1,0)*config.right_wheel;
+            width_of_intresst =lvr2::BaseVector<float> (0,0,0.3);
             depth_of_intresst =lvr2::BaseVector<float> (0,10,0);
             hight_of_intresst =lvr2::BaseVector<float> (0,0,0);
             length_of_intresst =lvr2::BaseVector<float> (20,0,0);
@@ -153,7 +154,9 @@ namespace mesh_map {
             std::ofstream out;
             out.open("/home/lukas/test/speedtests/mesh_map/t.txt", std::ios::app);
 
-            out <<right_wheel.x<<right_wheel.y<<right_wheel.z<< endl;
+            out <<base_footprint_to_os_sensor.transform.rotation.x<<" " << base_footprint_to_os_sensor.transform.rotation.y<<" "<< base_footprint_to_os_sensor.transform.rotation.z<<" " << base_footprint_to_os_sensor.transform.rotation.w<< endl;
+            out <<left_wheel.x<<" " << left_wheel.y<<" "<<left_wheel.z<< endl;
+
             out.close();
 
 
