@@ -60,8 +60,8 @@
 #include <lvr_ros/conversions.h>
 #include "std_msgs/Float64.h"
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
 #include <tf2_ros/transform_listener.h>
+#include <fstream>
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
@@ -104,36 +104,57 @@ namespace mesh_map {
         if(this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
+            tf2_ros::Buffer buffer_;
+            tf2_ros::TransformListener listener_(buffer_);
 
-            right_wheel =lvr2::BaseVector<float>(0,0.5,0);
-            left_wheel =lvr2::BaseVector<float>(0,-0.5,0);
 
-            left_polyeder_of_interest[0]= lvr2::BaseVector<float>(10,0,0.3);
-            left_polyeder_of_interest[1]= lvr2::BaseVector<float>(-0,10,0.8);
-            left_polyeder_of_interest[2]= lvr2::BaseVector<float>(10,0,0.3);
-            left_polyeder_of_interest[3]= lvr2::BaseVector<float>(-0,10,0.8);
-            left_polyeder_of_interest[4]= lvr2::BaseVector<float>(10,0,0.3);
-            left_polyeder_of_interest[5]= lvr2::BaseVector<float>(-0,10,0.8);
-            left_polyeder_of_interest[6]= lvr2::BaseVector<float>(10,0,0.3);
-            left_polyeder_of_interest[7]= lvr2::BaseVector<float>(-0,10,0.8);
 
-            right_polyeder_of_interest[0]= lvr2::BaseVector<float>(-0,10,-0.3);
-            right_polyeder_of_interest[1]= lvr2::BaseVector<float>(10,0,-0.8);
-            right_polyeder_of_interest[2]= lvr2::BaseVector<float>(0,10,-0.3);
-            right_polyeder_of_interest[3]= lvr2::BaseVector<float>(10,0,-0.8);
-            right_polyeder_of_interest[4]= lvr2::BaseVector<float>(-0,10,-0.3);
-            right_polyeder_of_interest[5]= lvr2::BaseVector<float>(10,0,-0.8);
-            right_polyeder_of_interest[6]= lvr2::BaseVector<float>(0,10,-0.3);
-            right_polyeder_of_interest[7]= lvr2::BaseVector<float>(10,0,-0.8);
+            left_wheel =  lvr2::BaseVector<float> (0,0,-0.5);
+            right_wheel = lvr2::BaseVector<float> (0,0,0.5);
+            width_of_intresst =lvr2::BaseVector<float> (0,0,0.5);
+            depth_of_intresst =lvr2::BaseVector<float> (0,10,0);
+            hight_of_intresst =lvr2::BaseVector<float> (0,0,0);
+            length_of_intresst =lvr2::BaseVector<float> (20,0,0);
 
-            roboter_polyeder[0]=lvr2::BaseVector<float>(0,70,100+ config.softcap);
-            roboter_polyeder[1]=lvr2::BaseVector<float>(0,70,100+ config.softcap);
-            roboter_polyeder[2]=lvr2::BaseVector<float>(0,-70,0);
-            roboter_polyeder[3]=lvr2::BaseVector<float>(0,-70,0);
-            roboter_polyeder[4]=lvr2::BaseVector<float>(config.threshouldSpeed,70,100+ config.softcap);
-            roboter_polyeder[5]=lvr2::BaseVector<float>(config.threshouldSpeed,70,100+ config.softcap);
-            roboter_polyeder[6]=lvr2::BaseVector<float>(config.threshouldSpeed,-70,0);
-            roboter_polyeder[7]=lvr2::BaseVector<float>(config.threshouldSpeed,-70,0);
+
+            area_of_interesst_left[0]=left_wheel+width_of_intresst+depth_of_intresst;
+            area_of_interesst_left[1]=left_wheel-width_of_intresst+depth_of_intresst;
+
+            area_of_interesst_left[2]=left_wheel+width_of_intresst+hight_of_intresst;
+            area_of_interesst_left[3]=left_wheel-width_of_intresst+hight_of_intresst;
+
+            area_of_interesst_left[4]=left_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_left[5]=left_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+
+            area_of_interesst_left[6]=left_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
+            area_of_interesst_left[7]=left_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+
+            area_of_interesst_right[0]=right_wheel+width_of_intresst+depth_of_intresst;
+            area_of_interesst_right[1]=right_wheel-width_of_intresst+depth_of_intresst;
+
+            area_of_interesst_right[2]=right_wheel+width_of_intresst+hight_of_intresst;
+            area_of_interesst_right[3]=right_wheel-width_of_intresst+hight_of_intresst;
+
+            area_of_interesst_right[4]=right_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_right[5]=right_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+
+            area_of_interesst_right[6]=right_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
+            area_of_interesst_right[7]=right_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+
+            roboter_polyeder[0]=right_wheel;
+            roboter_polyeder[1]=left_wheel;
+            roboter_polyeder[2]=right_wheel + lvr2::BaseVector<float>(0,15,0);
+            roboter_polyeder[3]=left_wheel + lvr2::BaseVector<float>(0,15,0);
+            roboter_polyeder[0]=right_wheel+lvr2::BaseVector<float>(config.threshouldSpeed,0,0);
+            roboter_polyeder[1]=left_wheel+lvr2::BaseVector<float>(config.threshouldSpeed,0,0);;
+            roboter_polyeder[2]=right_wheel + lvr2::BaseVector<float>(config.threshouldSpeed,15,0);
+            roboter_polyeder[3]=left_wheel + lvr2::BaseVector<float>(config.threshouldSpeed,15,0);
+
+            std::ofstream out;
+            out.open("/home/lukas/test/speedtests/mesh_map/t.txt", std::ios::app);
+
+            out <<right_wheel.x<<right_wheel.y<<right_wheel.z<< endl;
+            out.close();
 
 
         }
@@ -141,25 +162,36 @@ namespace mesh_map {
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        result=0;
-        global_frame = "os_sensor";
-        int step = config.step;
+        if(i%2==0) {
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            result = 0;
+            global_frame = "os_sensor";
+            int step = config.step;
 
-        lvr2::PointBuffer pointBuffer;
-        lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
+            lvr2::PointBuffer pointBuffer;
+            lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
 
-        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,step,left_polyeder_of_interest, right_polyeder_of_interest);
-        checkleathleObjectsbetweenWheels(pointBuffer);
-        ofmg.setEdgeThreshold(config.edgeThreshold);
-        lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
-        mesh_msgs::MeshVertexColorsStamped color_msg;
-        ofmg.getMesh(*mesh_buffer_ptr, color_msg);
-        mesh_msgs::MeshGeometry mesh_map;
-        lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
-        *mesh_ptr = lvr2::HalfEdgeMesh<lvr2::BaseVector<float>>(mesh_buffer_ptr);
-        this->readMap();
-        this->vertex_colors_pub.publish(color_msg);
-        publishSpeedoverAllVertex();
+            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,area_of_interesst_left,area_of_interesst_right);
+            checkleathleObjectsbetweenWheels(pointBuffer);
+            ofmg.setEdgeThreshold(config.edgeThreshold);
+            lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
+            mesh_msgs::MeshVertexColorsStamped color_msg;
+            ofmg.getMesh(*mesh_buffer_ptr, color_msg);
+            mesh_msgs::MeshGeometry mesh_map;
+            lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
+            *mesh_ptr = lvr2::HalfEdgeMesh < lvr2::BaseVector < float >> (mesh_buffer_ptr);
+            this->readMap();
+            this->vertex_colors_pub.publish(color_msg);
+            publishSpeedoverAllVertex();
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            std::ofstream out;
+            out.open("/home/lukas/test/speedtests/mesh_map/t.txt", std::ios::app);
+
+            out << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<std::endl;
+            out << (int) mesh_ptr->numVertices() << std::endl;
+            out.close();
+        }
+        i++;
     }
 
 
