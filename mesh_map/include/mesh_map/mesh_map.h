@@ -56,6 +56,7 @@
 #include "nanoflann_mesh_adaptor.h"
 #include <sensor_msgs/PointCloud2.h>
 #include <organized_fast_mesh_generator.h>
+#include <lvr2/geometry/Quaternion.hpp>
 
 namespace mesh_map
 {
@@ -542,6 +543,17 @@ namespace mesh_map
 
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
+
+        lvr2::BaseVector<float> left_wheel;
+        lvr2::BaseVector<float> right_wheel;
+        lvr2::BaseVector<float> width_of_intresst;
+        lvr2::BaseVector<float> depth_of_intresst;
+        lvr2::BaseVector<float> hight_of_intresst;
+        lvr2::BaseVector<float> length_of_intresst;
+        lvr2::BaseVector<float>* area_of_interesst_left;
+        lvr2::BaseVector<float>* area_of_interesst_right;
+
+        lvr2::Quaternion<lvr2::BaseVector<float>> transform;
 
 
     };

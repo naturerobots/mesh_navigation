@@ -62,6 +62,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include <tf2_ros/transform_listener.h>
+#include <lvr2/geometry/Quaternion.hpp>
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
@@ -104,6 +105,39 @@ namespace mesh_map {
         if(this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
+            //transform = lvr::Quaternion<lvr2::BaseVector<float>> (0.999, 0, 0, 0);
+            left_wheel = lvr2::BaseVector<float> (-0.5,0,0);
+            right_wheel = lvr2::BaseVector<float> (0.5,0,0);
+            width_of_intresst =lvr2::BaseVector<float> (0.3,0,0);
+            depth_of_intresst =lvr2::BaseVector<float> (0,0,-5);
+            hight_of_intresst =lvr2::BaseVector<float> (0,0,5);
+            length_of_intresst =lvr2::BaseVector<float> (-15,0,0);
+            area_of_interesst_left[0]=left_wheel+width_of_intresst+depth_of_intresst;
+            area_of_interesst_left[1]=left_wheel-width_of_intresst+depth_of_intresst;
+
+            area_of_interesst_left[2]=left_wheel+width_of_intresst+hight_of_intresst;
+            area_of_interesst_left[3]=left_wheel-width_of_intresst+hight_of_intresst;
+
+            area_of_interesst_left[4]=left_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_left[5]=left_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+
+            area_of_interesst_left[6]=left_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
+            area_of_interesst_left[7]=left_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+
+            area_of_interesst_right[0]=right_wheel+width_of_intresst+depth_of_intresst;
+            area_of_interesst_right[1]=right_wheel-width_of_intresst+depth_of_intresst;
+
+            area_of_interesst_right[2]=right_wheel+width_of_intresst+hight_of_intresst;
+            area_of_interesst_right[3]=right_wheel-width_of_intresst+hight_of_intresst;
+
+            area_of_interesst_right[4]=right_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_right[5]=right_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+
+            area_of_interesst_right[6]=right_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
+            area_of_interesst_right[7]=right_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+
+
+
         }
       }
 
@@ -117,26 +151,9 @@ namespace mesh_map {
         lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
 
 
-        lvr2::BaseVector<float> left_wheel[8];
-        lvr2::BaseVector<float> right_wheel[8];
-        left_wheel[0]= lvr2::BaseVector<float>(10,-0.8,0);
-        left_wheel[1]= lvr2::BaseVector<float>(-0,-0.3,0);
-        left_wheel[2]= lvr2::BaseVector<float>(10,-0.8,-15);
-        left_wheel[3]= lvr2::BaseVector<float>(-0,-0.3,-15);
-        left_wheel[4]= lvr2::BaseVector<float>(10,-0.8,-0);
-        left_wheel[5]= lvr2::BaseVector<float>(-0,-0.3,-0);
-        left_wheel[6]= lvr2::BaseVector<float>(10,-0.8,-15);
-        left_wheel[7]= lvr2::BaseVector<float>(-0,-0.3,-15);
-        right_wheel[0]= lvr2::BaseVector<float>(-0,0.8,0);
-        right_wheel[1]= lvr2::BaseVector<float>(10,0.3,0);
-        right_wheel[2]= lvr2::BaseVector<float>(0,0.8,-15);
-        right_wheel[3]= lvr2::BaseVector<float>(10,0.3,-15);
-        right_wheel[4]= lvr2::BaseVector<float>(-0,0.8,0);
-        right_wheel[5]= lvr2::BaseVector<float>(10,0.5,0);
-        right_wheel[6]= lvr2::BaseVector<float>(0,0.8,-15);
-        right_wheel[7]= lvr2::BaseVector<float>(10,0.5,-15);
 
-        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,step, right_wheel, left_wheel);
+
+        OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator (pointBuffer, cloud->height, cloud->width,step, area_of_interesst_right, area_of_interesst_left);
         checkleathleObjectsbetweenWheels(pointBuffer);
         ofmg.setEdgeThreshold(config.edgeThreshold);
         lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
