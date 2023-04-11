@@ -418,6 +418,8 @@ namespace mesh_map
         lvr2::DenseVertexMap<bool> invalid;
 
     private:
+        bool isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float>* vertices);
+
         void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
         bool subscribe;
 
@@ -542,6 +544,12 @@ namespace mesh_map
 
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
+
+        lvr2::BaseVector<float> right_polyeder_of_interest[8];
+        lvr2::BaseVector<float> left_polyeder_of_interest[8];
+        lvr2::BaseVector<float> left_wheel;
+        lvr2::BaseVector<float> right_wheel;
+        lvr2::BaseVector<float> roboter_polyeder[8];
 
 
     };
