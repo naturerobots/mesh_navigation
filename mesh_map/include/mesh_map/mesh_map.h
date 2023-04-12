@@ -545,6 +545,8 @@ namespace mesh_map
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
         lvr2::Quaternion<lvr2::BaseVector<float>> transform;
+        lvr2::Quaternion<lvr2::BaseVector<float>> transform_to_base;
+
         lvr2::BaseVector<float> left_wheel;
         lvr2::BaseVector<float> right_wheel;
         lvr2::BaseVector<float> width_of_intresst;
@@ -554,6 +556,7 @@ namespace mesh_map
         lvr2::BaseVector<float> area_of_interesst_left[8];
         lvr2::BaseVector<float> area_of_interesst_right[8];
         lvr2::BaseVector<float> roboter_polyeder[8];
+        float  penalty;
         int i=0;
 
     };
