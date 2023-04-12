@@ -110,12 +110,12 @@ namespace mesh_map {
             geometry_msgs::TransformStamped base_footprint_to_os_sensor;
             base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0), ros::Duration(1.0));
             transform = lvr2::Quaternion<lvr2::BaseVector<float>>(base_footprint_to_os_sensor.transform.rotation.x,base_footprint_to_os_sensor.transform.rotation.y,base_footprint_to_os_sensor.transform.rotation.z,base_footprint_to_os_sensor.transform.rotation.w);
-            left_wheel =  transform*lvr2::BaseVector<float> (0,1,0)*-(config.left_wheel);
-            right_wheel = transform*lvr2::BaseVector<float> (0,1,0)*config.right_wheel;
-            width_of_intresst =lvr2::BaseVector<float> (0,0,0.3);
-            depth_of_intresst =lvr2::BaseVector<float> (0,10,0);
-            hight_of_intresst =lvr2::BaseVector<float> (0,0,0);
-            length_of_intresst =lvr2::BaseVector<float> (20,0,0);
+            left_wheel =  transform*lvr2::BaseVector<float> (0,1,0)*-(config.left_wheel)+(transform*lvr2::BaseVector<float> (1,0,0)*(0.4));
+            right_wheel = transform*lvr2::BaseVector<float> (0,1,0)*config.right_wheel+(transform*lvr2::BaseVector<float> (1,0,0)*(0.4));
+            width_of_intresst =transform*lvr2::BaseVector<float> (0,1,0)*config.delta;
+            depth_of_intresst =transform*lvr2::BaseVector<float> (0,0,1)*-30;
+            hight_of_intresst =transform*lvr2::BaseVector<float> (0,0,1)*config.max_z;
+            length_of_intresst =transform*lvr2::BaseVector<float> (1,0,0)*15;
 
 
             area_of_interesst_left[0]=left_wheel+width_of_intresst+depth_of_intresst;
@@ -142,19 +142,26 @@ namespace mesh_map {
             area_of_interesst_right[6]=right_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
             area_of_interesst_right[7]=right_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
 
-            roboter_polyeder[0]=right_wheel;
-            roboter_polyeder[1]=left_wheel;
-            roboter_polyeder[2]=right_wheel + lvr2::BaseVector<float>(0,15,0);
-            roboter_polyeder[3]=left_wheel + lvr2::BaseVector<float>(0,15,0);
-            roboter_polyeder[0]=right_wheel+lvr2::BaseVector<float>(config.threshouldSpeed,0,0);
-            roboter_polyeder[1]=left_wheel+lvr2::BaseVector<float>(config.threshouldSpeed,0,0);;
-            roboter_polyeder[2]=right_wheel + lvr2::BaseVector<float>(config.threshouldSpeed,15,0);
-            roboter_polyeder[3]=left_wheel + lvr2::BaseVector<float>(config.threshouldSpeed,15,0);
+
+           lvr2::BaseVector<float> roboter_hight = transform*lvr2::BaseVector<float> (0,0,1)*(config.roboter_hight);
+           lvr2::BaseVector<float> roboter_right_wheelbase = transform*lvr2::BaseVector<float> (0,1,0)*(config.roboter_wheelbase/2)+(transform*lvr2::BaseVector<float> (1,0,0)*(config.min_x));
+           lvr2::BaseVector<float> roboter_left_wheelbase = transform*lvr2::BaseVector<float> (0,1,0)*-(config.roboter_wheelbase/2)+(transform*lvr2::BaseVector<float> (1,0,0)*(config.min_x));
+           lvr2::BaseVector<float> roboter_ground_clearance =transform*lvr2::BaseVector<float> (0,0,1)*(config.roboter_ground_clearance);
+
+
+            roboter_polyeder[0]=roboter_right_wheelbase+roboter_ground_clearance;
+            roboter_polyeder[1]=roboter_left_wheelbase+roboter_ground_clearance;
+            roboter_polyeder[2]=roboter_right_wheelbase + roboter_hight;
+            roboter_polyeder[3]=roboter_left_wheelbase + roboter_hight;
+            roboter_polyeder[0]=roboter_right_wheelbase+length_of_intresst+roboter_ground_clearance;
+            roboter_polyeder[1]=roboter_left_wheelbase+length_of_intresst+roboter_ground_clearance;
+            roboter_polyeder[2]=roboter_right_wheelbase + length_of_intresst+ roboter_hight;
+            roboter_polyeder[3]=roboter_left_wheelbase + length_of_intresst+ roboter_hight;
 
             std::ofstream out;
-            out.open("/home/lukas/test/speedtests/mesh_map/t.txt", std::ios::app);
+            out.open("/home/lukas/test/speedtests/mesh_map/45_grad_y/min1_scan1.txt", std::ios::app);
 
-            out <<base_footprint_to_os_sensor.transform.rotation.x<<" " << base_footprint_to_os_sensor.transform.rotation.y<<" "<< base_footprint_to_os_sensor.transform.rotation.z<<" " << base_footprint_to_os_sensor.transform.rotation.w<< endl;
+
             out <<left_wheel.x<<" " << left_wheel.y<<" "<<left_wheel.z<< endl;
 
             out.close();
