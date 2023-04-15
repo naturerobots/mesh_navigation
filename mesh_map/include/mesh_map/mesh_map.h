@@ -558,6 +558,7 @@ namespace mesh_map
         lvr2::BaseVector<float> roboter_polyeder[8];
         float  penalty;
         int i=0;
+        float speed =0;
 
     };
 
