@@ -560,6 +560,9 @@ namespace mesh_map
         int i=0;
         float speed =0;
 
+        lvr2::Matrix4< lvr2::BaseVector<float>> matrixTransform;
+        float divider =0;
+
     };
 
 } /* namespace mesh_map */

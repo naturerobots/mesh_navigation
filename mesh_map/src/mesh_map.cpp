@@ -62,6 +62,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_listener.h>
 #include <fstream>
+#include <lvr2/geometry/Matrix4.hpp>
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
@@ -111,17 +112,16 @@ namespace mesh_map {
             geometry_msgs::TransformStamped os_sensor_to_base_footprintos_sensor;
             base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0), ros::Duration(1.0));
             os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0), ros::Duration(1.0));
-
+            //#TODO outsource in function
             transform = lvr2::Quaternion<lvr2::BaseVector<float>>(base_footprint_to_os_sensor.transform.rotation.x,base_footprint_to_os_sensor.transform.rotation.y,base_footprint_to_os_sensor.transform.rotation.z,base_footprint_to_os_sensor.transform.rotation.w);
             transform_to_base = lvr2::Quaternion<lvr2::BaseVector<float>>(os_sensor_to_base_footprintos_sensor.transform.rotation.x,os_sensor_to_base_footprintos_sensor.transform.rotation.y,os_sensor_to_base_footprintos_sensor.transform.rotation.z,os_sensor_to_base_footprintos_sensor.transform.rotation.w);
 
             left_wheel =  lvr2::BaseVector<float> (0,1,0)*-(config.left_wheel)+(lvr2::BaseVector<float> (1,0,0)*(config.min_x));
             right_wheel = lvr2::BaseVector<float> (0,1,0)*config.right_wheel+(lvr2::BaseVector<float> (1,0,0)*(config.min_x));
-            width_of_intresst =lvr2::BaseVector<float> (0,1,0)*0.4;
+            width_of_intresst =lvr2::BaseVector<float> (0,1,0)*0.3;
             depth_of_intresst =lvr2::BaseVector<float> (0,0,1)*-30;
             hight_of_intresst =lvr2::BaseVector<float> (0,0,1)*config.max_z;
             length_of_intresst =lvr2::BaseVector<float> (1,0,0)*20;
-
 
             area_of_interesst_left[0]=left_wheel+width_of_intresst+depth_of_intresst;
             area_of_interesst_left[1]=left_wheel-width_of_intresst+depth_of_intresst;
@@ -146,40 +146,53 @@ namespace mesh_map {
 
             area_of_interesst_right[6]=right_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
             area_of_interesst_right[7]=right_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+            lvr2::Matrix4< lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
+            to_os_sensor[3]= base_footprint_to_os_sensor.transform.translation.x;
+            to_os_sensor[7]= base_footprint_to_os_sensor.transform.translation.y;
+            to_os_sensor[11]= base_footprint_to_os_sensor.transform.translation.z;
 
+            lvr2::BaseVector<float> roboter_hight =  lvr2::BaseVector<float> (0,0,config.roboter_hight);
+           lvr2::BaseVector<float> roboter_right_wheelbase =   lvr2::BaseVector<float> (0,0,config.roboter_wheelbase/2);
+            lvr2::BaseVector<float> roboter_left_wheelbase =   lvr2::BaseVector<float> (0,0,(config.roboter_wheelbase/2)*-1);
+           lvr2::BaseVector<float> roboter_ground_clearance =lvr2::BaseVector<float> (0,0,config.roboter_ground_clearance);
+            lvr2::BaseVector<float> softcap =lvr2::BaseVector<float> (0,0,config.softcap);
 
-           lvr2::BaseVector<float> roboter_hight = transform*lvr2::BaseVector<float> (0,0,1)*(config.roboter_hight);
-           lvr2::BaseVector<float> roboter_right_wheelbase = transform*lvr2::BaseVector<float> (0,1,0)*(config.roboter_wheelbase/2)+transform*(lvr2::BaseVector<float> (1,0,0)*(config.softcap));
-           lvr2::BaseVector<float> roboter_left_wheelbase = transform*lvr2::BaseVector<float> (0,1,0)*-(config.roboter_wheelbase/2)+transform*(lvr2::BaseVector<float> (1,0,0)*(config.softcap));
-           lvr2::BaseVector<float> roboter_ground_clearance =transform*lvr2::BaseVector<float> (0,0,1)*(config.roboter_ground_clearance);
-
-
-            roboter_polyeder[0]=roboter_right_wheelbase+roboter_ground_clearance;
-            roboter_polyeder[1]=roboter_left_wheelbase+roboter_ground_clearance;
-            roboter_polyeder[2]=roboter_right_wheelbase + roboter_hight;
-            roboter_polyeder[3]=roboter_left_wheelbase + roboter_hight;
-            roboter_polyeder[4]=roboter_right_wheelbase+length_of_intresst+roboter_ground_clearance;
-            roboter_polyeder[5]=roboter_left_wheelbase+length_of_intresst+roboter_ground_clearance;
-            roboter_polyeder[6]=roboter_right_wheelbase + length_of_intresst+ roboter_hight;
-            roboter_polyeder[7]=roboter_left_wheelbase + length_of_intresst+ roboter_hight;
-
+            roboter_polyeder[0]=lvr2::BaseVector<float>(0.7,0.6,0.6);
+            roboter_polyeder[1]=lvr2::BaseVector<float>(0.7,-0.6,0.6);
+            roboter_polyeder[2]=lvr2::BaseVector<float>(0.7,-0.6,1.4);
+            roboter_polyeder[3]=lvr2::BaseVector<float>(0.7,0.6,1.4);
+            roboter_polyeder[4]=lvr2::BaseVector<float>(10,0.6,0.6);
+            roboter_polyeder[5]=lvr2::BaseVector<float>(10,-0.6,0.6);
+            roboter_polyeder[6]=lvr2::BaseVector<float>(10,-0.6,1.4);
+            roboter_polyeder[7]=lvr2::BaseVector<float>(10,0.6,1.4);
+            //Matrix to baselink
+            matrixTransform = transform_to_base.getMatrix();
+            matrixTransform[3]= os_sensor_to_base_footprintos_sensor.transform.translation.x;
+            matrixTransform[7]= os_sensor_to_base_footprintos_sensor.transform.translation.y;
+            matrixTransform[11]= os_sensor_to_base_footprintos_sensor.transform.translation.z;
 
             penalty =config.penalty;
+            this->global_frame="base_footprint";
 
-            global_frame = "base_footprint";
         }
       }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int step = 2;
-
-        if(i%10==0) {
+        int step =1;
+        divider =0;
+        if(i%5==0) {
             result =0;
+            std::ofstream out;
+            out.open("/home/lukas/newtest/speedpub/time.txt", std::ios::app);
 
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             lvr2::PointBuffer pointBuffer;
             lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,area_of_interesst_right,area_of_interesst_left);
+            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,area_of_interesst_left,area_of_interesst_right,matrixTransform);
+
+
+
             checkleathleObjectsbetweenWheels(pointBuffer);
             ofmg.setEdgeThreshold(config.edgeThreshold);
             lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
@@ -192,7 +205,8 @@ namespace mesh_map {
             this->readMap();
             this->vertex_colors_pub.publish(color_msg);
             publishSpeedoverAllVertex();
-
+            out << cloud->header.stamp<< std::endl;
+            out.close();
 
         }
         i++;
@@ -204,22 +218,26 @@ namespace mesh_map {
 
 
 
-
+        float soft=config.softcap;
         lvr2::floatArr cloudPoints = cloudBuffer.getPointArray();
         float threshold =config.threshouldSpeed;
         for (int i = 0; i < cloudBuffer.numPoints() * 3; i += 3) {
             if (cloudPoints[i] !=0  || cloudPoints[i + 1] != 0 ||  cloudPoints[i + 2] != 0) {
-            lvr2::BaseVector<float> p = lvr2::BaseVector<float>(cloudPoints[i], cloudPoints[i + 1], cloudPoints[i + 2]);
+                lvr2::BaseVector<float> p(cloudPoints[i]*matrixTransform[0]+ cloudPoints[i + 1]*matrixTransform[1]+cloudPoints[i + 2]*matrixTransform[2]+matrixTransform[3],cloudPoints[i]*matrixTransform[4]+ cloudPoints[i + 1]*matrixTransform[5]+cloudPoints[i + 2]*matrixTransform[6]+matrixTransform[7],cloudPoints[i]*matrixTransform[8]+ cloudPoints[i + 1]*matrixTransform[9]+cloudPoints[i + 2]*matrixTransform[10]+matrixTransform[11] ); // point at (x,y)
                 if (isInsideBox(p, roboter_polyeder)) {
 
-                if (p.x < 1.5) {
+                if (p.x < 40) {
                     result =std::numeric_limits<float>::infinity();
+                    divider +=1;
+
                 } else if (p.x < config.threshouldSpeed) {
-                    result = (result * p.x / threshold) + (penalty * (1 - (p.x / threshold)));
+                    result = (result * p.x / threshold);
+                    divider +=(penalty * (1 - (p.x / threshold)));
                 }
             }
         }
             }
+
     }
 
 
@@ -1342,11 +1360,11 @@ namespace mesh_map {
 
     void MeshMap::publishSpeedoverAllVertex(){
         std::ofstream out;
-        out.open("/home/lukas/test/speed/scan2_dop.txt", std::ios::app);
+        out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
         float softcap = config.softcap;
         float threshold = config.threshouldSpeed;
         float min=config.minDinstanceSpeed;
-        float multi = config.wight_of_vertex;
+        float multi = 1;
         float neuspeed =0;
         if (vertex_costs.numValues() ==0){
             speed=0;
@@ -1357,46 +1375,46 @@ namespace mesh_map {
         }
         else {
             speed=0;
+            float divider =0;
             if(result ==std::numeric_limits<float>::infinity() || result == -std::numeric_limits<float>::infinity()){
                 ROS_INFO("The calculated speed suggestion in percent is 0% because of an object in front of the roboter");
             }
 
             for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
                 lvr2::VertexHandle vh(i);
-                lvr2::BaseVector<float> point =mesh_ptr->getVertexPosition(vh);
+                lvr2::BaseVector<float> point = mesh_ptr->getVertexPosition(vh);
 
 
                 float distance = point.x;
-                if(distance>0) {
+                if (distance > min) {
                     if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
                         vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
                         if (lethals.find(vh) != lethals.end()) {
                             if (distance >= softcap && distance < threshold) {
-                                result = (result * distance / threshold) + (penalty * (1 - (distance / threshold)));
+                                result = penalty * (1 - (distance / threshold));
+                                divider = (1 - (distance / threshold));
                             } else if (distance < softcap) {
                                 result += vertex_costs[vh];
-
+                                divider = 1;
                             }
                         }
                     } else if (distance < threshold) {
-                        result = (result * distance / threshold) + (vertex_costs[vh] * (1 - (distance / threshold)));
-
+                        result = vertex_costs[vh] * (1 - (distance / threshold));
+                        divider = (1 - (distance / threshold));
                     }
 
                 }
             }
-            neuspeed = 1 - (4 * (result));
-            if(speed ==0){
+
+            result /=divider;
+
+            neuspeed = 1 - (multi * (result));
+            if(neuspeed <0) {
+                speed = 0;
+            }else if(speed ==0){
                 speed = neuspeed;
             } else {
                 speed = (speed + neuspeed)/2;
-            }
-            if (speed>1){
-                speed=1;
-            }
-
-            if(speed<0){
-                speed=0;
             }
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
