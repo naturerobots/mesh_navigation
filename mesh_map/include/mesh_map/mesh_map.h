@@ -421,6 +421,7 @@ namespace mesh_map
         bool isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float>* vertices);
 
         void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
+
         bool subscribe;
 
         ros::Subscriber cloud_sub_;
@@ -556,6 +557,8 @@ namespace mesh_map
         lvr2::BaseVector<float> area_of_interesst_left[8];
         lvr2::BaseVector<float> area_of_interesst_right[8];
         lvr2::BaseVector<float> roboter_polyeder[8];
+        std::vector<float> last_speed;
+        int last_add =0;
         float  penalty;
         int i=0;
         float speed =0;

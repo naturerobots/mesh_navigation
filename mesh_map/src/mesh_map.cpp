@@ -185,14 +185,9 @@ namespace mesh_map {
             result =0;
             std::ofstream out;
             out.open("/home/lukas/newtest/speedpub/time.txt", std::ios::app);
-
-            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             lvr2::PointBuffer pointBuffer;
             lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
             OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,area_of_interesst_left,area_of_interesst_right,matrixTransform);
-
-
-
             checkleathleObjectsbetweenWheels(pointBuffer);
             ofmg.setEdgeThreshold(config.edgeThreshold);
             lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
@@ -205,7 +200,7 @@ namespace mesh_map {
             this->readMap();
             this->vertex_colors_pub.publish(color_msg);
             publishSpeedoverAllVertex();
-            out << cloud->header.stamp<< std::endl;
+            out << cloud->header.stamp <<std::endl;
             out.close();
 
         }
@@ -1359,13 +1354,15 @@ namespace mesh_map {
 
 
     void MeshMap::publishSpeedoverAllVertex(){
-        std::ofstream out;
-        out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
         float softcap = config.softcap;
         float threshold = config.threshouldSpeed;
         float min=config.minDinstanceSpeed;
-        float multi = 1;
+        float multi = 2;
         float neuspeed =0;
+        std::ofstream out;
+        out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
+
+
         if (vertex_costs.numValues() ==0){
             speed=0;
             std_msgs::Float64 speed_msg;
@@ -1409,26 +1406,41 @@ namespace mesh_map {
             result /=divider;
 
             neuspeed = 1 - (multi * (result));
-            if(neuspeed <0) {
-                speed = 0;
-            }else if(speed ==0){
-                speed = neuspeed;
-            } else {
-                speed = (speed + neuspeed)/2;
-            }
+            speed=neuspeed;
             std_msgs::Float64 speed_msg;
             speed_msg.data = speed;
             ROS_INFO("The calculated speed suggestion in percent is %f" , (speed*100)  ,"%");
             speed_pub.publish(speed_msg);
 
-
         }
 
-        out << speed <<std::endl;
+        if(last_speed.size()>9){
+            last_speed[last_add]=speed;
+            last_add++;
 
-        out.close();
+        }else{
+            last_speed.push_back(speed);
+            last_add++;
+        }
+        if ( last_add==10){
+            last_add=0;
+        }
+
+        if(speed == -std::numeric_limits<float>::infinity() || isnan(speed)){
+            speed =0;
+        }
+        if(speed!=0){
+            std::vector<float> order = last_speed;
+            std::sort (order.begin(), order.end());
+            if(order.size()%2==0){
+                speed = (order[order.size()/2]+order[(order.size()/2)-1])/2;
+            }else{
+                speed = order[order.size()/2];
+            }
 
 
+        }
+        out<<speed<<std::endl;
 
 
     }
