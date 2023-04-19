@@ -421,7 +421,7 @@ namespace mesh_map
         bool isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float>* vertices);
 
         void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
-
+        void median_filter_for_speed();
         bool subscribe;
 
         ros::Subscriber cloud_sub_;

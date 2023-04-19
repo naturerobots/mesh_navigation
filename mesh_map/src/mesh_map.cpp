@@ -1413,7 +1413,16 @@ namespace mesh_map {
             speed_pub.publish(speed_msg);
 
         }
+        median_filter_for_speed();
 
+        out<<speed<<std::endl;
+
+
+    }
+    bool MeshMap::getsubscribe() {
+        return this->subscribe;
+    }
+    void MeshMap::median_filter_for_speed() {
         if(last_speed.size()>9){
             last_speed[last_add]=speed;
             last_add++;
@@ -1437,15 +1446,9 @@ namespace mesh_map {
             }else{
                 speed = order[order.size()/2];
             }
-
-
         }
-        out<<speed<<std::endl;
 
 
-    }
-    bool MeshMap::getsubscribe() {
-        return this->subscribe;
     }
 
 
