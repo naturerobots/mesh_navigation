@@ -57,17 +57,17 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <organized_fast_mesh.h>
-#include <lvr_ros/conversions.h>
 #include "std_msgs/Float64.h"
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_listener.h>
 #include <fstream>
 #include <lvr2/geometry/Matrix4.hpp>
+
 namespace mesh_map {
     using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
             lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
 
-    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener,bool subscribe)
+    MeshMap::MeshMap(tf2_ros::Buffer &tf_listener, bool subscribe)
             : tf_buffer(tf_buffer), private_nh("~/mesh_map/"), first_config(true), map_loaded(false),
               layer_loader("mesh_map", "mesh_map::AbstractLayer"), mesh_ptr(new lvr2::HalfEdgeMesh<Vector>()) {
         private_nh.param<std::string>("server_url", srv_url, "");
@@ -97,12 +97,12 @@ namespace mesh_map {
         vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
         vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>("vertex_colors", 1, true);
         vector_field_pub = private_nh.advertise<visualization_msgs::Marker>("vector_field", 1, true);
-        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
+        reconfigure_server_ptr = boost::shared_ptr < dynamic_reconfigure::Server < mesh_map::MeshMapConfig >> (
                 new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
         config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);
-        this->subscribe=subscribe;
-        if(this->subscribe) {
+        this->subscribe = subscribe;
+        if (this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
             tf2_ros::Buffer buffer_;
@@ -110,84 +110,98 @@ namespace mesh_map {
 
             geometry_msgs::TransformStamped base_footprint_to_os_sensor;
             geometry_msgs::TransformStamped os_sensor_to_base_footprintos_sensor;
-            base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0), ros::Duration(1.0));
-            os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0), ros::Duration(1.0));
+            base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0),
+                                                                  ros::Duration(1.0));
+            os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0),
+                                                                           ros::Duration(1.0));
             //#TODO outsource in function
-            transform = lvr2::Quaternion<lvr2::BaseVector<float>>(base_footprint_to_os_sensor.transform.rotation.x,base_footprint_to_os_sensor.transform.rotation.y,base_footprint_to_os_sensor.transform.rotation.z,base_footprint_to_os_sensor.transform.rotation.w);
-            transform_to_base = lvr2::Quaternion<lvr2::BaseVector<float>>(os_sensor_to_base_footprintos_sensor.transform.rotation.x,os_sensor_to_base_footprintos_sensor.transform.rotation.y,os_sensor_to_base_footprintos_sensor.transform.rotation.z,os_sensor_to_base_footprintos_sensor.transform.rotation.w);
+            transform = lvr2::Quaternion < lvr2::BaseVector < float
+                    >> (base_footprint_to_os_sensor.transform.rotation.x, base_footprint_to_os_sensor.transform.rotation.y, base_footprint_to_os_sensor.transform.rotation.z, base_footprint_to_os_sensor.transform.rotation.w);
+            transform_to_base = lvr2::Quaternion < lvr2::BaseVector < float
+                    >> (os_sensor_to_base_footprintos_sensor.transform.rotation.x, os_sensor_to_base_footprintos_sensor.transform.rotation.y, os_sensor_to_base_footprintos_sensor.transform.rotation.z, os_sensor_to_base_footprintos_sensor.transform.rotation.w);
 
-            left_wheel =  lvr2::BaseVector<float> (0,1,0)*-(config.left_wheel)+(lvr2::BaseVector<float> (1,0,0)*(config.min_x));
-            right_wheel = lvr2::BaseVector<float> (0,1,0)*config.right_wheel+(lvr2::BaseVector<float> (1,0,0)*(config.min_x));
-            width_of_intresst =lvr2::BaseVector<float> (0,1,0)*0.3;
-            depth_of_intresst =lvr2::BaseVector<float> (0,0,1)*-30;
-            hight_of_intresst =lvr2::BaseVector<float> (0,0,1)*config.max_z;
-            length_of_intresst =lvr2::BaseVector<float> (1,0,0)*20;
+            left_wheel = lvr2::BaseVector<float>(0, 1, 0) * -(config.left_wheel) +
+                         (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
+            right_wheel = lvr2::BaseVector<float>(0, 1, 0) * config.right_wheel +
+                          (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
+            width_of_intresst = lvr2::BaseVector<float>(0, 1, 0) * 0.3;
+            depth_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * -30;
+            hight_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * config.max_z;
+            length_of_intresst = lvr2::BaseVector<float>(1, 0, 0) * 20;
 
-            area_of_interesst_left[0]=left_wheel+width_of_intresst+depth_of_intresst;
-            area_of_interesst_left[1]=left_wheel-width_of_intresst+depth_of_intresst;
+            area_of_interesst_left[0] = left_wheel + width_of_intresst + depth_of_intresst;
+            area_of_interesst_left[1] = left_wheel - width_of_intresst + depth_of_intresst;
 
-            area_of_interesst_left[2]=left_wheel+width_of_intresst+hight_of_intresst;
-            area_of_interesst_left[3]=left_wheel-width_of_intresst+hight_of_intresst;
+            area_of_interesst_left[2] = left_wheel + width_of_intresst + hight_of_intresst;
+            area_of_interesst_left[3] = left_wheel - width_of_intresst + hight_of_intresst;
 
-            area_of_interesst_left[4]=left_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
-            area_of_interesst_left[5]=left_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_left[4] = left_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
+            area_of_interesst_left[5] = left_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
 
-            area_of_interesst_left[6]=left_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
-            area_of_interesst_left[7]=left_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
+            area_of_interesst_left[6] = left_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
+            area_of_interesst_left[7] = left_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
 
-            area_of_interesst_right[0]=right_wheel+width_of_intresst+depth_of_intresst;
-            area_of_interesst_right[1]=right_wheel-width_of_intresst+depth_of_intresst;
+            area_of_interesst_right[0] = right_wheel + width_of_intresst + depth_of_intresst;
+            area_of_interesst_right[1] = right_wheel - width_of_intresst + depth_of_intresst;
 
-            area_of_interesst_right[2]=right_wheel+width_of_intresst+hight_of_intresst;
-            area_of_interesst_right[3]=right_wheel-width_of_intresst+hight_of_intresst;
+            area_of_interesst_right[2] = right_wheel + width_of_intresst + hight_of_intresst;
+            area_of_interesst_right[3] = right_wheel - width_of_intresst + hight_of_intresst;
 
-            area_of_interesst_right[4]=right_wheel+width_of_intresst+depth_of_intresst+length_of_intresst;
-            area_of_interesst_right[5]=right_wheel-width_of_intresst+depth_of_intresst+length_of_intresst;
+            area_of_interesst_right[4] = right_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
+            area_of_interesst_right[5] = right_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
 
-            area_of_interesst_right[6]=right_wheel+width_of_intresst+hight_of_intresst+length_of_intresst;
-            area_of_interesst_right[7]=right_wheel-width_of_intresst+hight_of_intresst+length_of_intresst;
-            lvr2::Matrix4< lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
-            to_os_sensor[3]= base_footprint_to_os_sensor.transform.translation.x;
-            to_os_sensor[7]= base_footprint_to_os_sensor.transform.translation.y;
-            to_os_sensor[11]= base_footprint_to_os_sensor.transform.translation.z;
+            area_of_interesst_right[6] = right_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
+            area_of_interesst_right[7] = right_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
+            lvr2::Matrix4 <lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
+            to_os_sensor[3] = base_footprint_to_os_sensor.transform.translation.x;
+            to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
+            to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
 
-            lvr2::BaseVector<float> roboter_hight =  lvr2::BaseVector<float> (0,0,config.roboter_hight);
-           lvr2::BaseVector<float> roboter_right_wheelbase =   lvr2::BaseVector<float> (0,0,config.roboter_wheelbase/2);
-            lvr2::BaseVector<float> roboter_left_wheelbase =   lvr2::BaseVector<float> (0,0,(config.roboter_wheelbase/2)*-1);
-           lvr2::BaseVector<float> roboter_ground_clearance =lvr2::BaseVector<float> (0,0,config.roboter_ground_clearance);
-            lvr2::BaseVector<float> softcap =lvr2::BaseVector<float> (0,0,config.softcap);
+            lvr2::BaseVector<float> roboter_hight = lvr2::BaseVector<float>(0, 0, config.roboter_hight);
+            lvr2::BaseVector<float> roboter_right_wheelbase = lvr2::BaseVector<float>(0, 0,
+                                                                                      config.roboter_wheelbase / 2);
+            lvr2::BaseVector<float> roboter_left_wheelbase = lvr2::BaseVector<float>(0, 0,
+                                                                                     (config.roboter_wheelbase / 2) *
+                                                                                     -1);
+            lvr2::BaseVector<float> roboter_ground_clearance = lvr2::BaseVector<float>(0, 0,
+                                                                                       config.roboter_ground_clearance);
+            lvr2::BaseVector<float> softcap = lvr2::BaseVector<float>(0, 0, config.softcap);
 
-            roboter_polyeder[0]=lvr2::BaseVector<float>(0.7,0.6,0.6);
-            roboter_polyeder[1]=lvr2::BaseVector<float>(0.7,-0.6,0.6);
-            roboter_polyeder[2]=lvr2::BaseVector<float>(0.7,-0.6,1.4);
-            roboter_polyeder[3]=lvr2::BaseVector<float>(0.7,0.6,1.4);
-            roboter_polyeder[4]=lvr2::BaseVector<float>(10,0.6,0.6);
-            roboter_polyeder[5]=lvr2::BaseVector<float>(10,-0.6,0.6);
-            roboter_polyeder[6]=lvr2::BaseVector<float>(10,-0.6,1.4);
-            roboter_polyeder[7]=lvr2::BaseVector<float>(10,0.6,1.4);
+            roboter_polyeder[0] = lvr2::BaseVector<float>(0.7, 0.6, 0.6);
+            roboter_polyeder[1] = lvr2::BaseVector<float>(0.7, -0.6, 0.6);
+            roboter_polyeder[2] = lvr2::BaseVector<float>(0.7, -0.6, 1.4);
+            roboter_polyeder[3] = lvr2::BaseVector<float>(0.7, 0.6, 1.4);
+            roboter_polyeder[4] = lvr2::BaseVector<float>(10, 0.6, 0.6);
+            roboter_polyeder[5] = lvr2::BaseVector<float>(10, -0.6, 0.6);
+            roboter_polyeder[6] = lvr2::BaseVector<float>(10, -0.6, 1.4);
+            roboter_polyeder[7] = lvr2::BaseVector<float>(10, 0.6, 1.4);
             //Matrix to baselink
             matrixTransform = transform_to_base.getMatrix();
-            matrixTransform[3]= os_sensor_to_base_footprintos_sensor.transform.translation.x;
-            matrixTransform[7]= os_sensor_to_base_footprintos_sensor.transform.translation.y;
-            matrixTransform[11]= os_sensor_to_base_footprintos_sensor.transform.translation.z;
+            matrixTransform[3] = os_sensor_to_base_footprintos_sensor.transform.translation.x;
+            matrixTransform[7] = os_sensor_to_base_footprintos_sensor.transform.translation.y;
+            matrixTransform[11] = os_sensor_to_base_footprintos_sensor.transform.translation.z;
 
-            penalty =config.penalty;
-            this->global_frame="base_footprint";
+            penalty = config.penalty;
+            this->global_frame = "base_footprint";
 
         }
-      }
+    }
 
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int step =1;
-        divider =0;
-        if(i%5==0) {
-            result =0;
+        int step = 2;
+        divider = 0;
+        if (i % 5 == 0) {
+            result = 0;
             std::ofstream out;
             out.open("/home/lukas/newtest/speedpub/time.txt", std::ios::app);
+
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             lvr2::PointBuffer pointBuffer;
-            lvr_ros::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,area_of_interesst_left,area_of_interesst_right,matrixTransform);
+            mesh_msgs_conversions::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
+            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,
+                                                                         step, area_of_interesst_left,
+                                                                         area_of_interesst_right, matrixTransform);
             checkleathleObjectsbetweenWheels(pointBuffer);
             ofmg.setEdgeThreshold(config.edgeThreshold);
             lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
@@ -195,12 +209,13 @@ namespace mesh_map {
             ofmg.getMesh(*mesh_buffer_ptr, color_msg);
 
             mesh_msgs::MeshGeometry mesh_map;
-            lvr_ros::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
+            mesh_msgs_conversions::fromMeshBufferToMeshGeometryMessage(mesh_buffer_ptr, mesh_map);
             *mesh_ptr = lvr2::HalfEdgeMesh < lvr2::BaseVector < float >> (mesh_buffer_ptr);
             this->readMap();
             this->vertex_colors_pub.publish(color_msg);
             publishSpeedoverAllVertex();
-            out << cloud->header.stamp <<std::endl;
+
+            out << cloud->header.stamp << std::endl;
             out.close();
 
         }
@@ -208,35 +223,39 @@ namespace mesh_map {
     }
 
 
-
-    void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer){
-
+    void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer) {
 
 
-        float soft=config.softcap;
+        float soft = config.softcap;
         lvr2::floatArr cloudPoints = cloudBuffer.getPointArray();
-        float threshold =config.threshouldSpeed;
+        float threshold = config.threshouldSpeed;
         for (int i = 0; i < cloudBuffer.numPoints() * 3; i += 3) {
-            if (cloudPoints[i] !=0  || cloudPoints[i + 1] != 0 ||  cloudPoints[i + 2] != 0) {
-                lvr2::BaseVector<float> p(cloudPoints[i]*matrixTransform[0]+ cloudPoints[i + 1]*matrixTransform[1]+cloudPoints[i + 2]*matrixTransform[2]+matrixTransform[3],cloudPoints[i]*matrixTransform[4]+ cloudPoints[i + 1]*matrixTransform[5]+cloudPoints[i + 2]*matrixTransform[6]+matrixTransform[7],cloudPoints[i]*matrixTransform[8]+ cloudPoints[i + 1]*matrixTransform[9]+cloudPoints[i + 2]*matrixTransform[10]+matrixTransform[11] ); // point at (x,y)
+            if (cloudPoints[i] != 0 || cloudPoints[i + 1] != 0 || cloudPoints[i + 2] != 0) {
+                lvr2::BaseVector<float> p(
+                        cloudPoints[i] * matrixTransform[0] + cloudPoints[i + 1] * matrixTransform[1] +
+                        cloudPoints[i + 2] * matrixTransform[2] + matrixTransform[3],
+                        cloudPoints[i] * matrixTransform[4] + cloudPoints[i + 1] * matrixTransform[5] +
+                        cloudPoints[i + 2] * matrixTransform[6] + matrixTransform[7],
+                        cloudPoints[i] * matrixTransform[8] + cloudPoints[i + 1] * matrixTransform[9] +
+                        cloudPoints[i + 2] * matrixTransform[10] + matrixTransform[11]); // point at (x,y)
                 if (isInsideBox(p, roboter_polyeder)) {
 
-                if (p.x < 40) {
-                    result =std::numeric_limits<float>::infinity();
-                    divider +=1;
+                    if (p.x < 40) {
+                        result = std::numeric_limits<float>::infinity();
+                        divider += 1;
 
-                } else if (p.x < config.threshouldSpeed) {
-                    result = (result * p.x / threshold);
-                    divider +=(penalty * (1 - (p.x / threshold)));
+                    } else if (p.x < config.threshouldSpeed) {
+                        result = (result * p.x / threshold);
+                        divider += (penalty * (1 - (p.x / threshold)));
+                    }
                 }
             }
         }
-            }
 
     }
 
 
-    bool MeshMap::isInsideBox( lvr2::BaseVector<float> p, lvr2::BaseVector<float>* vertices) {
+    bool MeshMap::isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float> *vertices) {
         // Berechne die minimalen und maximalen Grenzwerte der Koordinaten des Quaders
         lvr2::BaseVector<float> bMin, bMax;
         bMin.x = bMax.x = vertices[0].x;
@@ -259,8 +278,6 @@ namespace mesh_map {
         else
             return true;
     }
-
-
 
 
     bool MeshMap::readMap() {
@@ -324,7 +341,7 @@ namespace mesh_map {
             boost::uuids::uuid uuid = gen();
             uuid_str = boost::uuids::to_string(uuid);
 
-            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>("face_normals");
+            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseFaceMap < Normal >> ("face_normals");
 
             if (face_normals_opt) {
                 face_normals = face_normals_opt.get();
@@ -340,7 +357,8 @@ namespace mesh_map {
                 }
             }
 
-            auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<Normal>>("vertex_normals");
+            auto vertex_normals_opt =
+                    mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < Normal >> ("vertex_normals");
 
             if (vertex_normals_opt) {
                 vertex_normals = vertex_normals_opt.get();
@@ -360,7 +378,7 @@ namespace mesh_map {
                                                                         vertex_normals));
 
             ROS_INFO_STREAM("Try to read edge distances from map file...");
-            auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
+            auto edge_distances_opt = mesh_io_ptr->getAttributeMap < lvr2::DenseEdgeMap < float >> ("edge_distances");
 
             if (edge_distances_opt) {
                 ROS_INFO_STREAM("Vertex distances have been read successfully.");
@@ -438,7 +456,7 @@ namespace mesh_map {
                 for (auto &layer: layers) {
                     auto &layer_plugin = layer.second;
                     const auto &layer_name = layer.first;
-                    std::set<lvr2::VertexHandle> empty;
+                    std::set <lvr2::VertexHandle> empty;
                     layer_plugin->updateLethal(lethals, empty);
                     layer_plugin->computeLayer(!subscribe);
                     lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
@@ -516,7 +534,7 @@ namespace mesh_map {
     }
 
     void MeshMap::layerChanged(const std::string &layer_name) {
-        std::lock_guard<std::mutex> lock(layer_mtx);
+        std::lock_guard <std::mutex> lock(layer_mtx);
 
         ROS_INFO_STREAM("Layer \"" << layer_name << "\" changed.");
 
@@ -568,7 +586,7 @@ namespace mesh_map {
         lethals.clear();
         lethal_indices.clear();
 
-        std::shared_ptr<mesh_map::MeshMap> map(this);
+        std::shared_ptr <mesh_map::MeshMap> map(this);
         for (auto &layer: layers) {
             auto &layer_plugin = layer.second;
             const auto &layer_name = layer.first;
@@ -580,7 +598,7 @@ namespace mesh_map {
                 return false;
             }
 
-            std::set<lvr2::VertexHandle> empty;
+            std::set <lvr2::VertexHandle> empty;
             layer_plugin->updateLethal(lethals, empty);
             if (!subscribe) {
                 if (!layer_plugin->readLayer()) {
@@ -621,7 +639,6 @@ namespace mesh_map {
                 if (std::isnan(cost))
                     hasNaN = true;
                 vertex_costs[vH] += factor * cost;
-
 
 
                 if (std::isfinite(cost)) {
@@ -670,13 +687,12 @@ namespace mesh_map {
         }
 
 
-
         ROS_INFO("Successfully combined costs!");
     }
 
-    void MeshMap::findLethalByContours(const int &min_contour_size, std::set<lvr2::VertexHandle> &lethals) {
+    void MeshMap::findLethalByContours(const int &min_contour_size, std::set <lvr2::VertexHandle> &lethals) {
         int size = lethals.size();
-        std::vector<std::vector<lvr2::VertexHandle>> contours;
+        std::vector <std::vector<lvr2::VertexHandle>> contours;
         findContours(contours, min_contour_size);
         for (auto contour: contours) {
             lethals.insert(contour.begin(), contour.end());
@@ -684,10 +700,10 @@ namespace mesh_map {
         ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices as contour vertices");
     }
 
-    void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>> &contours, int min_contour_size) {
+    void MeshMap::findContours(std::vector <std::vector<lvr2::VertexHandle>> &contours, int min_contour_size) {
         ROS_INFO_STREAM("Find contours...");
 
-        std::vector<std::vector<lvr2::VertexHandle>> tmp_contours;
+        std::vector <std::vector<lvr2::VertexHandle>> tmp_contours;
 
         array<lvr2::OptionalFaceHandle, 2> facepair;
         lvr2::SparseEdgeMap<bool> usedEdges(false);
@@ -702,11 +718,11 @@ namespace mesh_map {
             // If border Edge found
             if ((!facepair[0] || !facepair[1]) && !usedEdges[eHStart]) {
                 std:
-                vector<lvr2::VertexHandle> contour;
+                vector <lvr2::VertexHandle> contour;
                 // Set vector which links to the following Edge
                 array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
                 lvr2::VertexHandle vH = vertexPair[1];
-                vector<lvr2::EdgeHandle> curEdges;
+                vector <lvr2::EdgeHandle> curEdges;
                 lvr2::EdgeHandle eHTemp = eHStart;
                 bool moving = true;
                 bool vertex_flag = false;
@@ -753,12 +769,12 @@ namespace mesh_map {
         ROS_INFO_STREAM("Found " << contours.size() << " contours.");
     }
 
-    void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector> &vector_map) {
+    void MeshMap::setVectorMap(lvr2::DenseVertexMap <mesh_map::Vector> &vector_map) {
         this->vector_map = vector_map;
     }
 
-    boost::optional<Vector> MeshMap::directionAtPosition(
-            const lvr2::VertexMap<lvr2::BaseVector<float>> &vector_map,
+    boost::optional <Vector> MeshMap::directionAtPosition(
+            const lvr2::VertexMap <lvr2::BaseVector<float>> &vector_map,
             const std::array<lvr2::VertexHandle, 3> &vertices,
             const std::array<float, 3> &barycentric_coords) {
         const auto &a = vector_map.get(vertices[0]);
@@ -851,20 +867,20 @@ namespace mesh_map {
     }
 
     void MeshMap::publishVectorField(const std::string &name,
-                                     const lvr2::DenseVertexMap<lvr2::BaseVector<float>> &vector_map,
+                                     const lvr2::DenseVertexMap <lvr2::BaseVector<float>> &vector_map,
                                      const bool publish_face_vectors) {
         publishVectorField(name, vector_map, vertex_costs, {}, publish_face_vectors);
     }
 
     void MeshMap::publishCombinedVectorField() {
-        lvr2::DenseVertexMap<Vector> vertex_vectors;
-        lvr2::DenseFaceMap<Vector> face_vectors;
+        lvr2::DenseVertexMap <Vector> vertex_vectors;
+        lvr2::DenseFaceMap <Vector> face_vectors;
 
         vertex_vectors.reserve(mesh_ptr->nextVertexIndex());
         face_vectors.reserve(mesh_ptr->nextFaceIndex());
 
         for (auto layer_iter: layer_names) {
-            lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
+            lvr2::DenseFaceMap <uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
             AbstractLayer::Ptr layer = layer_iter.second;
             auto opt_vec_map = layer->vectorMap();
             if (!opt_vec_map)
@@ -899,7 +915,7 @@ namespace mesh_map {
     }
 
     void MeshMap::publishVectorField(const std::string &name,
-                                     const lvr2::DenseVertexMap<lvr2::BaseVector<float>> &vector_map,
+                                     const lvr2::DenseVertexMap <lvr2::BaseVector<float>> &vector_map,
                                      const lvr2::DenseVertexMap<float> &values,
                                      const std::function<float(float)> &cost_function,
                                      const bool publish_face_vectors) {
@@ -929,8 +945,8 @@ namespace mesh_map {
         unsigned int cnt = 0;
         unsigned int faces = 0;
 
-        lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh.numFaces(), 0);
-        std::set<lvr2::FaceHandle> complete_faces;
+        lvr2::DenseFaceMap <uint8_t> vector_field_faces(mesh.numFaces(), 0);
+        std::set <lvr2::FaceHandle> complete_faces;
 
         for (auto vH: vector_map) {
             const auto &dir_vec = vector_map[vH];
@@ -997,8 +1013,8 @@ namespace mesh_map {
                 std::array<float, 3> barycentric_coords;
                 float dist;
                 if (mesh_map::projectedBarycentricCoords(center, vertices, barycentric_coords, dist)) {
-                    boost::optional<mesh_map::Vector> dir_opt = directionAtPosition(vector_map, vertex_handles,
-                                                                                    barycentric_coords);
+                    boost::optional <mesh_map::Vector> dir_opt = directionAtPosition(vector_map, vertex_handles,
+                                                                                     barycentric_coords);
                     if (dir_opt) {
                         const float &cost = costAtPosition(values, vertex_handles, barycentric_coords);
                         const float &value = cost_function ? cost_function(cost) : cost;
@@ -1042,11 +1058,12 @@ namespace mesh_map {
                                     mesh_ptr->getVertexPosition(vertices[2]), dist, 0.0001);
     }
 
-    boost::optional<std::tuple<lvr2::FaceHandle, std::array<Vector, 3>, std::array<float, 3>>>
+    boost::optional <std::tuple<lvr2::FaceHandle, std::array < Vector, 3>, std::array<float, 3>>>
+
     MeshMap::searchNeighbourFaces(
             const Vector &pos, const lvr2::FaceHandle &face,
             const float &max_radius, const float &max_dist) {
-        std::list<lvr2::FaceHandle> possible_faces;
+        std::list <lvr2::FaceHandle> possible_faces;
         possible_faces.push_back(face);
         std::list<lvr2::FaceHandle>::iterator face_iter = possible_faces.begin();
 
@@ -1139,318 +1156,374 @@ namespace mesh_map {
         return lvr2::OptionalFaceHandle();
     }
 
-    boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector, 3>,
-            std::array<float, 3>>> MeshMap::searchContainingFace(
-            Vector &position, const float &max_dist) {
-        if (auto vH_opt = getNearestVertexHandle(position)) {
-            auto vH = vH_opt.unwrap();
-            float min_triangle_position_distance = std::numeric_limits<float>::max();
-            std::array<Vector, 3> vertices;
-            std::array<float, 3> bary_coords;
-            lvr2::OptionalFaceHandle opt_fH;
-            for (auto fH: mesh_ptr->getFacesOfVertex(vH)) {
-                const auto &tmp_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
-                float dist = 0;
-                std::array<float, 3> tmp_bary_coords;
-                if (mesh_map::projectedBarycentricCoords(position, vertices, tmp_bary_coords, dist)
-                    && std::fabs(dist) < max_dist) {
-                    return std::make_tuple(fH, tmp_vertices, tmp_bary_coords);
-                }
+    boost::optional <std::tuple<lvr2::FaceHandle, std::array < mesh_map::Vector, 3>,
+    std::array<float, 3>>>
+    MeshMap::searchContainingFace(
+            Vector
+    &position,
+    const float &max_dist
+    ) {
+    if (
+    auto vH_opt = getNearestVertexHandle(position)
+    ) {
+    auto vH = vH_opt.unwrap();
+    float min_triangle_position_distance = std::numeric_limits<float>::max();
+    std::array<Vector, 3> vertices;
+    std::array<float, 3> bary_coords;
+    lvr2::OptionalFaceHandle opt_fH;
+    for (
+    auto fH
+    : mesh_ptr->
+    getFacesOfVertex(vH)
+    ) {
+    const auto &tmp_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
+    float dist = 0;
+    std::array<float, 3> tmp_bary_coords;
+    if (
+    mesh_map::projectedBarycentricCoords(position, vertices, tmp_bary_coords, dist
+    )
+    &&
+    std::fabs(dist)
+    < max_dist) {
+    return
+    std::make_tuple(fH, tmp_vertices, tmp_bary_coords
+    );
+}
 
-                float triangle_dist = 0;
-                triangle_dist += (vertices[0] - position).length2();
-                triangle_dist += (vertices[1] - position).length2();
-                triangle_dist += (vertices[2] - position).length2();
-                if (triangle_dist < min_triangle_position_distance) {
-                    min_triangle_position_distance = triangle_dist;
-                    opt_fH = fH;
-                    vertices = tmp_vertices;
-                    bary_coords = tmp_bary_coords;
-                }
-            }
-            if (opt_fH) {
-                return std::make_tuple(opt_fH.unwrap(), vertices, bary_coords);
-            }
-            ROS_ERROR_STREAM("No containing face found!");
-            return boost::none;
-        }
-        ROS_FATAL_STREAM("Could not find the nearest vertex");
-        return boost::none;
-    }
+float triangle_dist = 0;
+triangle_dist += (vertices[0] - position).
 
-    lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos) {
-        float querry_point[3] = {pos.x, pos.y, pos.z};
-        size_t ret_index;
-        float out_dist_sqr;
-        size_t num_results = kd_tree_ptr->knnSearch(&querry_point[0], 1, &ret_index, &out_dist_sqr);
-        return num_results == 0 ? lvr2::OptionalVertexHandle() : lvr2::VertexHandle(ret_index);
-    }
+length2();
 
-    inline const geometry_msgs::Point MeshMap::toPoint(const Vector &vec) {
-        geometry_msgs::Point p;
-        p.x = vec.x;
-        p.y = vec.y;
-        p.z = vec.z;
-        return p;
-    }
+triangle_dist += (vertices[1] - position).
 
-    constexpr float kEpsilon = 1e-8;
+length2();
 
-    bool MeshMap::projectedBarycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle,
-                                             std::array<float, 3> &barycentric_coords, float &dist) {
-        const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
-        return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords, dist);
-    }
+triangle_dist += (vertices[2] - position).
 
-    mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string &layer_name) {
-        return layer_names[layer_name];
-    }
+length2();
 
-    bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v, float &w) {
-        const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
-        return mesh_map::barycentricCoords(p, face[0], face[1], face[2], u, v, w);
-    }
+if (triangle_dist<min_triangle_position_distance) {
+min_triangle_position_distance = triangle_dist;
+opt_fH = fH;
+vertices = tmp_vertices;
+bary_coords = tmp_bary_coords;
+}
+}
+if (opt_fH) {
+return
+std::make_tuple(opt_fH
+.
 
-    bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir, const Vector &v0, const Vector &v1,
-                                       const Vector &v2, float &t, float &u, float &v, Vector &p) {
-        // compute plane's normal
-        Vector v0v1 = v1 - v0;
-        Vector v0v2 = v2 - v0;
+unwrap(), vertices, bary_coords
 
-        // no need to normalize
-        Vector N = v0v1.cross(v0v2);  // N
-        float denom = N.dot(N);
+);
+}
+ROS_ERROR_STREAM("No containing face found!");
+return
+boost::none;
+}
+ROS_FATAL_STREAM("Could not find the nearest vertex");
+return
+boost::none;
+}
 
-        // Step 1: finding P
+lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector &pos) {
+    float querry_point[3] = {pos.x, pos.y, pos.z};
+    size_t ret_index;
+    float out_dist_sqr;
+    size_t num_results = kd_tree_ptr->knnSearch(&querry_point[0], 1, &ret_index, &out_dist_sqr);
+    return num_results == 0 ? lvr2::OptionalVertexHandle() : lvr2::VertexHandle(ret_index);
+}
 
-        // check if ray and plane are parallel ?
-        float NdotRayDirection = N.dot(dir);
-        if (fabs(NdotRayDirection) < kEpsilon)  // almost 0
-            return false;                         // they are parallel so they don't intersect !
+inline const geometry_msgs::Point MeshMap::toPoint(const Vector &vec) {
+    geometry_msgs::Point p;
+    p.x = vec.x;
+    p.y = vec.y;
+    p.z = vec.z;
+    return p;
+}
 
-        // compute d parameter using equation 2
-        float d = N.dot(v0);
+constexpr float kEpsilon = 1e-8;
 
-        // compute t (equation 3)
-        t = (N.dot(orig) + d) / NdotRayDirection;
+bool MeshMap::projectedBarycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle,
+                                         std::array<float, 3> &barycentric_coords, float &dist) {
+    const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
+    return mesh_map::projectedBarycentricCoords(p, face, barycentric_coords, dist);
+}
 
-        // check if the triangle is in behind the ray
-        // if (t < 0) return false; // the triangle is behind
+mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string &layer_name) {
+    return layer_names[layer_name];
+}
 
-        // compute the intersection point using equation 1
-        p = orig + dir * t;
+bool MeshMap::barycentricCoords(const Vector &p, const lvr2::FaceHandle &triangle, float &u, float &v, float &w) {
+    const auto &face = mesh_ptr->getVertexPositionsOfFace(triangle);
+    return mesh_map::barycentricCoords(p, face[0], face[1], face[2], u, v, w);
+}
 
-        // Step 2: inside-outside test
-        Vector C;  // vector perpendicular to triangle's plane
+bool MeshMap::rayTriangleIntersect(const Vector &orig, const Vector &dir, const Vector &v0, const Vector &v1,
+                                   const Vector &v2, float &t, float &u, float &v, Vector &p) {
+    // compute plane's normal
+    Vector v0v1 = v1 - v0;
+    Vector v0v2 = v2 - v0;
 
-        // edge 0
-        Vector edge0 = v1 - v0;
-        Vector vp0 = p - v0;
-        C = edge0.cross(vp0);
-        if (N.dot(C) < 0)
-            return false;  // P is on the right side
+    // no need to normalize
+    Vector N = v0v1.cross(v0v2);  // N
+    float denom = N.dot(N);
 
-        // edge 1
-        Vector edge1 = v2 - v1;
-        Vector vp1 = p - v1;
-        C = edge1.cross(vp1);
-        if ((u = N.dot(C)) < 0)
-            return false;  // P is on the right side
+    // Step 1: finding P
 
-        // edge 2
-        Vector edge2 = v0 - v2;
-        Vector vp2 = p - v2;
-        C = edge2.cross(vp2);
-        if ((v = N.dot(C)) < 0)
-            return false;  // P is on the right side;
+    // check if ray and plane are parallel ?
+    float NdotRayDirection = N.dot(dir);
+    if (fabs(NdotRayDirection) < kEpsilon)  // almost 0
+        return false;                         // they are parallel so they don't intersect !
 
-        u /= denom;
-        v /= denom;
+    // compute d parameter using equation 2
+    float d = N.dot(v0);
 
-        return true;  // this ray hits the triangle
-    }
+    // compute t (equation 3)
+    t = (N.dot(orig) + d) / NdotRayDirection;
 
-    bool MeshMap::resetLayers() {
-        return true;  // TODO implement
-    }
+    // check if the triangle is in behind the ray
+    // if (t < 0) return false; // the triangle is behind
 
-    void MeshMap::publishCostLayers() {
-        ROS_INFO_STREAM("Start publishing");
-        for (auto &layer: layers) {
-            ROS_INFO_STREAM("Layer \"" << layer.first << "\" try to publish!");
+    // compute the intersection point using equation 1
+    p = orig + dir * t;
+
+    // Step 2: inside-outside test
+    Vector C;  // vector perpendicular to triangle's plane
+
+    // edge 0
+    Vector edge0 = v1 - v0;
+    Vector vp0 = p - v0;
+    C = edge0.cross(vp0);
+    if (N.dot(C) < 0)
+        return false;  // P is on the right side
+
+    // edge 1
+    Vector edge1 = v2 - v1;
+    Vector vp1 = p - v1;
+    C = edge1.cross(vp1);
+    if ((u = N.dot(C)) < 0)
+        return false;  // P is on the right side
+
+    // edge 2
+    Vector edge2 = v0 - v2;
+    Vector vp2 = p - v2;
+    C = edge2.cross(vp2);
+    if ((v = N.dot(C)) < 0)
+        return false;  // P is on the right side;
+
+    u /= denom;
+    v /= denom;
+
+    return true;  // this ray hits the triangle
+}
+
+bool MeshMap::resetLayers() {
+    return true;  // TODO implement
+}
+
+void MeshMap::publishCostLayers() {
+    ROS_INFO_STREAM("Start publishing");
+    for (auto &layer: layers) {
+        ROS_INFO_STREAM("Layer \"" << layer.first << "\" try to publish!");
 
 
-            mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                        layer.second->defaultValue(), layer.first, global_frame,
-                                                        uuid_str);
-            vertex_costs_pub.publish(
-                    mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                                layer.second->defaultValue(), layer.first,
-                                                                global_frame,
-                                                                uuid_str));
-
-        }
-
-
+        mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+                                                    layer.second->defaultValue(), layer.first, global_frame,
+                                                    uuid_str);
         vertex_costs_pub.publish(
-                mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
-
-    }
-
-    void MeshMap::publishVertexCosts(const lvr2::VertexMap<float> &costs, const std::string &name) {
-        vertex_costs_pub.publish(
-                mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame,
+                mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+                                                            layer.second->defaultValue(), layer.first,
+                                                            global_frame,
                                                             uuid_str));
-    }
-
-    void MeshMap::publishVertexColors() {
-        using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
-
-        using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
-
-        VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->getDenseAttributeMap<VertexColorMap>("vertex_colors");
-        if (vertex_colors_opt) {
-            const VertexColorMap colors = vertex_colors_opt.get();
-            mesh_msgs::MeshVertexColorsStamped msg;
-            msg.header.frame_id = mapFrame();
-            msg.header.stamp = ros::Time::now();
-            msg.uuid = uuid_str;
-            msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
-            for (auto vH: colors) {
-                std_msgs::ColorRGBA color_rgba;
-                const auto &color_array = colors[vH];
-                color_rgba.a = 1;
-                color_rgba.r = color_array[0] / 255.0;
-                color_rgba.g = color_array[1] / 255.0;
-                color_rgba.b = color_array[2] / 255.0;
-                msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
-            }
-            this->vertex_colors_pub.publish(msg);
-        }
 
     }
 
-    void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg, uint32_t level) {
-        ROS_INFO_STREAM("Dynamic reconfigure callback...");
-        if (first_config) {
-            config = cfg;
-            first_config = false;
-            return;
-        }
 
-        if (!first_config && map_loaded) {
-            if (cfg.cost_limit != config.cost_limit) {
-                combineVertexCosts();
-            }
+    vertex_costs_pub.publish(
+            mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 
-            config = cfg;
+}
+
+void MeshMap::publishVertexCosts(const lvr2::VertexMap<float> &costs, const std::string &name) {
+    vertex_costs_pub.publish(
+            mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame,
+                                                        uuid_str));
+}
+
+void MeshMap::publishVertexColors() {
+    using VertexColorMapOpt = lvr2::DenseVertexMapOptional <std::array<uint8_t, 3>>;
+
+    using VertexColorMap = lvr2::DenseVertexMap <std::array<uint8_t, 3>>;
+
+    VertexColorMapOpt vertex_colors_opt = this->mesh_io_ptr->getDenseAttributeMap<VertexColorMap>("vertex_colors");
+    if (vertex_colors_opt) {
+        const VertexColorMap colors = vertex_colors_opt.get();
+        mesh_msgs::MeshVertexColorsStamped msg;
+        msg.header.frame_id = mapFrame();
+        msg.header.stamp = ros::Time::now();
+        msg.uuid = uuid_str;
+        msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
+        for (auto vH: colors) {
+            std_msgs::ColorRGBA color_rgba;
+            const auto &color_array = colors[vH];
+            color_rgba.a = 1;
+            color_rgba.r = color_array[0] / 255.0;
+            color_rgba.g = color_array[1] / 255.0;
+            color_rgba.b = color_array[2] / 255.0;
+            msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
         }
+        this->vertex_colors_pub.publish(msg);
     }
 
-    const std::string MeshMap::getGlobalFrameID() {
-        return global_frame;
+}
+
+void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig &cfg, uint32_t level) {
+    ROS_INFO_STREAM("Dynamic reconfigure callback...");
+    if (first_config) {
+        config = cfg;
+        first_config = false;
+        return;
     }
 
-
-
-    void MeshMap::publishSpeedoverAllVertex(){
-        float softcap = config.softcap;
-        float threshold = config.threshouldSpeed;
-        float min=config.minDinstanceSpeed;
-        float multi = 2;
-        float neuspeed =0;
-        std::ofstream out;
-        out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
-
-
-        if (vertex_costs.numValues() ==0){
-            speed=0;
-            std_msgs::Float64 speed_msg;
-            speed_msg.data = speed;
-            ROS_INFO_STREAM("The calculated speed suggestion in percent is 0%, because the created mesh has no vertices");
-            speed_pub.publish(speed_msg);
+    if (!first_config && map_loaded) {
+        if (cfg.cost_limit != config.cost_limit) {
+            combineVertexCosts();
         }
-        else {
-            speed=0;
-            float divider =0;
-            if(result ==std::numeric_limits<float>::infinity() || result == -std::numeric_limits<float>::infinity()){
-                ROS_INFO("The calculated speed suggestion in percent is 0% because of an object in front of the roboter");
-            }
 
-            for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
-                lvr2::VertexHandle vh(i);
-                lvr2::BaseVector<float> point = mesh_ptr->getVertexPosition(vh);
+        config = cfg;
+    }
+}
+
+const std::string MeshMap::getGlobalFrameID() {
+    return global_frame;
+}
 
 
-                float distance = point.x;
-                if (distance > min) {
-                    if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
-                        vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
-                        if (lethals.find(vh) != lethals.end()) {
-                            if (distance >= softcap && distance < threshold) {
-                                result = penalty * (1 - (distance / threshold));
-                                divider = (1 - (distance / threshold));
-                            } else if (distance < softcap) {
-                                result += vertex_costs[vh];
-                                divider = 1;
-                            }
+void MeshMap::publishSpeedoverAllVertex() {
+    float softcap = config.softcap;
+    float threshold = config.threshouldSpeed;
+    float min = config.minDinstanceSpeed;
+    float multi = 2;
+    float neuspeed = 0;
+    std::ofstream out;
+    out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
+
+
+    if (vertex_costs.numValues() == 0) {
+        speed = 0;
+        std_msgs::Float64 speed_msg;
+        speed_msg.data = speed;
+        ROS_INFO_STREAM("The calculated speed suggestion in percent is 0%, because the created mesh has no vertices");
+        speed_pub.publish(speed_msg);
+    } else {
+        speed = 0;
+        float divider = 0;
+        if (result == std::numeric_limits<float>::infinity() || result == -std::numeric_limits<float>::infinity()) {
+            ROS_INFO("The calculated speed suggestion in percent is 0% because of an object in front of the roboter");
+        }
+
+        for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
+            lvr2::VertexHandle vh(i);
+            lvr2::BaseVector<float> point = mesh_ptr->getVertexPosition(vh);
+
+
+            float distance = point.x;
+            if (distance > min) {
+                if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
+                    vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
+                    if (lethals.find(vh) != lethals.end()) {
+                        if (distance >= softcap && distance < threshold) {
+                            result = penalty * (1 - (distance / threshold));
+                            divider = (1 - (distance / threshold));
+                        } else if (distance < softcap) {
+                            result += vertex_costs[vh];
+                            divider = 1;
                         }
-                    } else if (distance < threshold) {
-                        result = vertex_costs[vh] * (1 - (distance / threshold));
-                        divider = (1 - (distance / threshold));
                     }
-
+                } else if (distance < threshold) {
+                    result = vertex_costs[vh] * (1 - (distance / threshold));
+                    divider = (1 - (distance / threshold));
                 }
-            }
 
-            result /=divider;
-
-            neuspeed = 1 - (multi * (result));
-            speed=neuspeed;
-            std_msgs::Float64 speed_msg;
-            speed_msg.data = speed;
-            ROS_INFO("The calculated speed suggestion in percent is %f" , (speed*100)  ,"%");
-            speed_pub.publish(speed_msg);
-
-        }
-        median_filter_for_speed();
-
-        out<<speed<<std::endl;
-
-
-    }
-    bool MeshMap::getsubscribe() {
-        return this->subscribe;
-    }
-    void MeshMap::median_filter_for_speed() {
-        if(last_speed.size()>9){
-            last_speed[last_add]=speed;
-            last_add++;
-
-        }else{
-            last_speed.push_back(speed);
-            last_add++;
-        }
-        if ( last_add==10){
-            last_add=0;
-        }
-
-        if(speed == -std::numeric_limits<float>::infinity() || isnan(speed)){
-            speed =0;
-        }
-        if(speed!=0){
-            std::vector<float> order = last_speed;
-            std::sort (order.begin(), order.end());
-            if(order.size()%2==0){
-                speed = (order[order.size()/2]+order[(order.size()/2)-1])/2;
-            }else{
-                speed = order[order.size()/2];
             }
         }
 
+        result /= divider;
+
+        speed = 1 - (multi * (result));
+        if (speed == -std::numeric_limits<float>::infinity() || isnan(speed)) {
+            speed = 0;
+        }
+        average_filter_for_speed();
+        std_msgs::Float64 speed_msg;
+        speed_msg.data = speed;
+        ROS_INFO("The calculated speed suggestion in percent is %f", (speed * 100), "%");
+        speed_pub.publish(speed_msg);
+        out << speed << std::endl;
 
     }
 
+
+}
+
+bool MeshMap::getsubscribe() {
+    return this->subscribe;
+}
+
+void MeshMap::median_filter_for_speed() {
+    if (last_speed.size() > 9) {
+        last_speed[last_add] = speed;
+        last_add++;
+
+    } else {
+        last_speed.push_back(speed);
+        last_add++;
+    }
+    if (last_add == 10) {
+        last_add = 0;
+    }
+
+
+    if (speed != 0) {
+        std::vector<float> order = last_speed;
+        std::sort(order.begin(), order.end());
+        if (order.size() % 2 == 0) {
+            speed = (order[order.size() / 2] + order[(order.size() / 2) - 1]) / 2;
+        } else {
+            speed = order[order.size() / 2];
+        }
+    }
+
+
+}
+
+void MeshMap::average_filter_for_speed() {
+    if (last_speed.size() > 9) {
+        last_speed[last_add] = speed;
+        last_add++;
+
+    } else {
+        last_speed.push_back(speed);
+        last_add++;
+    }
+    if (last_add == 10) {
+        last_add = 0;
+    }
+
+
+    if (speed != 0) {
+        float sum = 0;
+        for (int i = 0; i < last_speed.size(); i++) {
+            sum += last_speed[i];
+        }
+        speed = sum / last_speed.size();
+    }
+
+
+}
 
 
 } /* namespace mesh_map */

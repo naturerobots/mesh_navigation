@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
         pluginlib
         roscpp
 
-        lvr_ros
+
         tf2
         tf2_geometry_msgs
         tf2_ros
@@ -50,7 +50,6 @@ catkin_package(
             tf2_ros
             visualization_msgs
             xmlrpcpp
-            lvr_ros
             sensor_msgs
             organized_fast_mesh
         DEPENDS

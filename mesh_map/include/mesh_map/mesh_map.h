@@ -422,6 +422,8 @@ namespace mesh_map
 
         void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
         void median_filter_for_speed();
+        void average_filter_for_speed();
+
         bool subscribe;
 
         ros::Subscriber cloud_sub_;

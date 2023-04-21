@@ -20,6 +20,5 @@
     <depend>visualization_msgs</depend>
     <depend>xmlrpcpp</depend>
     <depend>sensor_msgs</depend>
-    <depend>lvr_ros</depend>
     <depend>organized_fast_mesh</depend>
 </package>
