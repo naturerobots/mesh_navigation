@@ -105,88 +105,90 @@ namespace mesh_map {
         if (this->subscribe) {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
-            tf2_ros::Buffer buffer_;
-            tf2_ros::TransformListener listener_(buffer_);
-
-            geometry_msgs::TransformStamped base_footprint_to_os_sensor;
-            geometry_msgs::TransformStamped os_sensor_to_base_footprintos_sensor;
-            base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0),
-                                                                  ros::Duration(1.0));
-            os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0),
-                                                                           ros::Duration(1.0));
-            //#TODO outsource in function
-            transform = lvr2::Quaternion < lvr2::BaseVector < float
-                    >> (base_footprint_to_os_sensor.transform.rotation.x, base_footprint_to_os_sensor.transform.rotation.y, base_footprint_to_os_sensor.transform.rotation.z, base_footprint_to_os_sensor.transform.rotation.w);
-            transform_to_base = lvr2::Quaternion < lvr2::BaseVector < float
-                    >> (os_sensor_to_base_footprintos_sensor.transform.rotation.x, os_sensor_to_base_footprintos_sensor.transform.rotation.y, os_sensor_to_base_footprintos_sensor.transform.rotation.z, os_sensor_to_base_footprintos_sensor.transform.rotation.w);
-
-            left_wheel = lvr2::BaseVector<float>(0, 1, 0) * -(config.left_wheel) +
-                         (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
-            right_wheel = lvr2::BaseVector<float>(0, 1, 0) * config.right_wheel +
-                          (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
-            width_of_intresst = lvr2::BaseVector<float>(0, 1, 0) * 0.3;
-            depth_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * -30;
-            hight_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * config.max_z;
-            length_of_intresst = lvr2::BaseVector<float>(1, 0, 0) * 20;
-
-            area_of_interesst_left[0] = left_wheel + width_of_intresst + depth_of_intresst;
-            area_of_interesst_left[1] = left_wheel - width_of_intresst + depth_of_intresst;
-
-            area_of_interesst_left[2] = left_wheel + width_of_intresst + hight_of_intresst;
-            area_of_interesst_left[3] = left_wheel - width_of_intresst + hight_of_intresst;
-
-            area_of_interesst_left[4] = left_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
-            area_of_interesst_left[5] = left_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
-
-            area_of_interesst_left[6] = left_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
-            area_of_interesst_left[7] = left_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
-
-            area_of_interesst_right[0] = right_wheel + width_of_intresst + depth_of_intresst;
-            area_of_interesst_right[1] = right_wheel - width_of_intresst + depth_of_intresst;
-
-            area_of_interesst_right[2] = right_wheel + width_of_intresst + hight_of_intresst;
-            area_of_interesst_right[3] = right_wheel - width_of_intresst + hight_of_intresst;
-
-            area_of_interesst_right[4] = right_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
-            area_of_interesst_right[5] = right_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
-
-            area_of_interesst_right[6] = right_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
-            area_of_interesst_right[7] = right_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
-            lvr2::Matrix4 <lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
-            to_os_sensor[3] = base_footprint_to_os_sensor.transform.translation.x;
-            to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
-            to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
-
-            lvr2::BaseVector<float> roboter_hight = lvr2::BaseVector<float>(0, 0, config.roboter_hight);
-            lvr2::BaseVector<float> roboter_right_wheelbase = lvr2::BaseVector<float>(0, 0,
-                                                                                      config.roboter_wheelbase / 2);
-            lvr2::BaseVector<float> roboter_left_wheelbase = lvr2::BaseVector<float>(0, 0,
-                                                                                     (config.roboter_wheelbase / 2) *
-                                                                                     -1);
-            lvr2::BaseVector<float> roboter_ground_clearance = lvr2::BaseVector<float>(0, 0,
-                                                                                       config.roboter_ground_clearance);
-            lvr2::BaseVector<float> softcap = lvr2::BaseVector<float>(0, 0, config.softcap);
-
-            roboter_polyeder[0] = lvr2::BaseVector<float>(0.7, 0.6, 0.6);
-            roboter_polyeder[1] = lvr2::BaseVector<float>(0.7, -0.6, 0.6);
-            roboter_polyeder[2] = lvr2::BaseVector<float>(0.7, -0.6, 1.4);
-            roboter_polyeder[3] = lvr2::BaseVector<float>(0.7, 0.6, 1.4);
-            roboter_polyeder[4] = lvr2::BaseVector<float>(10, 0.6, 0.6);
-            roboter_polyeder[5] = lvr2::BaseVector<float>(10, -0.6, 0.6);
-            roboter_polyeder[6] = lvr2::BaseVector<float>(10, -0.6, 1.4);
-            roboter_polyeder[7] = lvr2::BaseVector<float>(10, 0.6, 1.4);
-            //Matrix to baselink
-            matrixTransform = transform_to_base.getMatrix();
-            matrixTransform[3] = os_sensor_to_base_footprintos_sensor.transform.translation.x;
-            matrixTransform[7] = os_sensor_to_base_footprintos_sensor.transform.translation.y;
-            matrixTransform[11] = os_sensor_to_base_footprintos_sensor.transform.translation.z;
-
             penalty = config.penalty;
+            setParamsForSpeedCalc();
             this->global_frame = "base_footprint";
 
         }
     }
 
+    void MeshMap::setParamsForSpeedCalc(){
+        tf2_ros::Buffer buffer_;
+        tf2_ros::TransformListener listener_(buffer_);
+
+        geometry_msgs::TransformStamped base_footprint_to_os_sensor;
+        geometry_msgs::TransformStamped os_sensor_to_base_footprintos_sensor;
+        base_footprint_to_os_sensor = buffer_.lookupTransform("os_sensor", "base_footprint", ros::Time(0),
+                                                              ros::Duration(1.0));
+        os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0),
+                                                                       ros::Duration(1.0));
+        //#TODO outsource in function
+        transform = lvr2::Quaternion < lvr2::BaseVector < float
+                >> (base_footprint_to_os_sensor.transform.rotation.x, base_footprint_to_os_sensor.transform.rotation.y, base_footprint_to_os_sensor.transform.rotation.z, base_footprint_to_os_sensor.transform.rotation.w);
+        transform_to_base = lvr2::Quaternion < lvr2::BaseVector < float
+                >> (os_sensor_to_base_footprintos_sensor.transform.rotation.x, os_sensor_to_base_footprintos_sensor.transform.rotation.y, os_sensor_to_base_footprintos_sensor.transform.rotation.z, os_sensor_to_base_footprintos_sensor.transform.rotation.w);
+
+        left_wheel = lvr2::BaseVector<float>(0, 1, 0) * -(config.left_wheel) +
+                     (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
+        right_wheel = lvr2::BaseVector<float>(0, 1, 0) * config.right_wheel +
+                      (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
+        width_of_intresst = lvr2::BaseVector<float>(0, 1, 0) * 0.3;
+        depth_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * -30;
+        hight_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * config.max_z;
+        length_of_intresst = lvr2::BaseVector<float>(1, 0, 0) * 20;
+
+        area_of_interesst_left[0] = left_wheel + width_of_intresst + depth_of_intresst;
+        area_of_interesst_left[1] = left_wheel - width_of_intresst + depth_of_intresst;
+
+        area_of_interesst_left[2] = left_wheel + width_of_intresst + hight_of_intresst;
+        area_of_interesst_left[3] = left_wheel - width_of_intresst + hight_of_intresst;
+
+        area_of_interesst_left[4] = left_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
+        area_of_interesst_left[5] = left_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
+
+        area_of_interesst_left[6] = left_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
+        area_of_interesst_left[7] = left_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
+
+        area_of_interesst_right[0] = right_wheel + width_of_intresst + depth_of_intresst;
+        area_of_interesst_right[1] = right_wheel - width_of_intresst + depth_of_intresst;
+
+        area_of_interesst_right[2] = right_wheel + width_of_intresst + hight_of_intresst;
+        area_of_interesst_right[3] = right_wheel - width_of_intresst + hight_of_intresst;
+
+        area_of_interesst_right[4] = right_wheel + width_of_intresst + depth_of_intresst + length_of_intresst;
+        area_of_interesst_right[5] = right_wheel - width_of_intresst + depth_of_intresst + length_of_intresst;
+
+        area_of_interesst_right[6] = right_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
+        area_of_interesst_right[7] = right_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
+        lvr2::Matrix4 <lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
+        to_os_sensor[3] = base_footprint_to_os_sensor.transform.translation.x;
+        to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
+        to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
+
+        lvr2::BaseVector<float> roboter_hight = lvr2::BaseVector<float>(0, 0, config.roboter_hight);
+        lvr2::BaseVector<float> roboter_right_wheelbase = lvr2::BaseVector<float>(0, 0,
+                                                                                  config.roboter_wheelbase / 2);
+        lvr2::BaseVector<float> roboter_left_wheelbase = lvr2::BaseVector<float>(0, 0,
+                                                                                 (config.roboter_wheelbase / 2) *
+                                                                                 -1);
+        lvr2::BaseVector<float> roboter_ground_clearance = lvr2::BaseVector<float>(0, 0,
+                                                                                   config.roboter_ground_clearance);
+        lvr2::BaseVector<float> softcap = lvr2::BaseVector<float>(0, 0, config.softcap);
+
+        roboter_polyeder[0] = lvr2::BaseVector<float>(0.7, 0.6, 0.6);
+        roboter_polyeder[1] = lvr2::BaseVector<float>(0.7, -0.6, 0.6);
+        roboter_polyeder[2] = lvr2::BaseVector<float>(0.7, -0.6, 1.4);
+        roboter_polyeder[3] = lvr2::BaseVector<float>(0.7, 0.6, 1.4);
+        roboter_polyeder[4] = lvr2::BaseVector<float>(10, 0.6, 0.6);
+        roboter_polyeder[5] = lvr2::BaseVector<float>(10, -0.6, 0.6);
+        roboter_polyeder[6] = lvr2::BaseVector<float>(10, -0.6, 1.4);
+        roboter_polyeder[7] = lvr2::BaseVector<float>(10, 0.6, 1.4);
+        //Matrix to baselink
+        matrixTransform = transform_to_base.getMatrix();
+        matrixTransform[3] = os_sensor_to_base_footprintos_sensor.transform.translation.x;
+        matrixTransform[7] = os_sensor_to_base_footprintos_sensor.transform.translation.y;
+        matrixTransform[11] = os_sensor_to_base_footprintos_sensor.transform.translation.z;
+    }
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
         int step = 2;
