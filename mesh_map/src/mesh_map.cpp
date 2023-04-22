@@ -103,7 +103,7 @@ namespace mesh_map {
         reconfigure_server_ptr->setCallback(config_callback);
         this->subscribe = subscribe;
         if (this->subscribe) {
-            cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createAndAnalyseOFM, this);
+            cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
             penalty = config.penalty;
             this->row_step = config.row_step;
@@ -186,7 +186,7 @@ namespace mesh_map {
         matrixTransform[11] = os_sensor_to_base_footprintos_sensor.transform.translation.z;
     }
 
-    void MeshMap::createAndAnalyseOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
+    void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
         divider = 0;
         if (i % reduce == 0) {
             result = 0;
