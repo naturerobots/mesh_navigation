@@ -128,14 +128,12 @@ namespace mesh_map {
         transform_to_base = lvr2::Quaternion < lvr2::BaseVector < float
                 >> (os_sensor_to_base_footprintos_sensor.transform.rotation.x, os_sensor_to_base_footprintos_sensor.transform.rotation.y, os_sensor_to_base_footprintos_sensor.transform.rotation.z, os_sensor_to_base_footprintos_sensor.transform.rotation.w);
 
-        left_wheel = lvr2::BaseVector<float>(0, 1, 0) * -(config.left_wheel) +
-                     (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
-        right_wheel = lvr2::BaseVector<float>(0, 1, 0) * config.right_wheel +
-                      (lvr2::BaseVector<float>(1, 0, 0) * (config.min_x));
-        width_of_intresst = lvr2::BaseVector<float>(0, 1, 0) * 0.3;
-        depth_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * -30;
-        hight_of_intresst = lvr2::BaseVector<float>(0, 0, 1) * config.max_z;
-        length_of_intresst = lvr2::BaseVector<float>(1, 0, 0) * 20;
+        left_wheel = lvr2::BaseVector<float>(config.min_x, -(config.left_wheel), 0);
+        right_wheel = lvr2::BaseVector<float>(config.min_x, config.right_wheel, 0);
+        width_of_intresst = lvr2::BaseVector<float>(0, 0.3, 0) ;
+        depth_of_intresst = lvr2::BaseVector<float>(0, 0, -30);
+        hight_of_intresst = lvr2::BaseVector<float>(0, 0, config.max_z) ;
+        length_of_intresst = lvr2::BaseVector<float>(20, 0, 0);
 
         area_of_interesst_left[0] = left_wheel + width_of_intresst + depth_of_intresst;
         area_of_interesst_left[1] = left_wheel - width_of_intresst + depth_of_intresst;
@@ -165,25 +163,15 @@ namespace mesh_map {
         to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
         to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
 
-        lvr2::BaseVector<float> roboter_hight = lvr2::BaseVector<float>(0, 0, config.roboter_hight);
-        lvr2::BaseVector<float> roboter_right_wheelbase = lvr2::BaseVector<float>(0, 0,
-                                                                                  config.roboter_wheelbase / 2);
-        lvr2::BaseVector<float> roboter_left_wheelbase = lvr2::BaseVector<float>(0, 0,
-                                                                                 (config.roboter_wheelbase / 2) *
-                                                                                 -1);
-        lvr2::BaseVector<float> roboter_ground_clearance = lvr2::BaseVector<float>(0, 0,
-                                                                                   config.roboter_ground_clearance);
-        lvr2::BaseVector<float> softcap = lvr2::BaseVector<float>(0, 0, config.softcap);
+        roboter_polyeder[0] = lvr2::BaseVector<float>(config.min_x, config.roboter_wheelbase, config.roboter_ground_clearance);
+        roboter_polyeder[1] = lvr2::BaseVector<float>(config.min_x, -config.roboter_wheelbase, config.roboter_ground_clearance);
+        roboter_polyeder[2] = lvr2::BaseVector<float>(config.min_x, -config.roboter_wheelbase, config.roboter_hight);
+        roboter_polyeder[3] = lvr2::BaseVector<float>(config.min_x, config.roboter_wheelbase, config.roboter_hight);
+        roboter_polyeder[4] = lvr2::BaseVector<float>(20, config.roboter_wheelbase, config.roboter_ground_clearance);
+        roboter_polyeder[5] = lvr2::BaseVector<float>(20, -config.roboter_wheelbase, config.roboter_ground_clearance);
+        roboter_polyeder[6] = lvr2::BaseVector<float>(20, -config.roboter_wheelbase, config.roboter_hight);
+        roboter_polyeder[7] = lvr2::BaseVector<float>(20, config.roboter_wheelbase, config.roboter_hight);
 
-        roboter_polyeder[0] = lvr2::BaseVector<float>(0.7, 0.6, 0.6);
-        roboter_polyeder[1] = lvr2::BaseVector<float>(0.7, -0.6, 0.6);
-        roboter_polyeder[2] = lvr2::BaseVector<float>(0.7, -0.6, 1.4);
-        roboter_polyeder[3] = lvr2::BaseVector<float>(0.7, 0.6, 1.4);
-        roboter_polyeder[4] = lvr2::BaseVector<float>(10, 0.6, 0.6);
-        roboter_polyeder[5] = lvr2::BaseVector<float>(10, -0.6, 0.6);
-        roboter_polyeder[6] = lvr2::BaseVector<float>(10, -0.6, 1.4);
-        roboter_polyeder[7] = lvr2::BaseVector<float>(10, 0.6, 1.4);
-        //Matrix to baselink
         matrixTransform = transform_to_base.getMatrix();
         matrixTransform[3] = os_sensor_to_base_footprintos_sensor.transform.translation.x;
         matrixTransform[7] = os_sensor_to_base_footprintos_sensor.transform.translation.y;
