@@ -398,10 +398,10 @@ namespace mesh_map
         mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
         /**
-         * @brief create a Organized Fast Mesh and write it to mesh_ptr
+         * @brief create a Organized Fast Mesh, write it to mesh_ptr and anylse it
          * @param cloud
          */
-        void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
+        void createAndAnalyseOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
         /**
          *  @brief calculate and publish a speed estimation
@@ -418,17 +418,45 @@ namespace mesh_map
         lvr2::DenseVertexMap<bool> invalid;
 
     private:
+        /**
+         * check if the point p is in side the square of vertices
+         * @param p
+         * @param vertices
+         * @return true if point o is inside the square
+         */
         bool isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float>* vertices);
 
+        /**
+         * checks whether an object protrudes between the wheels and above the ground clearance.
+         * If so, the speed is reduced or maintained
+         * @param cloudBuffer
+         */
         void checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer);
+
+        /**
+         * use a median filter on the speed estimation (if the speed estimation are zero the return is zero)
+         */
         void median_filter_for_speed();
+
+        /**
+         * use a average filter on the speed estimation (if the speed estimation are zero the return is zero)
+         */
         void average_filter_for_speed();
+
+        /**
+         * set the parames for the ofm creating and the speed calc
+         */
         void setParamsForSpeedCalc();
+
+        //! if true the MeshMap is subscribe to a point cloud
         bool subscribe;
 
+        //! subscriber of the point cloud
         ros::Subscriber cloud_sub_;
+
+        //! publisher of the mesh
         ros::Publisher mesh_pub_;
-        std::string point_cloud;
+
         //! plugin class loader for for the layer plugins
         pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -459,7 +487,6 @@ namespace mesh_map
         std::string mesh_layer;
 
 
-        float result;
         float min_roughness;
         float max_roughness;
         float min_height_diff;
@@ -495,7 +522,7 @@ namespace mesh_map
         //! publisher for vertex costs
         ros::Publisher vertex_costs_pub;
 
-        //! publisher for speed
+        //! publisher for speed estimation
         ros::Publisher speed_pub;
 
         //! publisher for vertex colors
@@ -547,32 +574,77 @@ namespace mesh_map
 
         //! k-d tree to query mesh vertices in logarithmic time
         std::unique_ptr<KDTree> kd_tree_ptr;
-        lvr2::Quaternion<lvr2::BaseVector<float>> transform;
+
+        //! quaternion for rotation to sensor
+        lvr2::Quaternion<lvr2::BaseVector<float>> transform_to_sensor;
+
+        //! quaternion for rotation to base
         lvr2::Quaternion<lvr2::BaseVector<float>> transform_to_base;
 
+        //! point of the left wheel
         lvr2::BaseVector<float> left_wheel;
+
+        //! point of the right wheeö
         lvr2::BaseVector<float> right_wheel;
+
+
         lvr2::BaseVector<float> width_of_intresst;
         lvr2::BaseVector<float> depth_of_intresst;
         lvr2::BaseVector<float> hight_of_intresst;
         lvr2::BaseVector<float> length_of_intresst;
+
+        //! defention of area of interesst
         lvr2::BaseVector<float> area_of_interesst_left[8];
+
+        //! defention of area of interesst
         lvr2::BaseVector<float> area_of_interesst_right[8];
+
+        //! defention of area of the roboter
         lvr2::BaseVector<float> roboter_polyeder[8];
+
+        //! the last ten speed estimation
         std::vector<float> last_speed;
-        int last_add =0;
+
+        //! postion which speed estimation will be overwritten next
+        int next_del =0;
+        //! penalty for non-navigable vertices
         float  penalty;
+
+        //! couter of scans
         int i=0;
+
+        //! Reduced hertz rate for better visualization in RViz
+        //! (if the driveability analysis is slower than the scanner's hertz rate, the image will flicker in RViz)
+        int reduce=2;
+
+        //! current speed estimation
         float speed =0;
+
+        //! cal_step size for OFM
         int cal_step;
+
+        //! row_step size for OFM
         int row_step;
+
+        //! softcap for speed estimation
+        //!if a non-passable point is closer to the robot than the softcap value, the robot stops
         float softcap;
+
+        //!if a point is closer than threshold to the robot,
+        //! the passability of the point is considered in the speed estimation
         float threshold;
+
+        //! if a point is closer than this value to the robot
+        //! it will not be part of the mesh and will not be considered in the speed estimation
         float min;
 
-        lvr2::Matrix4< lvr2::BaseVector<float>> matrixTransform;
+        //! sum of all weighted vertex cost
+        float result;
+        //! sum of all weights
         float divider =0;
 
+        //! Transformation matrix from os_sensor to base_link
+        lvr2::Matrix4< lvr2::BaseVector<float>> matrixTransform;
     };
 
 } /* namespace mesh_map */

@@ -103,11 +103,11 @@ namespace mesh_map {
         reconfigure_server_ptr->setCallback(config_callback);
         this->subscribe = subscribe;
         if (this->subscribe) {
-            cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
+            cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createAndAnalyseOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
             penalty = config.penalty;
-            this->row_step=2;
-            this->cal_step=2;
+            this->row_step=config.row_step;
+            this->cal_step=config.cal_step;
             this-> softcap = config.softcap;
             this->threshold = config.threshouldSpeed;
             this->min = config.min_x;
@@ -128,15 +128,15 @@ namespace mesh_map {
                                                               ros::Duration(1.0));
         os_sensor_to_base_footprintos_sensor = buffer_.lookupTransform("base_footprint", "os_sensor", ros::Time(0),
                                                                        ros::Duration(1.0));
-        //#TODO outsource in function
-        transform = lvr2::Quaternion < lvr2::BaseVector < float
+
+        transform_to_sensor = lvr2::Quaternion < lvr2::BaseVector < float
                 >> (base_footprint_to_os_sensor.transform.rotation.x, base_footprint_to_os_sensor.transform.rotation.y, base_footprint_to_os_sensor.transform.rotation.z, base_footprint_to_os_sensor.transform.rotation.w);
         transform_to_base = lvr2::Quaternion < lvr2::BaseVector < float
                 >> (os_sensor_to_base_footprintos_sensor.transform.rotation.x, os_sensor_to_base_footprintos_sensor.transform.rotation.y, os_sensor_to_base_footprintos_sensor.transform.rotation.z, os_sensor_to_base_footprintos_sensor.transform.rotation.w);
 
         left_wheel = lvr2::BaseVector<float>(config.min_x, -(config.left_wheel), 0);
         right_wheel = lvr2::BaseVector<float>(config.min_x, config.right_wheel, 0);
-        width_of_intresst = lvr2::BaseVector<float>(0, 0.3, 0) ;
+        width_of_intresst = lvr2::BaseVector<float>(0, config.delta, 0) ;
         depth_of_intresst = lvr2::BaseVector<float>(0, 0, -30);
         hight_of_intresst = lvr2::BaseVector<float>(0, 0, config.max_z) ;
         length_of_intresst = lvr2::BaseVector<float>(20, 0, 0);
@@ -164,7 +164,7 @@ namespace mesh_map {
 
         area_of_interesst_right[6] = right_wheel + width_of_intresst + hight_of_intresst + length_of_intresst;
         area_of_interesst_right[7] = right_wheel - width_of_intresst + hight_of_intresst + length_of_intresst;
-        lvr2::Matrix4 <lvr2::BaseVector<float>> to_os_sensor = transform.getMatrix();
+        lvr2::Matrix4 <lvr2::BaseVector<float>> to_os_sensor = transform_to_sensor.getMatrix();
         to_os_sensor[3] = base_footprint_to_os_sensor.transform.translation.x;
         to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
         to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
@@ -184,14 +184,10 @@ namespace mesh_map {
         matrixTransform[11] = os_sensor_to_base_footprintos_sensor.transform.translation.z;
     }
 
-    void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
+    void MeshMap::createAndAnalyseOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
         divider = 0;
-        if (i % 5 == 0) {
+        if (i % reduce== 0) {
             result = 0;
-            std::ofstream out;
-            out.open("/home/lukas/newtest/speedpub/time.txt", std::ios::app);
-
-            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             lvr2::PointBuffer pointBuffer;
             mesh_msgs_conversions::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
             checkleathleObjectsbetweenWheels(pointBuffer);
@@ -210,9 +206,8 @@ namespace mesh_map {
             this->vertex_colors_pub.publish(color_msg);
             publishSpeedoverAllVertex();
 
-            out << cloud->header.stamp << std::endl;
-            out.close();
 
+            i=0;
         }
         i++;
     }
@@ -249,7 +244,7 @@ namespace mesh_map {
 
 
     bool MeshMap::isInsideBox(lvr2::BaseVector<float> p, lvr2::BaseVector<float> *vertices) {
-        // Berechne die minimalen und maximalen Grenzwerte der Koordinaten des Quaders
+
         lvr2::BaseVector<float> bMin, bMax;
         bMin.x = bMax.x = vertices[0].x;
         bMin.y = bMax.y = vertices[0].y;
@@ -263,7 +258,7 @@ namespace mesh_map {
             if (vertices[i].z > bMax.z) bMax.z = vertices[i].z;
         }
 
-        // Überprüfe, ob der Punkt innerhalb des Quaders liegt
+
         if (p.x < bMin.x || p.x > bMax.x ||
             p.y < bMin.y || p.y > bMax.y ||
             p.z < bMin.z || p.z > bMax.z)
@@ -1398,11 +1393,6 @@ const std::string MeshMap::getGlobalFrameID() {
 void MeshMap::publishSpeedoverAllVertex() {
 
     float multi = 2;
-    float neuspeed = 0;
-    std::ofstream out;
-    out.open("/home/lukas/newtest/speedpub/ak.txt", std::ios::app);
-
-
     if (vertex_costs.numValues() == 0) {
         speed = 0;
         std_msgs::Float64 speed_msg;
@@ -1455,7 +1445,6 @@ void MeshMap::publishSpeedoverAllVertex() {
             speed_pub.publish(speed_msg);
         }
 
-        out << speed << std::endl;
 
     }
 
@@ -1468,15 +1457,15 @@ bool MeshMap::getsubscribe() {
 
 void MeshMap::median_filter_for_speed() {
     if (last_speed.size() > 9) {
-        last_speed[last_add] = speed;
-        last_add++;
+        last_speed[next_del] = speed;
+        next_del++;
 
     } else {
         last_speed.push_back(speed);
-        last_add++;
+        next_del++;
     }
-    if (last_add == 10) {
-        last_add = 0;
+    if (next_del == 10) {
+        next_del = 0;
     }
 
 
@@ -1495,15 +1484,15 @@ void MeshMap::median_filter_for_speed() {
 
 void MeshMap::average_filter_for_speed() {
     if (last_speed.size() > 9) {
-        last_speed[last_add] = speed;
-        last_add++;
+        last_speed[next_del] = speed;
+        next_del++;
 
     } else {
         last_speed.push_back(speed);
-        last_add++;
+        next_del++;
     }
-    if (last_add == 10) {
-        last_add = 0;
+    if (next_del == 10) {
+        next_del = 0;
     }
 
 
