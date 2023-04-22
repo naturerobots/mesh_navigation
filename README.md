@@ -61,9 +61,10 @@ All dependencies can be installed using rosdep
 
 As explicit dependencies we refer to the following ROS packages, which are also developed by us:
 
-* **[lvr2](https://github.com/uos/lvr2)* **
+* **[lvr2](https://github.com/uos/lvr2)**
 * **[mesh_tools](https://github.com/uos/mesh_tools/)**
 * **[move_base_flex](https://github.com/magazino/move_base_flex/)**
+* **[organized_fast_mesh](https://github.com/naturerobots/organized_fast_mesh/tree/feature/use_mesh_tools_dev/)**
 
 Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for example HDF5 map datasets, Gazebo simulations, and example configurations.
  
@@ -71,11 +72,13 @@ Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for exampl
 git clone https://github.com/naturerobots/organized_fast_mesh Branch feature/use_mesh_tools
 git clone https://github.com/naturerobots/mesh_tools.git
 git clone https://github.com/magazino/move_base_flex.git
+git clone https://github.com/naturerobots/organized_fast_mesh.git
 sudo apt install ros-noetic-costmap-2d
 sudo apt-get install ros-noetic-navigation
 
 
-
+For using with the Ouster ROS Install:
+git clone https://github.com/naturerobots/organized_fast_mesh.git
 
 ## Software Stack
 
