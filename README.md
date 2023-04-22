@@ -70,9 +70,13 @@ Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for exampl
  
  Install:
 git clone https://github.com/naturerobots/organized_fast_mesh Branch feature/use_mesh_tools
+
 git clone https://github.com/naturerobots/mesh_tools.git
+
 git clone https://github.com/magazino/move_base_flex.git
+
 sudo apt install ros-noetic-costmap-2d
+
 sudo apt-get install ros-noetic-navigation
 
 
