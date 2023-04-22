@@ -42,12 +42,13 @@
 #include <pluginlib/class_list_macros.h>
 #include <math.h>
 
-PLUGINLIB_EXPORT_CLASS(mesh_layers::SteepnessLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::SteepnessLayer, mesh_map::AbstractLayer
+)
 
 namespace mesh_layers {
     bool SteepnessLayer::readLayer() {
         ROS_INFO_STREAM("Try to read steepness from map file...");
-        auto steepness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("steepness");
+        auto steepness_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < float >> ("steepness");
         if (steepness_opt) {
             ROS_INFO_STREAM("Successfully read steepness from map file.");
             steepness = steepness_opt.get();
@@ -84,10 +85,10 @@ namespace mesh_layers {
     bool SteepnessLayer::computeLayer(bool hasIO) {
         ROS_INFO_STREAM("Computing steepness...");
 
-        lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
-        lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
+        lvr2::DenseFaceMap <mesh_map::Normal> face_normals;
+        lvr2::DenseVertexMap <mesh_map::Normal> vertex_normals;
         if (hasIO) {
-            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(
+            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseFaceMap < mesh_map::Normal >> (
                     "face_normals");
 
             if (face_normals_opt) {
@@ -105,7 +106,7 @@ namespace mesh_layers {
                 }
             }
 
-            auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>(
+            auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < mesh_map::Normal >> (
                     "vertex_normals");
 
             if (vertex_normals_opt) {
@@ -168,8 +169,9 @@ namespace mesh_layers {
 
     bool SteepnessLayer::initialize(const std::string &name) {
         first_config = true;
-        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>>(
-                new dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>(private_nh));
+        reconfigure_server_ptr =
+                boost::shared_ptr < dynamic_reconfigure::Server < mesh_layers::SteepnessLayerConfig >> (
+                        new dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>(private_nh));
 
         config_callback = boost::bind(&SteepnessLayer::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);

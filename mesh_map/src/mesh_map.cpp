@@ -106,9 +106,9 @@ namespace mesh_map {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createAndAnalyseOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
             penalty = config.penalty;
-            this->row_step=config.row_step;
-            this->cal_step=config.cal_step;
-            this-> softcap = config.softcap;
+            this->row_step = config.row_step;
+            this->cal_step = config.cal_step;
+            this->softcap = config.softcap;
             this->threshold = config.threshouldSpeed;
             this->min = config.min_x;
 
@@ -118,7 +118,7 @@ namespace mesh_map {
         }
     }
 
-    void MeshMap::setParamsForSpeedCalc(){
+    void MeshMap::setParamsForSpeedCalc() {
         tf2_ros::Buffer buffer_;
         tf2_ros::TransformListener listener_(buffer_);
 
@@ -136,9 +136,9 @@ namespace mesh_map {
 
         left_wheel = lvr2::BaseVector<float>(config.min_x, -(config.left_wheel), 0);
         right_wheel = lvr2::BaseVector<float>(config.min_x, config.right_wheel, 0);
-        width_of_intresst = lvr2::BaseVector<float>(0, config.delta, 0) ;
+        width_of_intresst = lvr2::BaseVector<float>(0, config.delta, 0);
         depth_of_intresst = lvr2::BaseVector<float>(0, 0, -30);
-        hight_of_intresst = lvr2::BaseVector<float>(0, 0, config.max_z) ;
+        hight_of_intresst = lvr2::BaseVector<float>(0, 0, config.max_z);
         length_of_intresst = lvr2::BaseVector<float>(20, 0, 0);
 
         area_of_interesst_left[0] = left_wheel + width_of_intresst + depth_of_intresst;
@@ -169,8 +169,10 @@ namespace mesh_map {
         to_os_sensor[7] = base_footprint_to_os_sensor.transform.translation.y;
         to_os_sensor[11] = base_footprint_to_os_sensor.transform.translation.z;
 
-        roboter_polyeder[0] = lvr2::BaseVector<float>(config.min_x, config.roboter_wheelbase, config.roboter_ground_clearance);
-        roboter_polyeder[1] = lvr2::BaseVector<float>(config.min_x, -config.roboter_wheelbase, config.roboter_ground_clearance);
+        roboter_polyeder[0] = lvr2::BaseVector<float>(config.min_x, config.roboter_wheelbase,
+                                                      config.roboter_ground_clearance);
+        roboter_polyeder[1] = lvr2::BaseVector<float>(config.min_x, -config.roboter_wheelbase,
+                                                      config.roboter_ground_clearance);
         roboter_polyeder[2] = lvr2::BaseVector<float>(config.min_x, -config.roboter_wheelbase, config.roboter_hight);
         roboter_polyeder[3] = lvr2::BaseVector<float>(config.min_x, config.roboter_wheelbase, config.roboter_hight);
         roboter_polyeder[4] = lvr2::BaseVector<float>(20, config.roboter_wheelbase, config.roboter_ground_clearance);
@@ -186,12 +188,13 @@ namespace mesh_map {
 
     void MeshMap::createAndAnalyseOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
         divider = 0;
-        if (i % reduce== 0) {
+        if (i % reduce == 0) {
             result = 0;
             lvr2::PointBuffer pointBuffer;
             mesh_msgs_conversions::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
             checkleathleObjectsbetweenWheels(pointBuffer);
-            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, row_step,
+            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width,
+                                                                         row_step,
                                                                          cal_step, area_of_interesst_left,
                                                                          area_of_interesst_right, matrixTransform);
             ofmg.setEdgeThreshold(config.edgeThreshold);
@@ -207,7 +210,7 @@ namespace mesh_map {
             publishSpeedoverAllVertex();
 
 
-            i=0;
+            i = 0;
         }
         i++;
     }
@@ -1404,8 +1407,7 @@ void MeshMap::publishSpeedoverAllVertex() {
         float divider = 0;
         if (result == std::numeric_limits<float>::infinity() || result == -std::numeric_limits<float>::infinity()) {
             ROS_INFO("The calculated speed suggestion in percent is 0% because of an object in front of the roboter");
-        }
-        else {
+        } else {
 
             for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
                 lvr2::VertexHandle vh(i);

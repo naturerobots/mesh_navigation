@@ -41,12 +41,13 @@
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <pluginlib/class_list_macros.h>
 
-PLUGINLIB_EXPORT_CLASS(mesh_layers::HeightDiffLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::HeightDiffLayer, mesh_map::AbstractLayer
+)
 
 namespace mesh_layers {
     bool HeightDiffLayer::readLayer() {
         ROS_INFO_STREAM("Try to read height differences from map file...");
-        auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
+        auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < float >> ("height_diff");
 
         if (height_diff_opt) {
             ROS_INFO_STREAM("Height differences have been read successfully.");
@@ -116,8 +117,9 @@ namespace mesh_layers {
 
     bool HeightDiffLayer::initialize(const std::string &name) {
         first_config = true;
-        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
-                new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(private_nh));
+        reconfigure_server_ptr =
+                boost::shared_ptr < dynamic_reconfigure::Server < mesh_layers::HeightDiffLayerConfig >> (
+                        new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(private_nh));
 
         config_callback = boost::bind(&HeightDiffLayer::reconfigureCallback, this, _1, _2);
         reconfigure_server_ptr->setCallback(config_callback);

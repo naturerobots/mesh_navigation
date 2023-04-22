@@ -41,14 +41,15 @@
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <pluginlib/class_list_macros.h>
 
-PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer
+)
 
 namespace mesh_layers {
 
     bool RoughnessLayer::readLayer() {
         ROS_INFO_STREAM("Try to read roughness from map file...");
         auto roughness_opt =
-                mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
+                mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < float >> (
                         "roughness");
         if (roughness_opt) {
             ROS_INFO_STREAM("Successfully read roughness from map file.");
@@ -87,11 +88,11 @@ namespace mesh_layers {
 
         ROS_INFO_STREAM("Computing roughness...");
 
-        lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
-        lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
+        lvr2::DenseFaceMap <mesh_map::Normal> face_normals;
+        lvr2::DenseVertexMap <mesh_map::Normal> vertex_normals;
         if (hasIO) {
             auto face_normals_opt =
-                    mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(
+                    mesh_io_ptr->getDenseAttributeMap < lvr2::DenseFaceMap < mesh_map::Normal >> (
                             "face_normals");
 
             if (face_normals_opt) {
@@ -113,7 +114,7 @@ namespace mesh_layers {
             }
 
             auto vertex_normals_opt =
-                    mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>(
+                    mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < mesh_map::Normal >> (
                             "vertex_normals");
 
             if (vertex_normals_opt) {
@@ -131,8 +132,7 @@ namespace mesh_layers {
                     return false;
                 }
             }
-        }
-        else{
+        } else {
 
             face_normals = map_ptr->faceNormals();
             vertex_normals = map_ptr->vertexNormals();
@@ -169,8 +169,8 @@ namespace mesh_layers {
 
     bool RoughnessLayer::initialize(const std::string &name) {
         first_config = true;
-        reconfigure_server_ptr = boost::shared_ptr<
-                dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>>(
+        reconfigure_server_ptr = boost::shared_ptr <
+                                 dynamic_reconfigure::Server < mesh_layers::RoughnessLayerConfig >> (
                 new dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>(
                         private_nh));
 

@@ -43,12 +43,13 @@
 #include <pluginlib/class_list_macros.h>
 #include <math.h>
 
-PLUGINLIB_EXPORT_CLASS(mesh_layers::RidgeLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::RidgeLayer, mesh_map::AbstractLayer
+)
 
 namespace mesh_layers {
     bool RidgeLayer::readLayer() {
         ROS_INFO_STREAM("Try to read ridge from map file...");
-        auto ridge_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("ridge");
+        auto ridge_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < float >> ("ridge");
         if (ridge_opt) {
             ROS_INFO_STREAM("Successfully read ridge from map file.");
             ridge = ridge_opt.get();
@@ -86,13 +87,13 @@ namespace mesh_layers {
 
     bool RidgeLayer::computeLayer(bool hasIO) {
         ROS_INFO_STREAM("Computing ridge...");
-        lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
-        lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
+        lvr2::DenseFaceMap <mesh_map::Normal> face_normals;
+        lvr2::DenseVertexMap <mesh_map::Normal> vertex_normals;
 
         if (hasIO) {
 
 
-            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(
+            auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseFaceMap < mesh_map::Normal >> (
                     "face_normals");
 
             if (face_normals_opt) {
@@ -109,7 +110,7 @@ namespace mesh_layers {
                     return false;
                 }
             }
-            auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>(
+            auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap < lvr2::DenseVertexMap < mesh_map::Normal >> (
                     "vertex_normals");
 
             if (vertex_normals_opt) {
@@ -142,7 +143,7 @@ namespace mesh_layers {
                 continue;
             }
 
-            std::set<lvr2::VertexHandle> invalid;
+            std::set <lvr2::VertexHandle> invalid;
 
             float value = 0.0;
             int num_neighbours = 0;
@@ -196,7 +197,7 @@ namespace mesh_layers {
 
     bool RidgeLayer::initialize(const std::string &name) {
         first_config = true;
-        reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::RidgeLayerConfig>>(
+        reconfigure_server_ptr = boost::shared_ptr < dynamic_reconfigure::Server < mesh_layers::RidgeLayerConfig >> (
                 new dynamic_reconfigure::Server<mesh_layers::RidgeLayerConfig>(private_nh));
 
         config_callback = boost::bind(&RidgeLayer::reconfigureCallback, this, _1, _2);
