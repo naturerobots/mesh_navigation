@@ -106,6 +106,12 @@ namespace mesh_map {
             cloud_sub_ = private_nh.subscribe(config.subscribe_node, 100, &MeshMap::createOFM, this);
             speed_pub = private_nh.advertise<std_msgs::Float64>("speed", 1, false);
             penalty = config.penalty;
+            this->row_step=2;
+            this->cal_step=2;
+            this-> softcap = config.softcap;
+            this->threshold = config.threshouldSpeed;
+            this->min = config.min_x;
+
             setParamsForSpeedCalc();
             this->global_frame = "base_footprint";
 
@@ -179,7 +185,6 @@ namespace mesh_map {
     }
 
     void MeshMap::createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud) {
-        int step = 2;
         divider = 0;
         if (i % 5 == 0) {
             result = 0;
@@ -189,10 +194,10 @@ namespace mesh_map {
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             lvr2::PointBuffer pointBuffer;
             mesh_msgs_conversions::fromPointCloud2ToPointBuffer(*cloud, pointBuffer);
-            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, step,
-                                                                         step, area_of_interesst_left,
-                                                                         area_of_interesst_right, matrixTransform);
             checkleathleObjectsbetweenWheels(pointBuffer);
+            OrganizedFastMeshGenerator ofmg = OrganizedFastMeshGenerator(pointBuffer, cloud->height, cloud->width, row_step,
+                                                                         cal_step, area_of_interesst_left,
+                                                                         area_of_interesst_right, matrixTransform);
             ofmg.setEdgeThreshold(config.edgeThreshold);
             lvr2::MeshBufferPtr mesh_buffer_ptr(new lvr2::MeshBuffer);
             mesh_msgs::MeshVertexColorsStamped color_msg;
@@ -216,9 +221,7 @@ namespace mesh_map {
     void MeshMap::checkleathleObjectsbetweenWheels(lvr2::PointBuffer &cloudBuffer) {
 
 
-        float soft = config.softcap;
         lvr2::floatArr cloudPoints = cloudBuffer.getPointArray();
-        float threshold = config.threshouldSpeed;
         for (int i = 0; i < cloudBuffer.numPoints() * 3; i += 3) {
             if (cloudPoints[i] != 0 || cloudPoints[i + 1] != 0 || cloudPoints[i + 2] != 0) {
                 lvr2::BaseVector<float> p(
@@ -230,11 +233,11 @@ namespace mesh_map {
                         cloudPoints[i + 2] * matrixTransform[10] + matrixTransform[11]); // point at (x,y)
                 if (isInsideBox(p, roboter_polyeder)) {
 
-                    if (p.x < 40) {
+                    if (p.x < softcap) {
                         result = std::numeric_limits<float>::infinity();
                         divider += 1;
 
-                    } else if (p.x < config.threshouldSpeed) {
+                    } else if (p.x < threshold) {
                         result = (result * p.x / threshold);
                         divider += (penalty * (1 - (p.x / threshold)));
                     }
@@ -1393,9 +1396,7 @@ const std::string MeshMap::getGlobalFrameID() {
 
 
 void MeshMap::publishSpeedoverAllVertex() {
-    float softcap = config.softcap;
-    float threshold = config.threshouldSpeed;
-    float min = config.minDinstanceSpeed;
+
     float multi = 2;
     float neuspeed = 0;
     std::ofstream out;
@@ -1414,44 +1415,46 @@ void MeshMap::publishSpeedoverAllVertex() {
         if (result == std::numeric_limits<float>::infinity() || result == -std::numeric_limits<float>::infinity()) {
             ROS_INFO("The calculated speed suggestion in percent is 0% because of an object in front of the roboter");
         }
+        else {
 
-        for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
-            lvr2::VertexHandle vh(i);
-            lvr2::BaseVector<float> point = mesh_ptr->getVertexPosition(vh);
+            for (int i = 0; i < vertex_costs.numValues() && result != std::numeric_limits<float>::infinity(); i++) {
+                lvr2::VertexHandle vh(i);
+                lvr2::BaseVector<float> point = mesh_ptr->getVertexPosition(vh);
 
 
-            float distance = point.x;
-            if (distance > min) {
-                if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
-                    vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
-                    if (lethals.find(vh) != lethals.end()) {
-                        if (distance >= softcap && distance < threshold) {
-                            result = penalty * (1 - (distance / threshold));
-                            divider = (1 - (distance / threshold));
-                        } else if (distance < softcap) {
-                            result += vertex_costs[vh];
-                            divider = 1;
+                float distance = point.x;
+                if (distance > min) {
+                    if (vertex_costs[vh] == std::numeric_limits<float>::infinity() ||
+                        vertex_costs[vh] == -(std::numeric_limits<float>::infinity())) {
+                        if (lethals.find(vh) != lethals.end()) {
+                            if (distance >= softcap && distance < threshold) {
+                                result = penalty * (1 - (distance / threshold));
+                                divider = (1 - (distance / threshold));
+                            } else if (distance < softcap) {
+                                result += vertex_costs[vh];
+                                divider = 1;
+                            }
                         }
+                    } else if (distance < threshold) {
+                        result = vertex_costs[vh] * (1 - (distance / threshold));
+                        divider = (1 - (distance / threshold));
                     }
-                } else if (distance < threshold) {
-                    result = vertex_costs[vh] * (1 - (distance / threshold));
-                    divider = (1 - (distance / threshold));
+
                 }
-
             }
+            result /= divider;
+
+            speed = 1 - (multi * (result));
+            if (speed == -std::numeric_limits<float>::infinity() || isnan(speed)) {
+                speed = 0;
+            }
+            average_filter_for_speed();
+            std_msgs::Float64 speed_msg;
+            speed_msg.data = speed;
+            ROS_INFO("The calculated speed suggestion in percent is %f", (speed * 100), "%");
+            speed_pub.publish(speed_msg);
         }
 
-        result /= divider;
-
-        speed = 1 - (multi * (result));
-        if (speed == -std::numeric_limits<float>::infinity() || isnan(speed)) {
-            speed = 0;
-        }
-        average_filter_for_speed();
-        std_msgs::Float64 speed_msg;
-        speed_msg.data = speed;
-        ROS_INFO("The calculated speed suggestion in percent is %f", (speed * 100), "%");
-        speed_pub.publish(speed_msg);
         out << speed << std::endl;
 
     }

@@ -564,6 +564,11 @@ namespace mesh_map
         float  penalty;
         int i=0;
         float speed =0;
+        int cal_step;
+        int row_step;
+        float softcap;
+        float threshold;
+        float min;
 
         lvr2::Matrix4< lvr2::BaseVector<float>> matrixTransform;
         float divider =0;
