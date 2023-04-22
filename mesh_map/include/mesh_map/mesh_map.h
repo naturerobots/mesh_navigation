@@ -401,7 +401,7 @@ namespace mesh_map
          * @brief create a Organized Fast Mesh, write it to mesh_ptr and anylse it
          * @param cloud
          */
-        void createAndAnalyseOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
+        void createOFM(const sensor_msgs::PointCloud2::ConstPtr &cloud);
 
         /**
          *  @brief calculate and publish a speed estimation
