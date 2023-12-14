@@ -85,7 +85,7 @@ The package structure is as follows:
   - MeshController - `mbf_mesh_core/mesh_controller.h`
   - MeshRecovery - `mbf_mesh_core/mesh_recovery.h`
 
-- `mbf_mesh_nav` contains the mesh navigation server which build on top of the abstract MBF navigation server.
+- `mbf_mesh_nav` contains the mesh navigation server which is built on top of the abstract MBF navigation server.
   It uses the plugin interfaces in `mbf_mesh_core` to load and initialize plugins of the types described above.
 
 - `mesh_map` contains an implementation of a mesh map representation building on top of the mesh data structures
@@ -105,7 +105,7 @@ The package structure is as follows:
 
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm.
   It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed 
-  vertex to the goal pose can be computed. This leads in a sub-optimal potential field, which highly depends on the mesh 
+  vertex to the goal pose can be computed. This leads to a sub-optimal potential field, which highly depends on the mesh 
   structure.
 
 - `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account.
@@ -124,7 +124,7 @@ Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz.
 ### Mesh Layers
 
 The following table gives an overview of all currently implemented layer plugins available in the stack and the 
-corresponding types tp specify for usage in the mesh map configuration. An example mesh map configuration is shown
+corresponding types to specify for usage in the mesh map configuration. An example mesh map configuration is shown
 below.
 
 #### Overview of all layers
@@ -196,6 +196,11 @@ It will be renamed soon to vector_field_planner.
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
 
+## Mesh Localization
+
+For the necessary localization of the robot relative to the mesh, we recommend using RMCL: [https://github.com/uos/rmcl](https://github.com/uos/rmcl). We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
+
+<a href="https://vimeo.com/879000775" target="_blank" ><img src="docs/images/roscon2023_talk.png" alt="MeshNav ROSCon 2023 Video" width="300px"/></a>
 
 ## Build Status
 
