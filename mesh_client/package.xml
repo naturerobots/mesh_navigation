@@ -13,9 +13,10 @@
   <depend>curl</depend>
   <depend>eigen</depend>
   <depend>libjsoncpp-dev</depend>
-  <depend>lvr2</depend>
-  <depend>roscpp</depend>
+  <depend>lvr2</depend> <!--TODO: lvr is not packaged for humble. use fork from source for now-->
+  <depend>rclcpp</depend>
 
-  <buildtool_depend>catkin</buildtool_depend>
-
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

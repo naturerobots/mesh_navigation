@@ -1,53 +1,46 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(mesh_client)
 
-set(CMAKE_CXX_STANDARD 14)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
-find_package(catkin REQUIRED COMPONENTS
-    roscpp
+find_package(ament_cmake REQUIRED)
+set(dependencies
+  rclcpp
+  LVR2
+  CURL
+  Eigen3
 )
+foreach(dep IN LISTS dependencies)
+  find_package(${dep} REQUIRED)
+endforeach()
 
-find_package(CURL REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(LVR2 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES mesh_client
-  CATKIN_DEPENDS roscpp
-  DEPENDS CURL EIGEN3 LVR2
-)
-
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
-  ${LVR2_INCLUDE_DIRS}
-  ${JSONCPP_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
-  ${CURL_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
   src/mesh_client.cpp
 )
+ament_target_dependencies(${PROJECT_NAME} ${dependencies})
+#link_libraries(${PROJECT_NAME}
+#  ${LVR2_LIBRARIES}
+#  ${JSONCPP_LIBRARIES}
+#  ${CURL_LIBRARIES}
+#)
 
-link_libraries(${PROJECT_NAME}
-  ${LVR2_LIBRARIES}
-  ${JSONCPP_LIBRARIES}
-  ${CURL_LIBRARIES}
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-)
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(rclcpp ${dependencies})
+ament_package()
