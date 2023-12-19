@@ -1,6 +1,12 @@
 name: Melodic CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - "humble"
+  pull_request:
+    branches-ignore:
+      - "humble"
 
 jobs:
   build:
