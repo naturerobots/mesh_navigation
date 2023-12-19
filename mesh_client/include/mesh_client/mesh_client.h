@@ -42,6 +42,7 @@
 
 #include <string>
 #include <array>
+#include <rclcpp/logger.hpp>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <lvr2/geometry/BoundingBox.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
@@ -53,11 +54,12 @@ class MeshClient : public lvr2::AttributeMeshIOBase
 {
 public:
   /**
-   * @brief Constructs a mesh client which receaves
-   * @param srv_url The url of the server, use http://localhost/my/path/to/mesh if the server is used locally.
+   * @brief Constructs a mesh client which receives
+   * @param server_url The url of the server, use http://localhost/my/path/to/mesh if the server is used locally.
+   * @param logger The ROS logger that shall be used by the MeshClient. Defaults to using a logger "mesh_client"
    */
-  MeshClient(const std::string& srv_url, const std::string& server_username, const std::string& server_password,
-             const std::string& mesh_layer);
+  MeshClient(const std::string& server_url, const std::string& server_username, const std::string& server_password,
+             const std::string& mesh_layer, rclcpp::Logger logger = rclcpp::get_logger("mesh_client"));
 
   /**
    * @brief sets the Bounding box for the query which is send to the server
@@ -176,6 +178,8 @@ private:
   std::string mesh_layer_;
   std::array<float, 6> bounding_box_;
   std::map<std::string, std::pair<float, float>> mesh_filters_;
+
+  rclcpp::Logger logger_;
 };
 
 size_t writeFunction(void* ptr, size_t size, size_t nmemb, std::string* data)
