@@ -40,16 +40,16 @@
 
 #include <atomic>
 #include <dynamic_reconfigure/server.h>
-#include <geometry_msgs/Point.h>
+#include <geometry_msgs/msg/point.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
 #include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/abstract_layer.h>
-#include <mesh_msgs/MeshVertexCosts.h>
-#include <mesh_msgs/MeshVertexColors.h>
+#include <mesh_msgs/msg/MeshVertexCosts.h>
+#include <mesh_msgs/msg/MeshVertexColors.h>
 #include <mutex>
 #include <pluginlib/class_loader.h>
-#include <std_msgs/ColorRGBA.h>
+#include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <tuple>
 #include "nanoflann.hpp"
@@ -199,7 +199,7 @@ public:
   /**
    * @brief Converts a vector to a ROS geometry_msgs/Point message
    */
-  inline const geometry_msgs::Point toPoint(const Vector& vec);
+  inline const geometry_msgs::msg::Point toPoint(const Vector& vec);
 
   /**
    * Computes the direction vector for the given triangle's vertices and barycentric coordinates while using the given vector map
@@ -353,7 +353,7 @@ public:
    * @param color The marker's color
    * @param name The marker's name
    */
-  void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name);
+  void publishDebugPoint(const Vector pos, const std_msgs::msg::ColorRGBA& color, const std::string& name);
 
   /**
    * @brief Publishes a triangle as marker. Used for debug purposes.
@@ -361,7 +361,7 @@ public:
    * @param color The marker's color
    * @param name The marker's name
    */
-  void publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::ColorRGBA& color, const std::string& name);
+  void publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::msg::ColorRGBA& color, const std::string& name);
 
   /**
    * @brief Publishes a vector field as visualisation_msgs/Marker

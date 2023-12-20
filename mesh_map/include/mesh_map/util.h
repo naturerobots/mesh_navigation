@@ -38,14 +38,14 @@
 #ifndef MESH_MAP__UTIL_H
 #define MESH_MAP__UTIL_H
 
-#include <geometry_msgs/Point.h>
-#include <geometry_msgs/Pose.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <lvr2/geometry/Handles.hpp>
 #include <lvr2/attrmaps/AttrMaps.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/geometry/Normal.hpp>
-#include <std_msgs/ColorRGBA.h>
+#include <std_msgs/msg/color_rgba.hpp>
 #include <tf2/LinearMath/Vector3.h>
 
 namespace mesh_map
@@ -66,7 +66,7 @@ typedef lvr2::BaseVector<float> Vector;
  * @param a alpha (optional, default is 1.0)
  * @return std_msgs/ColorRGBA message
  */
-std_msgs::ColorRGBA color(const float& r, const float& g, const float& b, const float& a = 1.0);
+std_msgs::msg::ColorRGBA color(const float& r, const float& g, const float& b, const float& a = 1.0);
 
 /**
  * @brief Function to compute the minimum and maximum of a cost layer
@@ -81,7 +81,7 @@ void getMinMax(const lvr2::VertexMap<float>& map, float& min, float& max);
  * @param point The point message to convert
  * @return The point converted to a lvr2 vector
  */
-Vector toVector(const geometry_msgs::Point& point);
+Vector toVector(const geometry_msgs::msg::Point& point);
 
 /**
  * Computes a geometry_msgs/Pose message from a position, direction and normal vector
@@ -90,7 +90,7 @@ Vector toVector(const geometry_msgs::Point& point);
  * @param normal The normal vector / z-axis
  * @return The converted pose message, in the right-hand / ROS coordinate system
  */
-geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vector& direction, const Normal& normal);
+geometry_msgs::msg::Pose calculatePoseFromDirection(const Vector& position, const Vector& direction, const Normal& normal);
 
 /**
  * @brief Calculates a geometry_msgs/Pose message from two positions and a normal vector
@@ -99,7 +99,7 @@ geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vec
  * @param normal The normal vector / z-axis
  * @return The converted pose message, in the right-hand / ROS coordinate system
  */
-geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal);
+geometry_msgs::msg::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal);
 
 /**
  * @brief Calculates a geometry_msgs/Pose message from two positions and a normal vector
@@ -109,7 +109,7 @@ geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vecto
  * @param cost The distance between "current" and "next"
  * @return The converted pose message, in the right-hand / ROS coordinate system
  */
-geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal,
+geometry_msgs::msg::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal,
                                               float& cost);
 /**
  * @brief Projects a vector / point onto a plane, which is defined by the reference vector and the normal vector
@@ -197,7 +197,7 @@ T linearCombineBarycentricCoords(const std::array<lvr2::VertexHandle, 3>& vertic
  * @param value value in range from 0 to 1
  * @return color message
  */
-std_msgs::ColorRGBA getRainbowColor(const float value);
+std_msgs::msg::ColorRGBA getRainbowColor(const float value);
 
 /**
  * @brief map value to color on color rainbow
@@ -214,7 +214,7 @@ void getRainbowColor(float value, float& r, float& g, float& b);
  * @return          direction normal vector
  */
 mesh_map::Normal poseToDirectionVector(
-      const geometry_msgs::PoseStamped& pose,
+      const geometry_msgs::msg::PoseStamped& pose,
       const tf2::Vector3& axis=tf2::Vector3(1,0,0));
 
 
@@ -224,7 +224,7 @@ mesh_map::Normal poseToDirectionVector(
  * @return          position vector
  */
   mesh_map::Vector poseToPositionVector(
-      const geometry_msgs::PoseStamped& pose);
+      const geometry_msgs::msg::PoseStamped& pose);
 
 } /* namespace mesh_map */
 

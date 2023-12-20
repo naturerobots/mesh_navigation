@@ -36,11 +36,11 @@
  */
 
 #include <mesh_map/util.h>
-#include <std_msgs/ColorRGBA.h>
+#include <std_msgs/msg/color_rgba.hpp>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2/LinearMath/Transform.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace mesh_map
 {
@@ -59,12 +59,12 @@ void getMinMax(const lvr2::VertexMap<float>& costs, float& min, float& max)
   }
 }
 
-Vector toVector(const geometry_msgs::Point& p)
+Vector toVector(const geometry_msgs::msg::Point& p)
 {
   return Vector(p.x, p.y, p.z);
 }
 
-geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vector& direction, const Normal& normal)
+geometry_msgs::msg::Pose calculatePoseFromDirection(const Vector& position, const Vector& direction, const Normal& normal)
 {
   Normal ez = normal.normalized();
   Normal ey = normal.cross(direction).normalized();
@@ -78,18 +78,18 @@ geometry_msgs::Pose calculatePoseFromDirection(const Vector& position, const Vec
   tf_pose.setBasis(tf_basis);
   tf_pose.setRotation(tf_pose.getRotation().normalize());
   tf_pose.setOrigin(tf_origin);
-  geometry_msgs::Pose pose;
+  geometry_msgs::msg::Pose pose;
   tf2::toMsg(tf_pose, pose);
   return pose;
 }
 
-geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal)
+geometry_msgs::msg::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal)
 {
   float cost = 0;
   return calculatePoseFromPosition(current, next, normal, cost);
 }
 
-geometry_msgs::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal,
+geometry_msgs::msg::Pose calculatePoseFromPosition(const Vector& current, const Vector& next, const Normal& normal,
                                               float& cost)
 {
   const Vector direction = next - current;
@@ -146,9 +146,9 @@ bool projectedBarycentricCoords(const Vector& p, const std::array<Vector, 3>& ve
           (0 - EPSILON <= gamma) && (gamma <= 1 + EPSILON));
 }
 
-std_msgs::ColorRGBA color(const float& r, const float& g, const float& b, const float& a)
+std_msgs::msg::ColorRGBA color(const float& r, const float& g, const float& b, const float& a)
 {
-  std_msgs::ColorRGBA color;
+  std_msgs::msg::ColorRGBA color;
   color.r = r;
   color.g = g;
   color.b = b;
@@ -198,11 +198,11 @@ bool barycentricCoords(const Vector& p, const Vector& v0, const Vector& v1, cons
   return true;
 }
 
-std_msgs::ColorRGBA getRainbowColor(const float value)
+std_msgs::msg::ColorRGBA getRainbowColor(const float value)
 {
   if (!std::isfinite(value))
-    return std_msgs::ColorRGBA();
-  std_msgs::ColorRGBA color;
+    return std_msgs::msg::ColorRGBA();
+  std_msgs::msg::ColorRGBA color;
   getRainbowColor(value, color.r, color.g, color.b);
   color.a = 1;
   return color;
@@ -232,7 +232,7 @@ void getRainbowColor(float value, float& r, float& g, float& b)
     r = 1, g = n, b = 0;
 }
 
-mesh_map::Normal poseToDirectionVector(const geometry_msgs::PoseStamped& pose, const tf2::Vector3& axis)
+mesh_map::Normal poseToDirectionVector(const geometry_msgs::msg::PoseStamped& pose, const tf2::Vector3& axis)
 {
   tf2::Stamped<tf2::Transform> transform;
   fromMsg(pose, transform);
@@ -241,7 +241,7 @@ mesh_map::Normal poseToDirectionVector(const geometry_msgs::PoseStamped& pose, c
 }
 
 
-mesh_map::Vector poseToPositionVector(const geometry_msgs::PoseStamped& pose)
+mesh_map::Vector poseToPositionVector(const geometry_msgs::msg::PoseStamped& pose)
 {
   return mesh_map::Vector(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
 }

@@ -40,9 +40,9 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <functional>
-#include <geometry_msgs/PointStamped.h>
-#include <geometry_msgs/Vector3.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/Vector3.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <mesh_client/mesh_client.h>
 
 #include <lvr2/geometry/Normal.hpp>
@@ -51,11 +51,11 @@
 #include <lvr2/io/hdf5/MeshIO.hpp>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
-#include <mesh_msgs/MeshGeometryStamped.h>
-#include <mesh_msgs_conversions/conversions.h>
+#include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
+#include <mesh_msgs/msg_conversions/conversions.h>
 #include <mutex>
 #include <ros/ros.h>
-#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/msg/marker.hpp>
 
 namespace mesh_map
 {
@@ -90,11 +90,11 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf_listener)
   private_nh.param<std::string>("global_frame", global_frame, "map");
   ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
 
-  marker_pub = private_nh.advertise<visualization_msgs::Marker>("marker", 100, true);
-  mesh_geometry_pub = private_nh.advertise<mesh_msgs::MeshGeometryStamped>("mesh", 1, true);
-  vertex_costs_pub = private_nh.advertise<mesh_msgs::MeshVertexCostsStamped>("vertex_costs", 1, false);
-  vertex_colors_pub = private_nh.advertise<mesh_msgs::MeshVertexColorsStamped>("vertex_colors", 1, true);
-  vector_field_pub = private_nh.advertise<visualization_msgs::Marker>("vector_field", 1, true);
+  marker_pub = private_nh.advertise<visualization_msgs::msg::Marker>("marker", 100, true);
+  mesh_geometry_pub = private_nh.advertise<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1, true);
+  vertex_costs_pub = private_nh.advertise<mesh_msgs::msg::MeshVertexCostsStamped>("vertex_costs", 1, false);
+  vertex_colors_pub = private_nh.advertise<mesh_msgs::msg::MeshVertexColorsStamped>("vertex_colors", 1, true);
+  vector_field_pub = private_nh.advertise<visualization_msgs::msg::Marker>("vector_field", 1, true);
   reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
       new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
 
@@ -646,22 +646,22 @@ float MeshMap::costAtPosition(const lvr2::DenseVertexMap<float>& costs,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name)
+void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::msg::ColorRGBA& color, const std::string& name)
 {
-  visualization_msgs::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker.header.frame_id = mapFrame();
   marker.header.stamp = ros::Time();
   marker.ns = name;
   marker.id = 0;
-  marker.type = visualization_msgs::Marker::SPHERE;
-  marker.action = visualization_msgs::Marker::ADD;
-  geometry_msgs::Vector3 scale;
+  marker.type = visualization_msgs::msg::Marker::SPHERE;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  geometry_msgs::msg::Vector3 scale;
   scale.x = 0.05;
   scale.y = 0.05;
   scale.z = 0.05;
   marker.scale = scale;
 
-  geometry_msgs::Pose p;
+  geometry_msgs::msg::Pose p;
   p.position.x = pos.x;
   p.position.y = pos.y;
   p.position.z = pos.z;
@@ -670,18 +670,18 @@ void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& col
   marker_pub.publish(marker);
 }
 
-void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::ColorRGBA& color,
+void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::msg::ColorRGBA& color,
                                const std::string& name)
 {
   const auto& vertices = mesh_ptr->getVerticesOfFace(face_handle);
-  visualization_msgs::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker.header.frame_id = mapFrame();
   marker.header.stamp = ros::Time();
   marker.ns = name;
   marker.id = 0;
-  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  geometry_msgs::Vector3 scale;
+  marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  geometry_msgs::msg::Vector3 scale;
   scale.x = 1.0;
   scale.y = 1.0;
   scale.z = 1.0;
@@ -690,7 +690,7 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
   for (auto vertex : vertices)
   {
     auto& pos = mesh_ptr->getVertexPosition(vertex);
-    geometry_msgs::Point p;
+    geometry_msgs::msg::Point p;
     p.x = pos.x;
     p.y = pos.y;
     p.z = pos.z;
@@ -764,15 +764,15 @@ void MeshMap::publishVectorField(const std::string& name,
   const auto& vertex_costs = vertexCosts();
   const auto& face_normals = faceNormals();
 
-  visualization_msgs::Marker vector_field;
+  visualization_msgs::msg::Marker vector_field;
 
-  geometry_msgs::Pose pose;
+  geometry_msgs::msg::Pose pose;
   pose.position.x = pose.position.y = pose.position.z = 0;
   pose.orientation.x = pose.orientation.y = pose.orientation.z = 0;
   pose.orientation.w = 1;
   vector_field.pose = pose;
 
-  vector_field.type = visualization_msgs::Marker::LINE_LIST;
+  vector_field.type = visualization_msgs::msg::Marker::LINE_LIST;
   vector_field.header.frame_id = mapFrame();
   vector_field.header.stamp = ros::Time::now();
   vector_field.ns = name;
@@ -814,7 +814,7 @@ void MeshMap::publishVectorField(const std::string& name,
     vector_field.points.push_back(toPoint(v));
 
     const float value = cost_function ? cost_function(values[vH]) : values[vH];
-    std_msgs::ColorRGBA color = getRainbowColor(value);
+    std_msgs::msg::ColorRGBA color = getRainbowColor(value);
     vector_field.colors.push_back(color);
     vector_field.colors.push_back(color);
 
@@ -889,7 +889,7 @@ void MeshMap::publishVectorField(const std::string& name,
           vector_field.points.push_back(toPoint(u));
           vector_field.points.push_back(toPoint(v));
 
-          std_msgs::ColorRGBA color = getRainbowColor(value);
+          std_msgs::msg::ColorRGBA color = getRainbowColor(value);
           vector_field.colors.push_back(color);
           vector_field.colors.push_back(color);
         }
@@ -1088,9 +1088,9 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector& pos)
   return num_results == 0 ? lvr2::OptionalVertexHandle() : lvr2::VertexHandle(ret_index);
 }
 
-inline const geometry_msgs::Point MeshMap::toPoint(const Vector& vec)
+inline const geometry_msgs::msg::Point MeshMap::toPoint(const Vector& vec)
 {
-  geometry_msgs::Point p;
+  geometry_msgs::msg::Point p;
   p.x = vec.x;
   p.y = vec.y;
   p.z = vec.z;
@@ -1207,14 +1207,14 @@ void MeshMap::publishVertexColors()
   if (vertex_colors_opt)
   {
     const VertexColorMap colors = vertex_colors_opt.get();
-    mesh_msgs::MeshVertexColorsStamped msg;
+    mesh_msgs::msg::MeshVertexColorsStamped msg;
     msg.header.frame_id = mapFrame();
     msg.header.stamp = ros::Time::now();
     msg.uuid = uuid_str;
     msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
     for (auto vH : colors)
     {
-      std_msgs::ColorRGBA color_rgba;
+      std_msgs::msg::ColorRGBA color_rgba;
       const auto& color_array = colors[vH];
       color_rgba.a = 1;
       color_rgba.r = color_array[0] / 255.0;
