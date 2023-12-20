@@ -36,10 +36,10 @@
  */
 
 #include <functional>
+#include <memory>
+#include <optional>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
-#include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/mesh_map.h>
-#include <boost/optional.hpp>
 
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
@@ -56,7 +56,7 @@ typedef std::function<void(const std::string&)> notify_func;
 class AbstractLayer
 {
 public:
-  typedef boost::shared_ptr<mesh_map::AbstractLayer> Ptr;
+  typedef std::shared_ptr<mesh_map::AbstractLayer> Ptr;
 
   /**
    * @brief reads the layer data, e.g. from a file, or a database
@@ -131,9 +131,9 @@ public:
    * the vector field into the mesh map.
    * @return an optional vector map.
    */
-  virtual const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
+  virtual const std::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
   {
-    return boost::none;
+    return {};
   }
 
   /**
