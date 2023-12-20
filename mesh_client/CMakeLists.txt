@@ -27,11 +27,6 @@ add_library(${PROJECT_NAME}
   src/mesh_client.cpp
 )
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
-#link_libraries(${PROJECT_NAME}
-#  ${LVR2_LIBRARIES}
-#  ${JSONCPP_LIBRARIES}
-#  ${CURL_LIBRARIES}
-#)
 
 install(
   TARGETS ${PROJECT_NAME}
