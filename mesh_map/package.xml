@@ -9,7 +9,7 @@
 
     <depend>geometry_msgs</depend>
     <depend>mesh_client</depend>
-    <depend>mesh_msgs_conversions</depend>
+    <depend>mesh_msgs_conversions</depend> <!-- TODO mesh_msgs_conversions from mesh_tools is not packages for humble, use it from source for now -->
     <depend>pluginlib</depend>
     <depend>rclcpp</depend>
     <depend>tf2_geometry_msgs</depend>
