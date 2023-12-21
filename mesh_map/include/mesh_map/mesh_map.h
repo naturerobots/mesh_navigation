@@ -439,8 +439,17 @@ private:
   double bb_max_y;
   double bb_max_z;
 
+
   std::string mesh_file;
   std::string mesh_part;
+
+  //! dynamic params callback handle
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
+
+  // Reconfigurable parameters (see reconfigureCallback method)
+  int min_contour_size;
+  double layer_factor;
+  double cost_limit;
 
   //! combined layer costs
   lvr2::DenseVertexMap<float> vertex_costs;
@@ -480,14 +489,6 @@ private:
 
   //! indicates whether the map has been loaded
   bool map_loaded;
-
-  //! dynamic params callback handle
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
-
-  // Reconfigurable parameters (see reconfigureCallback method)
-  int min_contour_size;
-  double layer_factor;
-  double cost_limit;
 
   //! node within the mesh map namespace
   rclcpp::Node::SharedPtr node;
