@@ -485,11 +485,11 @@ void MeshMap::combineVertexCosts()
     vertex_costs[vH] = std::numeric_limits<float>::infinity();
   }
 
-  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 
   hasNaN = false;
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "Layer weighting factor is: " << config.layer_factor);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Layer weighting factor is: " << layer_factor);
   for (auto eH : mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
@@ -498,7 +498,7 @@ void MeshMap::combineVertexCosts()
     const lvr2::VertexHandle& vH2 = eH_vHs[1];
     // Get the Riskiness for the current Edge (the maximum value from both
     // Vertices)
-    if (config.layer_factor != 0)
+    if (layer_factor != 0)
     {
       if (std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2]))
       {
@@ -509,7 +509,7 @@ void MeshMap::combineVertexCosts()
       {
         float cost_diff = std::fabs(vertex_costs[vH1] - vertex_costs[vH2]);
 
-        float vertex_factor = config.layer_factor * cost_diff;
+        float vertex_factor = layer_factor * cost_diff;
         if (std::isnan(vertex_factor))
           RCLCPP_INFO_STREAM(node->get_logger(), "NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
                                      << " vertex_factor:" << vertex_factor << " cost_diff:" << cost_diff);
@@ -1253,23 +1253,36 @@ void MeshMap::publishVertexColors()
 
 rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  RCLCPP_INFO_STREAM(node->get_logger(), "Dynamic reconfigure callback...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Set parameters callback...");
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+
   if (first_config)
   {
-    config = cfg;
     first_config = false;
-    return;
   }
-
-  if (!first_config && map_loaded)
+  else if (map_loaded)
   {
-    if (cfg.cost_limit != config.cost_limit)
+    for (const rclcpp::Parameter& param : parameters)
     {
-      combineVertexCosts();
+      const auto& param_name = param.get_name();
+      if (param_name == mesh_map_namespace + "/min_contour_size")
+      {
+        min_contour_size = param.as_int();
+      }
+      else if (param_name == mesh_map_namespace + "/layer_factor")
+      {
+        layer_factor = param.as_double();
+      }
+      else if (param_name == mesh_map_namespace + "/cost_limit")
+      {
+        cost_limit = param.as_double();
+        combineVertexCosts();
+        // TODO current implementation should mirror the old behavior; However, it seems like cost_limit and min_contour_size are never used in this class. Only layer_factor is used (in combineVertexCosts). We should probably remove the unused parameters and call combineVertexCosts whenever layer_factor changes.
+      }
     }
-
-    config = cfg;
   }
+  return result;
 }
 
 const std::string MeshMap::getGlobalFrameID()
