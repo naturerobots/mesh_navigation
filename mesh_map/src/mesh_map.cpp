@@ -64,6 +64,7 @@ using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features:
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   : tf_buffer(tf_buffer)
   , node(node)
+  , mesh_map_namespace("mesh_map")
   , first_config(true)
   , map_loaded(false)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
