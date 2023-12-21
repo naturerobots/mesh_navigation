@@ -491,7 +491,7 @@ private:
 
   //! node within the mesh map namespace
   rclcpp::Node::SharedPtr node;
-  constexpr auto mesh_map_namespace = "mesh_map";
+  constexpr mesh_map_namespace = "mesh_map";
 
   //! transformation buffer
   tf2_ros::Buffer& tf_buffer;
