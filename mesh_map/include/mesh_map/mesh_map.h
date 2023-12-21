@@ -39,16 +39,14 @@
 #define MESH_MAP__MESH_MAP_H
 
 #include <atomic>
-#include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/msg/point.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
-#include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/abstract_layer.h>
-#include <mesh_msgs/msg/MeshVertexCosts.h>
-#include <mesh_msgs/msg/MeshVertexColors.h>
+#include <mesh_msgs/msg/mesh_vertex_costs.h>
+#include <mesh_msgs/msg/mesh_vertex_colors.h>
 #include <mutex>
-#include <pluginlib/class_loader.h>
+#include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <tuple>
@@ -62,7 +60,7 @@ class MeshMap
 public:
   typedef boost::shared_ptr<MeshMap> Ptr;
 
-  MeshMap(tf2_ros::Buffer& tf);
+  MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node);
 
   /**
    * @brief Reads in the mesh geometry, normals and cost values and publishes all as mesh_msgs
@@ -116,9 +114,9 @@ public:
     std::array<float, 3>>> searchContainingFace(Vector& position, const float& max_dist);
 
   /**
-   * @brief reconfigure callback function which is called if a dynamic reconfiguration were triggered.
+   * @brief reconfigure callback function which is called if a parameter changes.
    */
-  void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
    * @brief A method which combines all layer costs with the respective weightings
@@ -430,16 +428,16 @@ private:
 
   std::string mesh_layer;
 
-  float min_roughness;
-  float max_roughness;
-  float min_height_diff;
-  float max_height_diff;
-  float bb_min_x;
-  float bb_min_y;
-  float bb_min_z;
-  float bb_max_x;
-  float bb_max_y;
-  float bb_max_z;
+  double min_roughness;
+  double max_roughness;
+  double min_height_diff;
+  double max_height_diff;
+  double bb_min_x;
+  double bb_min_y;
+  double bb_min_z;
+  double bb_max_x;
+  double bb_max_y;
+  double bb_max_z;
 
   std::string mesh_file;
   std::string mesh_part;
@@ -463,25 +461,19 @@ private:
   lvr2::DenseVertexMap<Normal> vertex_normals;
 
   //! publisher for vertex costs
-  ros::Publisher vertex_costs_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
 
   //! publisher for vertex colors
-  ros::Publisher vertex_colors_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;
 
   //! publisher for the mesh geometry
-  ros::Publisher mesh_geometry_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshGeometryStamped>::SharedPtr mesh_geometry_pub;
 
   //! publisher for the debug markers
-  ros::Publisher marker_pub;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub;
 
   //! publisher for the stored vector field
-  ros::Publisher vector_field_pub;
-
-  //! shared pointer to dynamic reconfigure server
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>> reconfigure_server_ptr;
-
-  //! dynamic reconfigure callback function binding
-  dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vector_field_pub;
 
   //! first reconfigure call
   bool first_config;
@@ -489,11 +481,17 @@ private:
   //! indicates whether the map has been loaded
   bool map_loaded;
 
-  //! current mesh map configuration
-  MeshMapConfig config;
+  //! dynamic params callback handle
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
 
-  //! private node handle within the mesh map namespace
-  ros::NodeHandle private_nh;
+  // Reconfigurable parameters (see reconfigureCallback method)
+  int min_contour_size;
+  double layer_factor;
+  double cost_limit;
+
+  //! node within the mesh map namespace
+  rclcpp::Node::SharedPtr node;
+  constexpr auto mesh_map_namespace = "mesh_map";
 
   //! transformation buffer
   tf2_ros::Buffer& tf_buffer;

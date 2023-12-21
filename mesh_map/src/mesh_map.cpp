@@ -34,14 +34,13 @@
  *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
  *
  */
-#include <XmlRpcException.h>
 #include <algorithm>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <functional>
 #include <geometry_msgs/msg/point_stamped.hpp>
-#include <geometry_msgs/msg/Vector3.h>
+#include <geometry_msgs/msg/vector3.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <mesh_client/mesh_client.h>
 
@@ -52,9 +51,9 @@
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
-#include <mesh_msgs/msg_conversions/conversions.h>
+#include <mesh_msgs_conversions/conversions.h>
 #include <mutex>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
 namespace mesh_map
@@ -62,49 +61,75 @@ namespace mesh_map
 using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
                                 lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
 
-MeshMap::MeshMap(tf2_ros::Buffer& tf_listener)
+MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   : tf_buffer(tf_buffer)
-  , private_nh("~/mesh_map/")
+  , node(node)
   , first_config(true)
   , map_loaded(false)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
   , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
-  private_nh.param<std::string>("server_url", srv_url, "");
-  private_nh.param<std::string>("server_username", srv_username, "");
-  private_nh.param<std::string>("server_password", srv_password, "");
-  private_nh.param<std::string>("mesh_layer", mesh_layer, "mesh0");
-  private_nh.param<float>("min_roughness", min_roughness, 0);
-  private_nh.param<float>("max_roughness", max_roughness, 0);
-  private_nh.param<float>("min_height_diff", min_height_diff, 0);
-  private_nh.param<float>("max_height_diff", max_height_diff, 0);
-  private_nh.param<float>("bb_min_x", bb_min_x, 0);
-  private_nh.param<float>("bb_min_y", bb_min_y, 0);
-  private_nh.param<float>("bb_min_z", bb_min_z, 0);
-  private_nh.param<float>("bb_max_x", bb_max_x, 0);
-  private_nh.param<float>("bb_max_y", bb_max_y, 0);
-  private_nh.param<float>("bb_max_z", bb_max_z, 0);
+  srv_url = node->declare_parameter(mesh_map_namespace + "/server_url", "");
+  srv_username = node->declare_parameter(mesh_map_namespace + "/server_username", "");
+  srv_password = node->declare_parameter(mesh_map_namespace + "server_password", "");
+  mesh_layer = node->declare_parameter(mesh_map_namespace + "/mesh_layer", "mesh0");
+  min_roughness = node->declare_parameter(mesh_map_namespace + "/min_roughness", 0.0);
+  max_roughness = node->declare_parameter(mesh_map_namespace + "/max_roughness", 0.0);
+  min_height_diff = node->declare_parameter(mesh_map_namespace + "/min_height_diff", 0.0);
+  max_height_diff = node->declare_parameter(mesh_map_namespace + "/max_height_diff", 0.0);
+  bb_min_x = node->declare_parameter(mesh_map_namespace + "/bb_min_x", 0.0);
+  bb_min_y = node->declare_parameter(mesh_map_namespace + "/bb_min_y", 0.0);
+  bb_min_z = node->declare_parameter(mesh_map_namespace + "/bb_min_z", 0.0);
+  bb_max_x = node->declare_parameter(mesh_map_namespace + "/bb_max_x", 0.0);
+  bb_max_y = node->declare_parameter(mesh_map_namespace + "/bb_max_y", 0.0);
+  bb_max_z = node->declare_parameter(mesh_map_namespace + "/bb_max_z", 0.0);
 
-  private_nh.param<std::string>("mesh_file", mesh_file, "");
-  private_nh.param<std::string>("mesh_part", mesh_part, "");
-  private_nh.param<std::string>("global_frame", global_frame, "map");
-  ROS_INFO_STREAM("mesh file is set to: " << mesh_file);
+  auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
+  min_contour_size_desc.name = mesh_map_namespace + "/min_contour_size";
+  min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
+  min_contour_size_desc.description = "Defines the minimum size for a contour to be classified as 'lethal'.";
+  auto min_contour_size_range = rcl_interfaces::msg::IntegerRange{};
+  min_contour_size_range.from_value = 0;
+  min_contour_size_range.from_value = 100000;
+  min_contour_size_desc.integer_range.push_back(min_contour_size_range);
+  min_contour_size = node->declare_parameter(mesh_map_namespace + "/min_contour_size", 3);
 
-  marker_pub = private_nh.advertise<visualization_msgs::msg::Marker>("marker", 100, true);
-  mesh_geometry_pub = private_nh.advertise<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1, true);
-  vertex_costs_pub = private_nh.advertise<mesh_msgs::msg::MeshVertexCostsStamped>("vertex_costs", 1, false);
-  vertex_colors_pub = private_nh.advertise<mesh_msgs::msg::MeshVertexColorsStamped>("vertex_colors", 1, true);
-  vector_field_pub = private_nh.advertise<visualization_msgs::msg::Marker>("vector_field", 1, true);
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>>(
-      new dynamic_reconfigure::Server<mesh_map::MeshMapConfig>(private_nh));
+  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
+  layer_factor_desc.name = mesh_map_namespace + "/layer_factor";
+  layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
+  layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
+  auto layer_factor_range = rcl_interfaces::msg::FloatingPointRange{};
+  layer_factor_range.from_value = 0.0;
+  layer_factor_range.from_value = 10.0;
+  layer_factor_desc.floating_point_range.push_back(layer_factor_range);
+  layer_factor = node->declare_parameter(mesh_map_namespace + "/layer_factor", 1.0, layer_factor_desc);
 
-  config_callback = boost::bind(&MeshMap::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  auto cost_limit_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
+  cost_limit_desc.name = mesh_map_namespace + "/cost_limit";
+  cost_limit_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
+  cost_limit_desc.description = "Defines the vertex cost limit with which it can be accessed.";
+  auto cost_limit_range = rcl_interfaces::msg::FloatingPointRange{};
+  cost_limit_range.from_value = 0.0;
+  cost_limit_range.from_value = 10.0;
+  cost_limit_desc.floating_point_range.push_back(cost_limit_range);
+  cost_limit = node->declare_parameter(mesh_map_namespace + "/cost_limit", 1.0);
+
+  mesh_file = node->declare_parameter(mesh_map_namespace + "/mesh_file", "");
+  mesh_part = node->declare_parameter(mesh_map_namespace + "/mesh_part", "");
+  global_frame = node->declare_parameter(mesh_map_namespace + "/global_frame", "map");
+  RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
+
+  marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("marker", 100);
+  mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1);
+  vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("vertex_costs", 1);
+  vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("vertex_colors", 1);
+  vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("vector_field", 1);
+  config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
 }
 
 bool MeshMap::readMap()
 {
-  ROS_INFO_STREAM("server url: " << srv_url);
+  RCLCPP_INFO_STREAM(node->get_logger(), "server url: " << srv_url);
   bool server = false;
 
   if (!srv_url.empty())
@@ -121,7 +146,7 @@ bool MeshMap::readMap()
   }
   else if (!mesh_file.empty() && !mesh_part.empty())
   {
-    ROS_INFO_STREAM("Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
     HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
     hdf_5_mesh_io->open(mesh_file);
     hdf_5_mesh_io->setMeshName(mesh_part);
@@ -129,17 +154,17 @@ bool MeshMap::readMap()
   }
   else
   {
-    ROS_ERROR_STREAM("Could not open file or server connection!");
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file or server connection!");
     return false;
   }
 
   if (server)
   {
-    ROS_INFO_STREAM("Start reading the mesh from the server '" << srv_url);
+    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh from the server '" << srv_url);
   }
   else
   {
-    ROS_INFO_STREAM("Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
   }
 
   auto mesh_opt = mesh_io_ptr->getMesh();
@@ -147,18 +172,18 @@ bool MeshMap::readMap()
   if (mesh_opt)
   {
     *mesh_ptr = mesh_opt.get();
-    ROS_INFO_STREAM("The mesh has been loaded successfully with " << mesh_ptr->numVertices() << " vertices and "
-                                                                  << mesh_ptr->numFaces() << " faces and "
-                                                                  << mesh_ptr->numEdges() << " edges.");
+    RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
+      << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
+      << mesh_ptr->numEdges() << " edges.");
 
     adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
     kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
-    ROS_INFO_STREAM("The k-d tree has been build successfully!");
+    RCLCPP_INFO_STREAM(node->get_logger(), "The k-d tree has been build successfully!");
   }
   else
   {
-    ROS_ERROR_STREAM("Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
     return false;
   }
 
@@ -176,20 +201,20 @@ bool MeshMap::readMap()
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Found " << face_normals.numValues() << " face normals in map file.");
   }
   else
   {
-    ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
     if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
     {
-      ROS_INFO_STREAM("Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(node->get_logger(), "Saved face normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not save face normals to map file!");
     }
   }
 
@@ -198,59 +223,59 @@ bool MeshMap::readMap()
   if (vertex_normals_opt)
   {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues() << " vertex normals in map file!");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Found " << vertex_normals.numValues() << " vertex normals in map file!");
   }
   else
   {
-    ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "No vertex normals found in the given map file, computing them...");
     vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
     if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(node->get_logger(), "Saved vertex normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not save vertex normals to map file!");
     }
   }
 
   mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
-  ROS_INFO_STREAM("Try to read edge distances from map file...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
 
   if (edge_distances_opt)
   {
-    ROS_INFO_STREAM("Vertex distances have been read successfully.");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Vertex distances have been read successfully.");
     edge_distances = edge_distances_opt.get();
   }
   else
   {
-    ROS_INFO_STREAM("Computing edge distances...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Computing edge distances...");
     edge_distances = lvr2::calcVertexDistances(*mesh_ptr);
-    ROS_INFO_STREAM("Saving " << edge_distances.numValues() << " edge distances to map file...");
+    RCLCPP_INFO_STREAM(node->get_logger(), "Saving " << edge_distances.numValues() << " edge distances to map file...");
 
     if (mesh_io_ptr->addAttributeMap(edge_distances, "edge_distances"))
     {
-      ROS_INFO_STREAM("Saved edge distances to map file.");
+      RCLCPP_INFO_STREAM(node->get_logger(), "Saved edge distances to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save edge distances to map file!");
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not save edge distances to map file!");
     }
   }
 
-  ROS_INFO_STREAM("Load layer plugins...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Load layer plugins...");
   if (!loadLayerPlugins())
   {
-    ROS_FATAL_STREAM("Could not load any layer plugin!");
+    RCLCPP_FATAL_STREAM(node->get_logger(), "Could not load any layer plugin!");
     return false;
   }
 
-  ROS_INFO_STREAM("Initialize layer plugins...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Initialize layer plugins...");
   if (!initLayerPlugins())
   {
-    ROS_FATAL_STREAM("Could not initialize plugins!");
+    RCLCPP_FATAL_STREAM(node->get_logger(), "Could not initialize plugins!");
     return false;
   }
 
@@ -269,7 +294,7 @@ bool MeshMap::loadLayerPlugins()
   XmlRpc::XmlRpcValue plugin_param_list;
   if (!private_nh.getParam("layers", plugin_param_list))
   {
-    ROS_WARN_STREAM("No layer plugins configured! - Use the param \"layers\" "
+    RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "
                     "in the namespace \""
                     << private_nh.getNamespace()
                     << "\". \"layers\" must be must be a list of "
@@ -277,11 +302,11 @@ bool MeshMap::loadLayerPlugins()
     return false;
   }
 
-  try
-  {
+  //try
+  //{
     for (int i = 0; i < plugin_param_list.size(); i++)
     {
-      XmlRpc::XmlRpcValue elem = plugin_param_list[i];
+      //XmlRpc::XmlRpcValue elem = plugin_param_list[i];
 
       std::string name = elem["name"];
       std::string type = elem["type"];
@@ -290,7 +315,7 @@ bool MeshMap::loadLayerPlugins()
 
       if (layer_names.find(name) != layer_names.end())
       {
-        ROS_ERROR_STREAM("The plugin \"" << name << "\" has already been loaded! Names must be unique!");
+        RCLCPP_ERROR_STREAM(node->get_logger(), "The plugin \"" << name << "\" has already been loaded! Names must be unique!");
         return false;
       }
 
@@ -300,7 +325,7 @@ bool MeshMap::loadLayerPlugins()
       }
       catch (pluginlib::LibraryLoadException& e)
       {
-        ROS_ERROR_STREAM(e.what());
+        RCLCPP_ERROR_STREAM(node->get_logger(), e.what());
       }
 
       if (plugin_ptr)
@@ -310,24 +335,24 @@ bool MeshMap::loadLayerPlugins()
         layers.push_back(elem);
         layer_names.insert(elem);
 
-        ROS_INFO_STREAM("The layer plugin with the type \""
+        RCLCPP_INFO_STREAM(node->get_logger(), "The layer plugin with the type \""
                         << type << "\" has been loaded successfully under the name \"" << name << "\".");
       }
       else
       {
-        ROS_ERROR_STREAM("Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
+        RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
                                                                             << "\"!");
       }
     }
-  }
-  catch (XmlRpc::XmlRpcException& e)
-  {
-    ROS_ERROR_STREAM("Invalid parameter structure. The \"layers\" parameter "
-                     "has to be a list of structs "
-                     << "with fields \"name\" and \"type\"!");
-    ROS_ERROR_STREAM(e.getMessage());
-    return false;
-  }
+  //}
+  //catch (XmlRpc::XmlRpcException& e)
+  //{
+  //  RCLCPP_ERROR_STREAM(node->get_logger(), "Invalid parameter structure. The \"layers\" parameter "
+  //                   "has to be a list of structs "
+  //                   << "with fields \"name\" and \"type\"!");
+  //  RCLCPP_ERROR_STREAM(node->get_logger(), e.getMessage());
+  //  return false;
+  //}
   // is there any layer plugin loaded for the map?
   return !layers.empty();
 }
@@ -336,11 +361,11 @@ void MeshMap::layerChanged(const std::string& layer_name)
 {
   std::lock_guard<std::mutex> lock(layer_mtx);
 
-  ROS_INFO_STREAM("Layer \"" << layer_name << "\" changed.");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" changed.");
 
   lethals.clear();
 
-  ROS_INFO_STREAM("Combine underlining lethal sets...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Combine underlining lethal sets...");
 
   // TODO pre-compute combined lethals upto a layer level
   auto layer_iter = layers.begin();
@@ -360,7 +385,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
   if (layer_iter != layers.end())
     layer_iter++;
 
-  ROS_INFO_STREAM("Combine  lethal sets...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Combine  lethal sets...");
 
   for (; layer_iter != layers.end(); layer_iter++)
   {
@@ -374,8 +399,8 @@ void MeshMap::layerChanged(const std::string& layer_name)
                                                            global_frame, uuid_str));
   }
 
-  ROS_INFO_STREAM("Found " << lethals.size() << " lethal vertices");
-  ROS_INFO_STREAM("Combine layer costs...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << lethals.size() << " lethal vertices");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Combine layer costs...");
 
   combineVertexCosts();
   // TODO new lethals old lethals -> renew potential field! around this areas
@@ -397,7 +422,7 @@ bool MeshMap::initLayerPlugins()
 
     if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr))
     {
-      ROS_ERROR_STREAM("Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
       return false;
     }
 
@@ -416,7 +441,7 @@ bool MeshMap::initLayerPlugins()
 
 void MeshMap::combineVertexCosts()
 {
-  ROS_INFO_STREAM("Combining costs...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Combining costs...");
 
   float combined_min = std::numeric_limits<float>::max();
   float combined_max = std::numeric_limits<float>::min();
@@ -432,7 +457,7 @@ void MeshMap::combineVertexCosts()
     const float norm = max - min;
     const float factor = private_nh.param<float>(layer.first + "/factor", 1.0);
     const float norm_factor = factor / norm;
-    ROS_INFO_STREAM("Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
+    RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
 
     const float default_value = layer.second->defaultValue();
@@ -450,7 +475,7 @@ void MeshMap::combineVertexCosts()
       }
     }
     if (hasNaN)
-      ROS_ERROR_STREAM("Layer \"" << layer.first << "\" contains NaN values!");
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" contains NaN values!");
   }
 
   const float combined_norm = combined_max - combined_min;
@@ -464,7 +489,7 @@ void MeshMap::combineVertexCosts()
 
   hasNaN = false;
 
-  ROS_INFO_STREAM("Layer weighting factor is: " << config.layer_factor);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Layer weighting factor is: " << config.layer_factor);
   for (auto eH : mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
@@ -486,7 +511,7 @@ void MeshMap::combineVertexCosts()
 
         float vertex_factor = config.layer_factor * cost_diff;
         if (std::isnan(vertex_factor))
-          ROS_INFO_STREAM("NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
+          RCLCPP_INFO_STREAM(node->get_logger(), "NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
                                      << " vertex_factor:" << vertex_factor << " cost_diff:" << cost_diff);
         edge_weights[eH] = edge_distances[eH] * (1 + vertex_factor);
       }
@@ -497,7 +522,7 @@ void MeshMap::combineVertexCosts()
     }
   }
 
-  ROS_INFO("Successfully combined costs!");
+  RCLCPP_INFO(node->get_logger(), "Successfully combined costs!");
 }
 
 void MeshMap::findLethalByContours(const int& min_contour_size, std::set<lvr2::VertexHandle>& lethals)
@@ -509,12 +534,12 @@ void MeshMap::findLethalByContours(const int& min_contour_size, std::set<lvr2::V
   {
     lethals.insert(contour.begin(), contour.end());
   }
-  ROS_INFO_STREAM("Found " << lethals.size() - size << " lethal vertices as contour vertices");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << lethals.size() - size << " lethal vertices as contour vertices");
 }
 
 void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size)
 {
-  ROS_INFO_STREAM("Find contours...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Find contours...");
 
   std::vector<std::vector<lvr2::VertexHandle>> tmp_contours;
 
@@ -589,7 +614,7 @@ void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contour
     }
   }
 
-  ROS_INFO_STREAM("Found " << contours.size() << " contours.");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << contours.size() << " contours.");
 }
 
 void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
@@ -615,11 +640,11 @@ boost::optional<Vector> MeshMap::directionAtPosition(
     if (std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z))
       return vec;
     else
-      ROS_ERROR_THROTTLE(0.3, "vector map contains invalid vectors!");
+      RCLCPP_ERROR_THROTTLE(node->get_logger(), 0.3, "vector map contains invalid vectors!");
   }
   else
   {
-    ROS_ERROR_THROTTLE(0.3, "vector map does not contain any of the corresponding vectors");
+    RCLCPP_ERROR_THROTTLE(node->get_logger(), 0.3, "vector map does not contain any of the corresponding vectors");
   }
   return boost::none;
 }
@@ -774,7 +799,7 @@ void MeshMap::publishVectorField(const std::string& name,
 
   vector_field.type = visualization_msgs::msg::Marker::LINE_LIST;
   vector_field.header.frame_id = mapFrame();
-  vector_field.header.stamp = ros::Time::now();
+  vector_field.header.stamp = node->now();
   vector_field.ns = name;
   vector_field.scale.x = 0.01;
   vector_field.color.a = 1;
@@ -795,7 +820,7 @@ void MeshMap::publishVectorField(const std::string& name,
     const float len2 = dir_vec.length2();
     if (len2 == 0 || !std::isfinite(len2))
     {
-      ROS_DEBUG_STREAM_THROTTLE(0.3, "Found invalid direction vector in vector field \"" << name << "\". Ignoring it!");
+      RCLCPP_DEBUG_STREAM_THROTTLE(node->get_logger(), *node->get_clock(), 300, "Found invalid direction vector in vector field \"" << name << "\". Ignoring it!");
       continue;
     }
 
@@ -848,9 +873,9 @@ void MeshMap::publishVectorField(const std::string& name,
 
   if (invalid_cnt > 0)
   {
-    ROS_WARN_STREAM("Found " << invalid_cnt << " non manifold vertices!");
+    RCLCPP_WARN_STREAM(node->get_logger(), "Found " << invalid_cnt << " non manifold vertices!");
   }
-  ROS_INFO_STREAM("Found " << faces << " complete vector faces!");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << faces << " complete vector faces!");
 
   if (publish_face_vectors)
   {
@@ -895,17 +920,17 @@ void MeshMap::publishVectorField(const std::string& name,
         }
         else
         {
-          ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the direction!");
+          RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), 0.3, "Could not compute the direction!");
         }
       }
       else
       {
-        ROS_ERROR_STREAM_THROTTLE(0.3, "Could not compute the barycentric coords!");
+        RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), 0.3, "Could not compute the barycentric coords!");
       }
     }
   }
   vector_field_pub.publish(vector_field);
-  ROS_INFO_STREAM("Published vector field \"" << name << "\" with " << cnt << " elements.");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Published vector field \"" << name << "\" with " << cnt << " elements.");
 }
 
 bool MeshMap::inTriangle(const Vector& pos, const lvr2::FaceHandle& face, const float& dist)
@@ -1072,10 +1097,10 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
     {
       return std::make_tuple(opt_fH.unwrap(), vertices, bary_coords);
     }
-    ROS_ERROR_STREAM("No containing face found!");
+    RCLCPP_ERROR_STREAM(node->get_logger(), "No containing face found!");
     return boost::none;
   }
-  ROS_FATAL_STREAM("Could not find the nearest vertex");
+  RCLCPP_FATAL_STREAM(node->get_logger(), "Could not find the nearest vertex");
   return boost::none;
 }
 
@@ -1209,7 +1234,7 @@ void MeshMap::publishVertexColors()
     const VertexColorMap colors = vertex_colors_opt.get();
     mesh_msgs::msg::MeshVertexColorsStamped msg;
     msg.header.frame_id = mapFrame();
-    msg.header.stamp = ros::Time::now();
+    msg.header.stamp = node->now();
     msg.uuid = uuid_str;
     msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
     for (auto vH : colors)
@@ -1226,9 +1251,9 @@ void MeshMap::publishVertexColors()
   }
 }
 
-void MeshMap::reconfigureCallback(mesh_map::MeshMapConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  ROS_INFO_STREAM("Dynamic reconfigure callback...");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Dynamic reconfigure callback...");
   if (first_config)
   {
     config = cfg;
