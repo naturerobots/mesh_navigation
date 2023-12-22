@@ -106,8 +106,8 @@ public:
    * @return true if the plugin has been initialized successfully
    */
   virtual bool initialize(const std::string& name,
-                          const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const std::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
                           const rclcpp::Node::SharedPtr& node) = 0;
 };
 } /* namespace mbf_mesh_core */
