@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
     <name>mbf_mesh_core</name>
     <version>1.0.1</version>
     <description>The mbf_mesh_core package</description>
@@ -9,9 +9,10 @@
     <license>BSD-3</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
-    <buildtool_depend>catkin</buildtool_depend>
-
     <depend>mbf_abstract_core</depend>
     <depend>mesh_map</depend>
 
+    <export>
+      <build_type>ament_cmake</build_type>
+    </export>
 </package>
