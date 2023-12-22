@@ -22,6 +22,7 @@ foreach(dep IN LISTS dependencies)
   find_package(${dep} REQUIRED)
 endforeach()
 
+find_package(Boost REQUIRED COMPONENTS system)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
