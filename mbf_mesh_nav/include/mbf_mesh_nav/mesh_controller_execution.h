@@ -101,7 +101,7 @@ protected:
 
 private:
   //! mesh for 3d navigation planning
-  const MeshPtr& mesh_ptr_;
+  const MeshPtr mesh_ptr_;
 
   //! Whether to lock mesh before calling the controller
   bool lock_mesh_;
