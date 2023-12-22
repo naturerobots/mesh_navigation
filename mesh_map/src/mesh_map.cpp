@@ -421,7 +421,7 @@ bool MeshMap::initLayerPlugins()
 
     auto callback = [this](const std::string& layer_name) { layerChanged(layer_name); };
 
-    if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr))
+    if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr, node))
     {
       RCLCPP_ERROR_STREAM(node->get_logger(), "Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
       return false;

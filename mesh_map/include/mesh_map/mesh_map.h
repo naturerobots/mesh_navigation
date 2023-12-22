@@ -43,8 +43,9 @@
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
 #include <mesh_map/abstract_layer.h>
-#include <mesh_msgs/msg/mesh_vertex_costs.h>
-#include <mesh_msgs/msg/mesh_vertex_colors.h>
+#include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
+#include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mutex>
 #include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
