@@ -240,7 +240,7 @@ bool MeshMap::readMap()
     }
   }
 
-  mesh_geometry_pub.publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+  mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
@@ -380,7 +380,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
       break;
   }
 
-  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
                                                          layer_iter->second->defaultValue(), layer_iter->first,
                                                          global_frame, uuid_str));
 
@@ -396,7 +396,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
 
-    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
+    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
                                                            layer_iter->second->defaultValue(), layer_iter->first,
                                                            global_frame, uuid_str));
   }
@@ -678,7 +678,7 @@ void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::msg::ColorRGBA
 {
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = mapFrame();
-  marker.header.stamp = ros::Time();
+  marker.header.stamp = node->now();
   marker.ns = name;
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::SPHERE;
@@ -695,7 +695,7 @@ void MeshMap::publishDebugPoint(const Vector pos, const std_msgs::msg::ColorRGBA
   p.position.z = pos.z;
   marker.pose = p;
   marker.color = color;
-  marker_pub.publish(marker);
+  marker_pub->publish(marker);
 }
 
 void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::msg::ColorRGBA& color,
@@ -704,7 +704,7 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
   const auto& vertices = mesh_ptr->getVerticesOfFace(face_handle);
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = mapFrame();
-  marker.header.stamp = ros::Time();
+  marker.header.stamp = node->now();
   marker.ns = name;
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -725,7 +725,7 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
     marker.points.push_back(p);
     marker.colors.push_back(color);
   }
-  marker_pub.publish(marker);
+  marker_pub->publish(marker);
 }
 
 void MeshMap::publishVectorField(const std::string& name,
@@ -932,7 +932,7 @@ void MeshMap::publishVectorField(const std::string& name,
       }
     }
   }
-  vector_field_pub.publish(vector_field);
+  vector_field_pub->publish(vector_field);
   RCLCPP_INFO_STREAM(node->get_logger(), "Published vector field \"" << name << "\" with " << cnt << " elements.");
 }
 
@@ -1214,16 +1214,16 @@ void MeshMap::publishCostLayers()
 {
   for (auto& layer : layers)
   {
-    vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
+    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
                                                            layer.second->defaultValue(), layer.first, global_frame,
                                                            uuid_str));
   }
-  vertex_costs_pub.publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name)
 {
-  vertex_costs_pub.publish(
+  vertex_costs_pub->publish(
       mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
 }
 
@@ -1250,7 +1250,7 @@ void MeshMap::publishVertexColors()
       color_rgba.b = color_array[2] / 255.0;
       msg.mesh_vertex_colors.vertex_colors.push_back(color_rgba);
     }
-    this->vertex_colors_pub.publish(msg);
+    this->vertex_colors_pub->publish(msg);
   }
 }
 
