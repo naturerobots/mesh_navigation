@@ -643,11 +643,11 @@ boost::optional<Vector> MeshMap::directionAtPosition(
     if (std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z))
       return vec;
     else
-      RCLCPP_ERROR_THROTTLE(node->get_logger(), 0.3, "vector map contains invalid vectors!");
+      RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 300, "vector map contains invalid vectors!");
   }
   else
   {
-    RCLCPP_ERROR_THROTTLE(node->get_logger(), 0.3, "vector map does not contain any of the corresponding vectors");
+    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 300, "vector map does not contain any of the corresponding vectors");
   }
   return boost::none;
 }
@@ -923,12 +923,12 @@ void MeshMap::publishVectorField(const std::string& name,
         }
         else
         {
-          RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), 0.3, "Could not compute the direction!");
+          RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), *node->get_clock(), 300, "Could not compute the direction!");
         }
       }
       else
       {
-        RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), 0.3, "Could not compute the barycentric coords!");
+        RCLCPP_ERROR_STREAM_THROTTLE(node->get_logger(), *node->get_clock(), 300, "Could not compute the barycentric coords!");
       }
     }
   }
