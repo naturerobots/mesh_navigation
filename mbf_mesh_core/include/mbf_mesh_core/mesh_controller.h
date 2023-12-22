@@ -105,8 +105,10 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
+  virtual bool initialize(const std::string& name,
+                          const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const rclcpp::Node::SharedPtr& node) = 0;
 };
 } /* namespace mbf_mesh_core */
 

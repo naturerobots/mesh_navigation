@@ -64,7 +64,6 @@ public:
    */
   virtual uint32_t runBehavior(std::string& message) = 0;
 
-  //! MeshRecovery cannot be constructed
   MeshRecovery() = delete;
 
   /**
@@ -90,7 +89,8 @@ public:
    * @return true if the plugin has been initialized successfully
    */
   virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
+                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const rclcpp::Node::SharedPtr& node) = 0;
 
 };
 }; /* namespace mbf_mesh_core */
