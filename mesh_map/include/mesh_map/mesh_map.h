@@ -58,6 +58,7 @@ namespace mesh_map
 class MeshMap
 {
 public:
+  inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
   typedef boost::shared_ptr<MeshMap> Ptr;
 
   MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node);
@@ -492,7 +493,6 @@ private:
 
   //! node within the mesh map namespace
   rclcpp::Node::SharedPtr node;
-  const std::string mesh_map_namespace;
 
   //! transformation buffer
   tf2_ros::Buffer& tf_buffer;

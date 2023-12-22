@@ -64,60 +64,59 @@ using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features:
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   : tf_buffer(tf_buffer)
   , node(node)
-  , mesh_map_namespace("mesh_map")
   , first_config(true)
   , map_loaded(false)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
   , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
-  srv_url = node->declare_parameter(mesh_map_namespace + "/server_url", "");
-  srv_username = node->declare_parameter(mesh_map_namespace + "/server_username", "");
-  srv_password = node->declare_parameter(mesh_map_namespace + "server_password", "");
-  mesh_layer = node->declare_parameter(mesh_map_namespace + "/mesh_layer", "mesh0");
-  min_roughness = node->declare_parameter(mesh_map_namespace + "/min_roughness", 0.0);
-  max_roughness = node->declare_parameter(mesh_map_namespace + "/max_roughness", 0.0);
-  min_height_diff = node->declare_parameter(mesh_map_namespace + "/min_height_diff", 0.0);
-  max_height_diff = node->declare_parameter(mesh_map_namespace + "/max_height_diff", 0.0);
-  bb_min_x = node->declare_parameter(mesh_map_namespace + "/bb_min_x", 0.0);
-  bb_min_y = node->declare_parameter(mesh_map_namespace + "/bb_min_y", 0.0);
-  bb_min_z = node->declare_parameter(mesh_map_namespace + "/bb_min_z", 0.0);
-  bb_max_x = node->declare_parameter(mesh_map_namespace + "/bb_max_x", 0.0);
-  bb_max_y = node->declare_parameter(mesh_map_namespace + "/bb_max_y", 0.0);
-  bb_max_z = node->declare_parameter(mesh_map_namespace + "/bb_max_z", 0.0);
+  srv_url = node->declare_parameter(MESH_MAP_NAMESPACE + "/server_url", "");
+  srv_username = node->declare_parameter(MESH_MAP_NAMESPACE + "/server_username", "");
+  srv_password = node->declare_parameter(MESH_MAP_NAMESPACE + "server_password", "");
+  mesh_layer = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_layer", "mesh0");
+  min_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_roughness", 0.0);
+  max_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + "/max_roughness", 0.0);
+  min_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_height_diff", 0.0);
+  max_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + "/max_height_diff", 0.0);
+  bb_min_x = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_x", 0.0);
+  bb_min_y = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_y", 0.0);
+  bb_min_z = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_z", 0.0);
+  bb_max_x = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_x", 0.0);
+  bb_max_y = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_y", 0.0);
+  bb_max_z = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_z", 0.0);
 
   auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  min_contour_size_desc.name = mesh_map_namespace + "/min_contour_size";
+  min_contour_size_desc.name = MESH_MAP_NAMESPACE + "/min_contour_size";
   min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
   min_contour_size_desc.description = "Defines the minimum size for a contour to be classified as 'lethal'.";
   auto min_contour_size_range = rcl_interfaces::msg::IntegerRange{};
   min_contour_size_range.from_value = 0;
   min_contour_size_range.from_value = 100000;
   min_contour_size_desc.integer_range.push_back(min_contour_size_range);
-  min_contour_size = node->declare_parameter(mesh_map_namespace + "/min_contour_size", 3);
+  min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_contour_size", 3);
 
   auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  layer_factor_desc.name = mesh_map_namespace + "/layer_factor";
+  layer_factor_desc.name = MESH_MAP_NAMESPACE + "/layer_factor";
   layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
   auto layer_factor_range = rcl_interfaces::msg::FloatingPointRange{};
   layer_factor_range.from_value = 0.0;
   layer_factor_range.from_value = 10.0;
   layer_factor_desc.floating_point_range.push_back(layer_factor_range);
-  layer_factor = node->declare_parameter(mesh_map_namespace + "/layer_factor", 1.0, layer_factor_desc);
+  layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + "/layer_factor", 1.0, layer_factor_desc);
 
   auto cost_limit_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  cost_limit_desc.name = mesh_map_namespace + "/cost_limit";
+  cost_limit_desc.name = MESH_MAP_NAMESPACE + "/cost_limit";
   cost_limit_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   cost_limit_desc.description = "Defines the vertex cost limit with which it can be accessed.";
   auto cost_limit_range = rcl_interfaces::msg::FloatingPointRange{};
   cost_limit_range.from_value = 0.0;
   cost_limit_range.from_value = 10.0;
   cost_limit_desc.floating_point_range.push_back(cost_limit_range);
-  cost_limit = node->declare_parameter(mesh_map_namespace + "/cost_limit", 1.0);
+  cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + "/cost_limit", 1.0);
 
-  mesh_file = node->declare_parameter(mesh_map_namespace + "/mesh_file", "");
-  mesh_part = node->declare_parameter(mesh_map_namespace + "/mesh_part", "");
-  global_frame = node->declare_parameter(mesh_map_namespace + "/global_frame", "map");
+  mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_file", "");
+  mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_part", "");
+  global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + "/global_frame", "map");
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("marker", 100);
@@ -297,7 +296,7 @@ bool MeshMap::loadLayerPlugins()
   {
     RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "
                     "in the namespace \""
-                    << mesh_map_namespace
+                    << MESH_MAP_NAMESPACE
                     << "\". \"layers\" must be must be a list of "
                        "tuples with a name and a type.");
     return false;
@@ -458,7 +457,7 @@ void MeshMap::combineVertexCosts()
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
     const float factor = 1.0; // TODO how to declare param for each plugin? Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
-    // const float factor = private_nh.param<float>(mesh_map_namespace + "/" + layer.first + "/factor", 1.0);
+    // const float factor = private_nh.param<float>(MESH_MAP_NAMESPACE + "/" + layer.first + "/factor", 1.0);
     const float norm_factor = factor / norm;
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
@@ -1269,15 +1268,15 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vecto
     for (const rclcpp::Parameter& param : parameters)
     {
       const auto& param_name = param.get_name();
-      if (param_name == mesh_map_namespace + "/min_contour_size")
+      if (param_name == MESH_MAP_NAMESPACE + "/min_contour_size")
       {
         min_contour_size = param.as_int();
       }
-      else if (param_name == mesh_map_namespace + "/layer_factor")
+      else if (param_name == MESH_MAP_NAMESPACE + "/layer_factor")
       {
         layer_factor = param.as_double();
       }
-      else if (param_name == mesh_map_namespace + "/cost_limit")
+      else if (param_name == MESH_MAP_NAMESPACE + "/cost_limit")
       {
         cost_limit = param.as_double();
         combineVertexCosts();
