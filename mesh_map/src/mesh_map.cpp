@@ -292,12 +292,12 @@ bool MeshMap::readMap()
 
 bool MeshMap::loadLayerPlugins()
 {
-  XmlRpc::XmlRpcValue plugin_param_list;
-  if (!private_nh.getParam("layers", plugin_param_list))
+  const std::vector<std::string> plugin_param_list = node->declare_parameter<std::vector<std::string>>("layers", {});
+  if (plugin_param_list.empty())
   {
     RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "
                     "in the namespace \""
-                    << private_nh.getNamespace()
+                    << mesh_map_namespace
                     << "\". \"layers\" must be must be a list of "
                        "tuples with a name and a type.");
     return false;
@@ -309,8 +309,9 @@ bool MeshMap::loadLayerPlugins()
     {
       //XmlRpc::XmlRpcValue elem = plugin_param_list[i];
 
-      std::string name = elem["name"];
-      std::string type = elem["type"];
+      // TODO figure out how to load the plugin configuration with ROS2 param
+      std::string name = "todo";// TODO elem["name"];
+      std::string type = "todo";// TODO elem["type"];
 
       typename AbstractLayer::Ptr plugin_ptr;
 
@@ -456,7 +457,8 @@ void MeshMap::combineVertexCosts()
     float min, max;
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
-    const float factor = private_nh.param<float>(layer.first + "/factor", 1.0);
+    const float factor = 1.0; // TODO how to declare param for each plugin? Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
+    // const float factor = private_nh.param<float>(mesh_map_namespace + "/" + layer.first + "/factor", 1.0);
     const float norm_factor = factor / norm;
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
