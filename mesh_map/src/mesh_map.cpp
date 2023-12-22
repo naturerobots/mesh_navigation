@@ -323,7 +323,7 @@ bool MeshMap::loadLayerPlugins()
 
       try
       {
-        plugin_ptr = layer_loader.createInstance(type);
+        plugin_ptr = layer_loader.createSharedInstance(type);
       }
       catch (pluginlib::LibraryLoadException& e)
       {
