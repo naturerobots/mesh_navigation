@@ -36,6 +36,10 @@ add_library(${PROJECT_NAME}
 )
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 
+install(DIRECTORY include/
+  DESTINATION include
+)
+
 install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
