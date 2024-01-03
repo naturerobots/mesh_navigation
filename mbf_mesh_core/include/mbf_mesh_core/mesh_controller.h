@@ -37,21 +37,23 @@
 #ifndef MBF_MESH_CORE__MESH_CONTROLLER_H
 #define MBF_MESH_CORE__MESH_CONTROLLER_H
 
-#include <boost/shared_ptr.hpp>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/TwistStamped.h>
-#include <mbf_abstract_core/abstract_controller.h>
-#include <mesh_map/mesh_map.h>
-#include <stdint.h>
+#include <memory>
 #include <string>
 #include <vector>
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <mbf_abstract_core/abstract_controller.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mbf_mesh_core
 {
 class MeshController : public mbf_abstract_core::AbstractController
 {
 public:
-  typedef boost::shared_ptr<mbf_mesh_core::MeshController> Ptr;
+  typedef std::shared_ptr<mbf_mesh_core::MeshController> Ptr;
+
+  MeshController() = delete;
 
   /**
    * @brief Destructor
@@ -68,9 +70,9 @@ public:
    * @param message Optional more detailed outcome as a string
    * @return Result code as described on ExePath action result (see ExePath.action)
    */
-  virtual uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
-                                           const geometry_msgs::TwistStamped& velocity,
-                                           geometry_msgs::TwistStamped& cmd_vel, std::string& message) = 0;
+  virtual uint32_t computeVelocityCommands(const geometry_msgs::msg::PoseStamped& pose,
+                                           const geometry_msgs::msg::TwistStamped& velocity,
+                                           geometry_msgs::msg::TwistStamped& cmd_vel, std::string& message) = 0;
 
   /**
    * @brief Check if the goal pose has been achieved by the local planner
@@ -87,7 +89,7 @@ public:
    * @param plan The plan to pass to the local planner
    * @return True if the plan was updated successfully, false otherwise
    */
-  virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) = 0;
+  virtual bool setPlan(const std::vector<geometry_msgs::msg::PoseStamped>& plan) = 0;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -103,14 +105,10 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
-
-protected:
-  /**
-   * @brief Constructor
-   */
-  MeshController(){};
+  virtual bool initialize(const std::string& name,
+                          const std::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const rclcpp::Node::SharedPtr& node) = 0;
 };
 } /* namespace mbf_mesh_core */
 

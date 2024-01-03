@@ -37,20 +37,22 @@
 #ifndef MBF_MESH_CORE__MESH_PLANNER_H
 #define MBF_MESH_CORE__MESH_PLANNER_H
 
-#include <boost/shared_ptr.hpp>
-#include <geometry_msgs/PoseStamped.h>
+#include <string>
+#include <memory>
+#include <vector>
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <mbf_abstract_core/abstract_planner.h>
 #include <mesh_map/mesh_map.h>
-#include <stdint.h>
-#include <string>
-#include <vector>
 
 namespace mbf_mesh_core
 {
 class MeshPlanner : public mbf_abstract_core::AbstractPlanner
 {
 public:
-  typedef boost::shared_ptr<mbf_mesh_core::MeshPlanner> Ptr;
+  typedef std::shared_ptr<mbf_mesh_core::MeshPlanner> Ptr;
+
+  MeshPlanner() = delete;
 
   /**
    * @brief Destructor
@@ -68,8 +70,8 @@ public:
    * @param message Optional more detailed outcome as a string
    * @return Result code as described on GetPath action result. (see GetPath.action)
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message) = 0;
 
   /**
@@ -85,13 +87,7 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map instance to access attributes and helper functions, etc.
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
-
-protected:
-  /**
-   * @brief Constructor
-   */
-  MeshPlanner(){};
+  virtual bool initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) = 0;
 };
 } /* namespace mbf_mesh_core */
 

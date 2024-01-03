@@ -37,11 +37,11 @@
 #ifndef MBF_MESH_CORE__ABSTRACT_RECOVERY_H
 #define MBF_MESH_CORE__ABSTRACT_RECOVERY_H
 
-#include <boost/shared_ptr.hpp>
+#include <string>
+#include <memory>
+
 #include <mbf_abstract_core/abstract_recovery.h>
 #include <mesh_map/mesh_map.h>
-#include <stdint.h>
-#include <string>
 
 namespace mbf_mesh_core
 {
@@ -54,7 +54,7 @@ namespace mbf_mesh_core
 class MeshRecovery : public mbf_abstract_core::AbstractRecovery
 {
 public:
-  typedef boost::shared_ptr<::mbf_mesh_core::MeshRecovery> Ptr;
+  typedef std::shared_ptr<::mbf_mesh_core::MeshRecovery> Ptr;
 
   /**
    * @brief Runs the AbstractRecovery
@@ -63,6 +63,8 @@ public:
    * @return An outcome which will be hand over to the action result.
    */
   virtual uint32_t runBehavior(std::string& message) = 0;
+
+  MeshRecovery() = delete;
 
   /**
    * @brief Virtual destructor for the interface
@@ -86,14 +88,10 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr) = 0;
+  virtual bool initialize(const std::string& name, const std::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const rclcpp::Node::SharedPtr& node) = 0;
 
-protected:
-  /**
-   * @brief Constructor
-   */
-  MeshRecovery(){};
 };
 }; /* namespace mbf_mesh_core */
 

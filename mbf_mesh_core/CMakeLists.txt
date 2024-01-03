@@ -1,23 +1,25 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(mbf_mesh_core)
 
 
-find_package(catkin REQUIRED COMPONENTS
+find_package(ament_cmake REQUIRED)
+set(dependencies
   mbf_abstract_core
   mesh_map
 )
 
-catkin_package(
-  INCLUDE_DIRS include
-  CATKIN_DEPENDS mbf_abstract_core mesh_map
-)
+foreach(dep IN LISTS dependencies)
+  find_package(${dep} REQUIRED)
+endforeach()
 
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
+install(DIRECTORY include/
+  DESTINATION include
 )
+
+ament_export_include_directories(include)
+ament_export_dependencies(${dependencies})
+ament_package()
