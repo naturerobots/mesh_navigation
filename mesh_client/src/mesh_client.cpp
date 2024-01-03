@@ -301,6 +301,12 @@ bool MeshClient::addChannel(const std::string group, const std::string name, con
   return true;
 }
 
+size_t writeFunction(void* ptr, size_t size, size_t nmemb, std::string* data)
+{
+  data->append((char*)ptr, size * nmemb);
+  return size * nmemb;
+}
+
 std::unique_ptr<std::string> MeshClient::requestChannel(std::string channel)
 {
   CURL* curl;
