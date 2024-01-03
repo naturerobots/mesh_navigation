@@ -3,10 +3,10 @@ name: Melodic CI
 on:
   push:
     branches-ignore:
-      - "humble"
+      - "humble**"
   pull_request:
     branches-ignore:
-      - "humble"
+      - "humble**"
 
 jobs:
   build:

@@ -39,17 +39,16 @@
 #define MESH_MAP__MESH_MAP_H
 
 #include <atomic>
-#include <dynamic_reconfigure/server.h>
-#include <geometry_msgs/Point.h>
+#include <geometry_msgs/msg/point.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
-#include <mesh_map/MeshMapConfig.h>
 #include <mesh_map/abstract_layer.h>
-#include <mesh_msgs/MeshVertexCosts.h>
-#include <mesh_msgs/MeshVertexColors.h>
+#include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
+#include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mutex>
-#include <pluginlib/class_loader.h>
-#include <std_msgs/ColorRGBA.h>
+#include <pluginlib/class_loader.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <tuple>
 #include "nanoflann.hpp"
@@ -60,9 +59,10 @@ namespace mesh_map
 class MeshMap
 {
 public:
+  inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
   typedef boost::shared_ptr<MeshMap> Ptr;
 
-  MeshMap(tf2_ros::Buffer& tf);
+  MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node);
 
   /**
    * @brief Reads in the mesh geometry, normals and cost values and publishes all as mesh_msgs
@@ -116,9 +116,9 @@ public:
     std::array<float, 3>>> searchContainingFace(Vector& position, const float& max_dist);
 
   /**
-   * @brief reconfigure callback function which is called if a dynamic reconfiguration were triggered.
+   * @brief reconfigure callback function which is called if a parameter changes.
    */
-  void reconfigureCallback(mesh_map::MeshMapConfig& config, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
    * @brief A method which combines all layer costs with the respective weightings
@@ -199,7 +199,7 @@ public:
   /**
    * @brief Converts a vector to a ROS geometry_msgs/Point message
    */
-  inline const geometry_msgs::Point toPoint(const Vector& vec);
+  inline const geometry_msgs::msg::Point toPoint(const Vector& vec);
 
   /**
    * Computes the direction vector for the given triangle's vertices and barycentric coordinates while using the given vector map
@@ -353,7 +353,7 @@ public:
    * @param color The marker's color
    * @param name The marker's name
    */
-  void publishDebugPoint(const Vector pos, const std_msgs::ColorRGBA& color, const std::string& name);
+  void publishDebugPoint(const Vector pos, const std_msgs::msg::ColorRGBA& color, const std::string& name);
 
   /**
    * @brief Publishes a triangle as marker. Used for debug purposes.
@@ -361,7 +361,7 @@ public:
    * @param color The marker's color
    * @param name The marker's name
    */
-  void publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::ColorRGBA& color, const std::string& name);
+  void publishDebugFace(const lvr2::FaceHandle& face_handle, const std_msgs::msg::ColorRGBA& color, const std::string& name);
 
   /**
    * @brief Publishes a vector field as visualisation_msgs/Marker
@@ -430,19 +430,28 @@ private:
 
   std::string mesh_layer;
 
-  float min_roughness;
-  float max_roughness;
-  float min_height_diff;
-  float max_height_diff;
-  float bb_min_x;
-  float bb_min_y;
-  float bb_min_z;
-  float bb_max_x;
-  float bb_max_y;
-  float bb_max_z;
+  double min_roughness;
+  double max_roughness;
+  double min_height_diff;
+  double max_height_diff;
+  double bb_min_x;
+  double bb_min_y;
+  double bb_min_z;
+  double bb_max_x;
+  double bb_max_y;
+  double bb_max_z;
+
 
   std::string mesh_file;
   std::string mesh_part;
+
+  //! dynamic params callback handle
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
+
+  // Reconfigurable parameters (see reconfigureCallback method)
+  int min_contour_size;
+  double layer_factor;
+  double cost_limit;
 
   //! combined layer costs
   lvr2::DenseVertexMap<float> vertex_costs;
@@ -463,25 +472,19 @@ private:
   lvr2::DenseVertexMap<Normal> vertex_normals;
 
   //! publisher for vertex costs
-  ros::Publisher vertex_costs_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
 
   //! publisher for vertex colors
-  ros::Publisher vertex_colors_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;
 
   //! publisher for the mesh geometry
-  ros::Publisher mesh_geometry_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshGeometryStamped>::SharedPtr mesh_geometry_pub;
 
   //! publisher for the debug markers
-  ros::Publisher marker_pub;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub;
 
   //! publisher for the stored vector field
-  ros::Publisher vector_field_pub;
-
-  //! shared pointer to dynamic reconfigure server
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_map::MeshMapConfig>> reconfigure_server_ptr;
-
-  //! dynamic reconfigure callback function binding
-  dynamic_reconfigure::Server<mesh_map::MeshMapConfig>::CallbackType config_callback;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vector_field_pub;
 
   //! first reconfigure call
   bool first_config;
@@ -489,11 +492,8 @@ private:
   //! indicates whether the map has been loaded
   bool map_loaded;
 
-  //! current mesh map configuration
-  MeshMapConfig config;
-
-  //! private node handle within the mesh map namespace
-  ros::NodeHandle private_nh;
+  //! node within the mesh map namespace
+  rclcpp::Node::SharedPtr node;
 
   //! transformation buffer
   tf2_ros::Buffer& tf_buffer;

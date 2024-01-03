@@ -36,10 +36,13 @@
  */
 
 #include <functional>
-#include <lvr2/io/AttributeMeshIOBase.hpp>
-#include <mesh_map/MeshMapConfig.h>
-#include <mesh_map/mesh_map.h>
+#include <memory>
+
 #include <boost/optional.hpp>
+#include <lvr2/io/AttributeMeshIOBase.hpp>
+#include <rclcpp/node.hpp>
+
+#include <mesh_map/mesh_map.h>
 
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
@@ -56,7 +59,7 @@ typedef std::function<void(const std::string&)> notify_func;
 class AbstractLayer
 {
 public:
-  typedef boost::shared_ptr<mesh_map::AbstractLayer> Ptr;
+  typedef std::shared_ptr<mesh_map::AbstractLayer> Ptr;
 
   /**
    * @brief reads the layer data, e.g. from a file, or a database
@@ -155,10 +158,11 @@ public:
    */
   virtual bool initialize(const std::string& name, const notify_func notify_update,
                           std::shared_ptr<mesh_map::MeshMap>& map, std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh,
-                          std::shared_ptr<lvr2::AttributeMeshIOBase>& io)
+                          std::shared_ptr<lvr2::AttributeMeshIOBase>& io, const rclcpp::Node::SharedPtr& node)
   {
     layer_name = name;
-    private_nh = ros::NodeHandle("~/mesh_map/" + name);
+    node_ = node;
+    layer_namespace_ = "mesh_map/" + name;
     notify = notify_update;
     mesh_ptr = mesh;
     map_ptr = map;
@@ -177,7 +181,8 @@ protected:
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
   std::shared_ptr<mesh_map::MeshMap> map_ptr;
 
-  ros::NodeHandle private_nh;
+  rclcpp::Node::SharedPtr node_;
+  std::string layer_namespace_;
 
 private:
   notify_func notify;
