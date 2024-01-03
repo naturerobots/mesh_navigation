@@ -62,8 +62,6 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr, const r
       node_->create_service<mbf_msgs::srv::CheckPath>("check_path_cost", std::bind(&MeshNavigationServer::callServiceCheckPathCost, this, _1, _2, _3));
   clear_mesh_srv_ = node_->create_service<std_srvs::srv::Empty>("clear_mesh", std::bind(&MeshNavigationServer::callServiceClearMesh, this, _1, _2, _3));
 
-  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(&MeshNavigationServer::reconfigure, this, _1));
-
   RCLCPP_INFO_STREAM(node_->get_logger(), "Reading map file...");
   mesh_ptr_->readMap();
 
@@ -225,13 +223,6 @@ void MeshNavigationServer::stop()
 
 MeshNavigationServer::~MeshNavigationServer()
 {
-}
-
-rcl_interfaces::msg::SetParametersResult reconfigure(std::vector<rclcpp::Parameter> parameters)
-{
-  rcl_interfaces::msg::SetParametersResult result;
-  result.successful = true;
-  return result; // TODO remove obsolete cb
 }
 
 void MeshNavigationServer::callServiceCheckPoseCost(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<mbf_msgs::srv::CheckPose::Request> request, std::shared_ptr<mbf_msgs::srv::CheckPose::Response> response)

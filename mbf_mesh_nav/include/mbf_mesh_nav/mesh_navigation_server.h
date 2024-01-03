@@ -184,11 +184,6 @@ private:
    */
   void callServiceClearMesh(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<std_srvs::srv::Empty::Request> request, std::shared_ptr<std_srvs::srv::Empty::Response> response);
 
-  /**
-   * @brief Callback for when ROS parameters change
-   */
-  rcl_interfaces::msg::SetParametersResult reconfigure(std::vector<rclcpp::Parameter> parameters);
-
   //! plugin class loader for recovery behaviors plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
 
@@ -197,9 +192,6 @@ private:
 
   //! plugin class loader for planner plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
-
-  //! Dynamic reconfigure server for the mbf_mesh2d_specific part
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 
   //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
