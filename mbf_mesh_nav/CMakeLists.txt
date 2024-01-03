@@ -7,12 +7,16 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 set(dependencies
+  geometry_msgs
   LVR2
   mbf_abstract_nav
   mbf_mesh_core
+  mbf_msgs
   mesh_map
+  nav_msgs
   pluginlib
   rclcpp
+  std_srvs
 )
 foreach(dep IN LISTS dependencies)
   find_package(${dep} REQUIRED)

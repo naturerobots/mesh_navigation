@@ -9,11 +9,15 @@
     <license>BSD-3</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
-    <depend>roscpp</depend>
+    <depend>geometry_msgs</depend>
     <depend>mbf_abstract_nav</depend>
     <depend>mbf_mesh_core</depend>
+    <depend>mbf_msgs</depend>
     <depend>mesh_map</depend>
+    <depend>nav_msgs</depend>
     <depend>pluginlib</depend>
+    <depend>rclcpp</depend>
+    <depend>std_srvs</depend>
 
     <export>
         <build_type>ament_cmake</build_type>
