@@ -40,7 +40,6 @@
 
 #include <mbf_abstract_nav/abstract_planner_execution.h>
 #include <mbf_mesh_core/mesh_planner.h>
-#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 
 namespace mbf_mesh_nav
@@ -56,7 +55,7 @@ namespace mbf_mesh_nav
 class MeshPlannerExecution : public mbf_abstract_nav::AbstractPlannerExecution
 {
 public:
-  typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
+  typedef std::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
   /**
    * @brief Constructor
@@ -64,8 +63,7 @@ public:
    * threads
    * @param mesh Shared pointer to the mesh.
    */
-  MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr, const MeshPtr& mesh,
-                       const MoveBaseFlexConfig& config);
+  MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr, const mbf_utility::RobotInformation::ConstPtr& robot_info, const MeshPtr& mesh, const rclcpp::Node::SharedPtr& node);
 
   /**
    * @brief Destructor
@@ -73,8 +71,6 @@ public:
   virtual ~MeshPlannerExecution();
 
 private:
-  mbf_abstract_nav::MoveBaseFlexConfig toAbstract(const MoveBaseFlexConfig& config);
-
   /**
    * @brief Calls the planner plugin to make a plan from the start pose to the
    * goal pose with the given tolerance, if a goal tolerance is enabled in the
@@ -90,15 +86,15 @@ private:
    * GetPath.action file
    */
   virtual uint32_t makePlan(
-      const geometry_msgs::PoseStamped &start,
-      const geometry_msgs::PoseStamped &goal,
+      const geometry_msgs::msg::PoseStamped &start,
+      const geometry_msgs::msg::PoseStamped &goal,
       double tolerance,
-      std::vector<geometry_msgs::PoseStamped> &plan,
+      std::vector<geometry_msgs::msg::PoseStamped> &plan,
       double &cost,
       std::string &message);
 
   //! Shared pointer to the mesh for 3d navigation planning
-  const MeshPtr& mesh_ptr_;
+  const MeshPtr mesh_ptr_;
 
   //! Whether to lock mesh before calling the planner (see issue #4 for details)
   bool lock_mesh_;
