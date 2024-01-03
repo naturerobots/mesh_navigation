@@ -39,18 +39,19 @@
 #define MESH_MAP__MESH_MAP_H
 
 #include <atomic>
+#include <mutex>
+#include <tuple>
 #include <geometry_msgs/msg/point.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
 #include <mesh_map/abstract_layer.h>
-#include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
-#include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
-#include <mutex>
+#include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
-#include <tuple>
+#include <visualization_msgs/msg/marker.hpp>
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
