@@ -40,24 +40,15 @@ namespace mbf_mesh_nav
 {
 MeshRecoveryExecution::MeshRecoveryExecution(const std::string name,
                                              const mbf_mesh_core::MeshRecovery::Ptr& recovery_ptr,
-                                             const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr,
-                                             const MoveBaseFlexConfig& config)
-  : AbstractRecoveryExecution(name, recovery_ptr, tf_listener_ptr, toAbstract(config)), mesh_ptr_(mesh_ptr)
+                                             const mbf_utility::RobotInformation::ConstPtr& robot_info,
+                                             const MeshPtr& mesh_ptr,
+                                             const rclcpp::Node::SharedPtr& node)
+  : AbstractRecoveryExecution(name, recovery_ptr, robot_info, node), mesh_ptr_(mesh_ptr)
 {
 }
 
 MeshRecoveryExecution::~MeshRecoveryExecution()
 {
-}
-
-mbf_abstract_nav::MoveBaseFlexConfig MeshRecoveryExecution::toAbstract(const MoveBaseFlexConfig& config)
-{
-  // copy the recovery-related abstract configuration common to all MBF-based
-  // navigation
-  mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
-  abstract_config.recovery_enabled = config.recovery_enabled;
-  abstract_config.recovery_patience = config.recovery_patience;
-  return abstract_config;
 }
 
 } /* namespace mbf_mesh_nav */
