@@ -38,39 +38,30 @@
 
 namespace mbf_mesh_nav
 {
-MeshPlannerExecution::MeshPlannerExecution(const std::string name, const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr,
-                                           const MeshPtr& mesh_ptr, const MoveBaseFlexConfig& config)
-  : AbstractPlannerExecution(name, planner_ptr, toAbstract(config)), mesh_ptr_(mesh_ptr)
+MeshPlannerExecution::MeshPlannerExecution(const std::string name,
+                                           const mbf_mesh_core::MeshPlanner::Ptr& planner_ptr,
+                                           const mbf_utility::RobotInformation::ConstPtr& robot_info,
+                                           const MeshPtr& mesh_ptr,
+                                           const rclcpp::Node::SharedPtr& node)
+  : AbstractPlannerExecution(name, planner_ptr, robot_info, node), mesh_ptr_(mesh_ptr)
 {
-  ros::NodeHandle private_nh("~");
-  private_nh.param("planner_lock_mesh", lock_mesh_, true);
+  lock_mesh_ = node_->declare_parameter("planner_lock_mesh", true);
 }
 
 MeshPlannerExecution::~MeshPlannerExecution()
 {
 }
 
-mbf_abstract_nav::MoveBaseFlexConfig MeshPlannerExecution::toAbstract(const MoveBaseFlexConfig& config)
-{
-  // copy the planner-related abstract configuration common to all MBF-based
-  // navigation
-  mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
-  abstract_config.planner_frequency = config.planner_frequency;
-  abstract_config.planner_patience = config.planner_patience;
-  abstract_config.planner_max_retries = config.planner_max_retries;
-  return abstract_config;
-}
-
-uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::PoseStamped &start,
-                                           const geometry_msgs::PoseStamped &goal,
+uint32_t MeshPlannerExecution::makePlan(const geometry_msgs::msg::PoseStamped &start,
+                                           const geometry_msgs::msg::PoseStamped &goal,
                                            double tolerance,
-                                           std::vector<geometry_msgs::PoseStamped> &plan,
+                                           std::vector<geometry_msgs::msg::PoseStamped> &plan,
                                            double &cost,
                                            std::string &message)
 {
-  ros::Time start_time = ros::Time::now();
+  rclcpp::Time start_time = node_->now();
   uint32_t outcome = planner_->makePlan(start, goal, tolerance, plan, cost, message);
-  ROS_INFO_STREAM("Runtime of " << plugin_name_ << ":" << (ros::Time::now() - start_time).toNSec() * 1e-6 << "ms");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Runtime of " << plugin_name_ << ":" << (node_->now() - start_time).nanoseconds() * 1e-6 << "ms");
   return outcome;
 }
 

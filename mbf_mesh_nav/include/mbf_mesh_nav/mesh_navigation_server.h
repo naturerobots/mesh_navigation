@@ -38,18 +38,20 @@
 #ifndef MBF_MESH_NAV__MESH_NAVIGATION_SERVER_H
 #define MBF_MESH_NAV__MESH_NAVIGATION_SERVER_H
 
+#include <mutex>
+
 #include <mbf_abstract_nav/abstract_navigation_server.h>
 
 #include "mesh_controller_execution.h"
 #include "mesh_planner_execution.h"
 #include "mesh_recovery_execution.h"
 
-#include <mbf_mesh_nav/MoveBaseFlexConfig.h>
-#include <mbf_msgs/CheckPath.h>
-#include <mbf_msgs/CheckPose.h>
-#include <std_srvs/Empty.h>
+#include <mbf_msgs/srv/check_path.hpp>
+#include <mbf_msgs/srv/check_pose.hpp>
+#include <std_srvs/srv/empty.hpp>
+#include <rclcpp/rclcpp.hpp>
 
-#include <pluginlib/class_loader.h>
+#include <pluginlib/class_loader.hpp>
 
 namespace mbf_mesh_nav
 {
@@ -57,9 +59,6 @@ namespace mbf_mesh_nav
  * @defgroup move_base_server Move Base Server
  * @brief Classes belonging to the Move Base Server level.
  */
-
-typedef boost::shared_ptr<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>
-    DynamicReconfigureServerMeshNav;
 
 /**
  * @brief The MeshNavigationServer makes Move Base Flex backwards compatible to
@@ -73,15 +72,15 @@ typedef boost::shared_ptr<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlex
 class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
 {
 public:
-  typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
+  typedef std::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
-  typedef boost::shared_ptr<MeshNavigationServer> Ptr;
+  typedef std::shared_ptr<MeshNavigationServer> Ptr;
 
   /**
    * @brief Constructor
    * @param tf_listener_ptr Shared pointer to a common TransformListener
    */
-  MeshNavigationServer(const TFPtr& tf_listener_ptr);
+  MeshNavigationServer(const TFPtr& tf_listener_ptr, const rclcpp::Node::SharedPtr& node);
 
   /**
    * @brief Destructor
@@ -162,39 +161,28 @@ private:
 
   /**
    * @brief Callback method for the check_pose_cost service
-   * @param request Request object, see the mbf_msgs/CheckPose service
+   * @param request Request object, see the mbf_msgs/srv/CheckPose service
    * definition file.
-   * @param response Response object, see the mbf_msgs/CheckPose service
+   * @param response Response object, see the mbf_msgs/srv/CheckPose service
    * definition file.
-   * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceCheckPoseCost(mbf_msgs::CheckPose::Request& request, mbf_msgs::CheckPose::Response& response);
+  void callServiceCheckPoseCost(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<mbf_msgs::srv::CheckPose::Request> request, std::shared_ptr<mbf_msgs::srv::CheckPose::Response> response);
 
   /**
    * @brief Callback method for the check_path_cost service
-   * @param request Request object, see the mbf_msgs/CheckPath service
+   * @param request Request object, see the mbf_msgs/srv/CheckPath service
    * definition file.
-   * @param response Response object, see the mbf_msgs/CheckPath service
+   * @param response Response object, see the mbf_msgs/srv/CheckPath service
    * definition file.
-   * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceCheckPathCost(mbf_msgs::CheckPath::Request& request, mbf_msgs::CheckPath::Response& response);
+  void callServiceCheckPathCost(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<mbf_msgs::srv::CheckPath::Request> request, std::shared_ptr<mbf_msgs::srv::CheckPath::Response> response);
 
   /**
    * @brief Callback method for the make_plan service
    * @param request Empty request object.
    * @param response Empty response object.
-   * @return true, if the service completed successfully, false otherwise
    */
-  bool callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
-
-  /**
-   * @brief Reconfiguration method called by dynamic reconfigure.
-   * @param config Configuration parameters. See the MoveBaseFlexConfig
-   * definition.
-   * @param level bit mask, which parameters are set.
-   */
-  void reconfigure(mbf_mesh_nav::MoveBaseFlexConfig& config, uint32_t level);
+  void callServiceClearMesh(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<std_srvs::srv::Empty::Request> request, std::shared_ptr<std_srvs::srv::Empty::Response> response);
 
   //! plugin class loader for recovery behaviors plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
@@ -205,32 +193,20 @@ private:
   //! plugin class loader for planner plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
 
-  //! Dynamic reconfigure server for the mbf_mesh2d_specific part
-  DynamicReconfigureServerMeshNav dsrv_mesh_;
-
-  //! last configuration save
-  mbf_mesh_nav::MoveBaseFlexConfig last_config_;
-
-  //! the default parameter configuration save
-  mbf_mesh_nav::MoveBaseFlexConfig default_config_;
-
-  //! true, if the dynamic reconfigure has been setup
-  bool setup_reconfigure_;
-
   //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
 
   //! Service Server to clear the mesh
-  ros::ServiceServer clear_mesh_srv_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr clear_mesh_srv_;
 
   //! Service Server for the check_pose_cost service
-  ros::ServiceServer check_pose_cost_srv_;
+  rclcpp::Service<mbf_msgs::srv::CheckPose>::SharedPtr check_pose_cost_srv_;
 
   //! Service Server for the check_path_cost service
-  ros::ServiceServer check_path_cost_srv_;
+  rclcpp::Service<mbf_msgs::srv::CheckPath>::SharedPtr check_path_cost_srv_;
 
   //! Start/stop meshs mutex; concurrent calls to start can lead to segfault
-  boost::mutex check_meshs_mutex_;
+  std::mutex check_meshs_mutex_;
 };
 
 } /* namespace mbf_mesh_nav */

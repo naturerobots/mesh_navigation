@@ -1,39 +1,36 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(mbf_mesh_nav)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  mbf_mesh_core
+find_package(ament_cmake REQUIRED)
+set(dependencies
+  geometry_msgs
+  LVR2
   mbf_abstract_nav
+  mbf_mesh_core
+  mbf_msgs
   mesh_map
-  dynamic_reconfigure
+  nav_msgs
   pluginlib
+  rclcpp
+  std_srvs
+)
+foreach(dep IN LISTS dependencies)
+  find_package(${dep} REQUIRED)
+endforeach()
+
+include_directories(
+  include
 )
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
-find_package(LVR2 2 REQUIRED)
-
-generate_dynamic_reconfigure_options(
-  cfg/MoveBaseFlex.cfg
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES mbf_mesh_server
-  CATKIN_DEPENDS roscpp mbf_mesh_core mesh_map dynamic_reconfigure mbf_abstract_nav pluginlib
-  DEPENDS LVR2
-)
-
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
-  ${LVR2_INCLUDE_DIRS}
 )
 
 add_library(mbf_mesh_server
@@ -42,31 +39,28 @@ add_library(mbf_mesh_server
   src/mesh_planner_execution.cpp
   src/mesh_recovery_execution.cpp
 )
-
-add_dependencies(mbf_mesh_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-target_link_libraries(mbf_mesh_server
-  ${catkin_LIBRARIES}
-  ${JSONCPP_LIBRARIES}
-)
+ament_target_dependencies(mbf_mesh_server ${dependencies})
+target_link_libraries(mbf_mesh_server ${JSONCPP_LIBRARIES})
 
 add_executable(${PROJECT_NAME} src/mbf_mesh_nav.cpp)
-
-add_dependencies(${PROJECT_NAME} mbf_mesh_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
+ament_target_dependencies(${PROJECT_NAME} ${dependencies} ${${PROJECT_NAME}_EXPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME} mbf_mesh_server)
 target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
   ${JSONCPP_LIBRARIES}
   mbf_mesh_server
 )
 
-install(TARGETS ${PROJECT_NAME} mbf_mesh_server
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+install(DIRECTORY include/
+  DESTINATION include
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
+install(TARGETS ${PROJECT_NAME} mbf_mesh_server
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
 )
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_dependencies(${dependencies})
+ament_package()

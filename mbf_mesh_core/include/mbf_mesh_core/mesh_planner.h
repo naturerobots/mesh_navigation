@@ -70,7 +70,7 @@ public:
    * @param message Optional more detailed outcome as a string
    * @return Result code as described on GetPath action result. (see GetPath.action)
    */
-  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
                             double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message) = 0;
 

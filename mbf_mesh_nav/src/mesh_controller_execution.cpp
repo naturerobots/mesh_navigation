@@ -38,38 +38,26 @@
 
 namespace mbf_mesh_nav
 {
-MeshControllerExecution::MeshControllerExecution(const std::string name,
+MeshControllerExecution::MeshControllerExecution(const std::string& name,
                                                  const mbf_mesh_core::MeshController::Ptr& controller_ptr,
-                                                 const ros::Publisher& vel_pub, const ros::Publisher& goal_pub,
-                                                 const TFPtr& tf_listener_ptr, const MeshPtr& mesh_ptr,
-                                                 const MoveBaseFlexConfig& config)
-  : AbstractControllerExecution(name, controller_ptr, vel_pub, goal_pub, tf_listener_ptr, toAbstract(config))
+                                                 const mbf_utility::RobotInformation::ConstPtr& robot_info,
+                                                 const rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr& vel_pub,
+                                                 const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr& goal_pub,
+                                                 const MeshPtr& mesh_ptr,
+                                                 const rclcpp::Node::SharedPtr& node)
+  : AbstractControllerExecution(name, controller_ptr, robot_info, vel_pub, goal_pub, node)
   , mesh_ptr_(mesh_ptr)
 {
-  ros::NodeHandle private_nh("~");
-  private_nh.param("controller_lock_mesh", lock_mesh_, true);
+  lock_mesh_ = node_handle_->declare_parameter("controller_lock_mesh", true);
 }
 
 MeshControllerExecution::~MeshControllerExecution()
 {
 }
 
-mbf_abstract_nav::MoveBaseFlexConfig MeshControllerExecution::toAbstract(const MoveBaseFlexConfig& config)
-{
-  // copy the controller-related abstract configuration common to all MBF-based
-  // navigation
-  mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
-  abstract_config.controller_frequency = config.controller_frequency;
-  abstract_config.controller_patience = config.controller_patience;
-  abstract_config.controller_max_retries = config.controller_max_retries;
-  abstract_config.oscillation_timeout = config.oscillation_timeout;
-  abstract_config.oscillation_distance = config.oscillation_distance;
-  return abstract_config;
-}
-
-uint32_t MeshControllerExecution::computeVelocityCmd(const geometry_msgs::PoseStamped& robot_pose,
-                                                     const geometry_msgs::TwistStamped& robot_velocity,
-                                                     geometry_msgs::TwistStamped& vel_cmd, std::string& message)
+uint32_t MeshControllerExecution::computeVelocityCmd(const geometry_msgs::msg::PoseStamped& robot_pose,
+                                                     const geometry_msgs::msg::TwistStamped& robot_velocity,
+                                                     geometry_msgs::msg::TwistStamped& vel_cmd, std::string& message)
 {
   // Lock the mesh while planning, but following issue #4, we allow to move the
   // responsibility to the planner itself

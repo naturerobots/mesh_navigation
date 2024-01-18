@@ -35,66 +35,62 @@
  *
  */
 
-#include <geometry_msgs/PoseArray.h>
-#include <mbf_abstract_nav/MoveBaseFlexConfig.h>
-#include <mesh_map/mesh_map.h>
-#include <nav_msgs/Path.h>
-
 #include "mbf_mesh_nav/mesh_navigation_server.h"
+
+#include <functional>
+
+#include <geometry_msgs/msg/pose_array.hpp>
+#include <mesh_map/mesh_map.h>
+#include <nav_msgs/msg/path.hpp>
+#include <rclcpp/logging.hpp>
 
 namespace mbf_mesh_nav
 {
-MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
-  : AbstractNavigationServer(tf_listener_ptr)
+using namespace std::placeholders;
+
+MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr, const rclcpp::Node::SharedPtr& node)
+  : AbstractNavigationServer(tf_listener_ptr, node)
   , recovery_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshRecovery")
   , controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController")
   , planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner")
-  , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_))
-  , setup_reconfigure_(false)
+  , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_, node))
 {
   // advertise services and current goal topic
   check_pose_cost_srv_ =
-      private_nh_.advertiseService("check_pose_cost", &MeshNavigationServer::callServiceCheckPoseCost, this);
+      node_->create_service<mbf_msgs::srv::CheckPose>("check_pose_cost", std::bind(&MeshNavigationServer::callServiceCheckPoseCost, this, _1, _2, _3));
   check_path_cost_srv_ =
-      private_nh_.advertiseService("check_path_cost", &MeshNavigationServer::callServiceCheckPathCost, this);
-  clear_mesh_srv_ = private_nh_.advertiseService("clear_mesh", &MeshNavigationServer::callServiceClearMesh, this);
+      node_->create_service<mbf_msgs::srv::CheckPath>("check_path_cost", std::bind(&MeshNavigationServer::callServiceCheckPathCost, this, _1, _2, _3));
+  clear_mesh_srv_ = node_->create_service<std_srvs::srv::Empty>("clear_mesh", std::bind(&MeshNavigationServer::callServiceClearMesh, this, _1, _2, _3));
 
-  // dynamic reconfigure server for mbf_mesh_nav configuration; also include
-  // abstract server parameters
-  dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
-  dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
-
-  ROS_INFO_STREAM("Reading map file...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Reading map file...");
   mesh_ptr_->readMap();
 
   // initialize all plugins
   initializeServerComponents();
-
-  // start all action servers
-  startActionServers();
 }
 
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {
-  return boost::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), mesh_ptr_, last_config_);
+  return std::make_shared<mbf_mesh_nav::MeshPlannerExecution>(
+      plugin_name, std::static_pointer_cast<mbf_mesh_core::MeshPlanner>(plugin_ptr), robot_info_, mesh_ptr_, node_);
 }
 
 mbf_abstract_nav::AbstractControllerExecution::Ptr MeshNavigationServer::newControllerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr)
 {
-  return boost::make_shared<mbf_mesh_nav::MeshControllerExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), vel_pub_, goal_pub_,
-      tf_listener_ptr_, mesh_ptr_, last_config_);
+  return std::make_shared<mbf_mesh_nav::MeshControllerExecution>(
+      plugin_name, std::static_pointer_cast<mbf_mesh_core::MeshController>(plugin_ptr), robot_info_,
+      vel_pub_, goal_pub_,
+      mesh_ptr_, node_);
 }
 
 mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecoveryExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr)
 {
-  return boost::make_shared<mbf_mesh_nav::MeshRecoveryExecution>(
-      plugin_name, boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), tf_listener_ptr_,
-      boost::ref(mesh_ptr_), last_config_);
+  return std::make_shared<mbf_mesh_nav::MeshRecoveryExecution>(
+      plugin_name, std::static_pointer_cast<mbf_mesh_core::MeshRecovery>(plugin_ptr), robot_info_,
+      mesh_ptr_, node_);
 }
 
 mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(const std::string& planner_type)
@@ -102,14 +98,14 @@ mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(
   mbf_abstract_core::AbstractPlanner::Ptr planner_ptr;
   try
   {
-    planner_ptr = boost::static_pointer_cast<mbf_abstract_core::AbstractPlanner>(
-        planner_plugin_loader_.createInstance(planner_type));
+    planner_ptr = std::static_pointer_cast<mbf_abstract_core::AbstractPlanner>(
+        planner_plugin_loader_.createSharedInstance(planner_type));
     std::string planner_name = planner_plugin_loader_.getName(planner_type);
-    ROS_DEBUG_STREAM("mbf_mesh_core-based planner plugin " << planner_name << " loaded.");
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based planner plugin " << planner_name << " loaded.");
   }
   catch (const pluginlib::PluginlibException& ex_mbf_core)
   {
-    ROS_FATAL_STREAM("Failed to load the " << planner_type << " planner, are you sure it's properly registered"
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << planner_type << " planner, are you sure it's properly registered"
                                            << " and that the containing library is built? " << ex_mbf_core.what());
   }
 
@@ -120,15 +116,15 @@ bool MeshNavigationServer::initializePlannerPlugin(const std::string& name,
                                                    const mbf_abstract_core::AbstractPlanner::Ptr& planner_ptr)
 {
   mbf_mesh_core::MeshPlanner::Ptr mesh_planner_ptr =
-      boost::static_pointer_cast<mbf_mesh_core::MeshPlanner>(planner_ptr);
-  ROS_DEBUG_STREAM("Initialize planner \"" << name << "\".");
+      std::static_pointer_cast<mbf_mesh_core::MeshPlanner>(planner_ptr);
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Initialize planner \"" << name << "\".");
 
   if (!mesh_ptr_)
   {
-    ROS_FATAL_STREAM("The mesh pointer has not been initialized!");
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
     return false;
   }
-  return mesh_planner_ptr->initialize(name, mesh_ptr_);
+  return mesh_planner_ptr->initialize(name, mesh_ptr_, node_);
 }
 
 mbf_abstract_core::AbstractController::Ptr
@@ -137,13 +133,13 @@ MeshNavigationServer::loadControllerPlugin(const std::string& controller_type)
   mbf_abstract_core::AbstractController::Ptr controller_ptr;
   try
   {
-    controller_ptr = controller_plugin_loader_.createInstance(controller_type);
+    controller_ptr = controller_plugin_loader_.createSharedInstance(controller_type);
     std::string controller_name = controller_plugin_loader_.getName(controller_type);
-    ROS_DEBUG_STREAM("mbf_mesh_core-based controller plugin " << controller_name << " loaded.");
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based controller plugin " << controller_name << " loaded.");
   }
   catch (const pluginlib::PluginlibException& ex_mbf_core)
   {
-    ROS_FATAL_STREAM("Failed to load the " << controller_type << " controller, are you sure it's properly registered"
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << controller_type << " controller, are you sure it's properly registered"
                                            << " and that the containing library is built? " << ex_mbf_core.what());
   }
   return controller_ptr;
@@ -152,24 +148,24 @@ MeshNavigationServer::loadControllerPlugin(const std::string& controller_type)
 bool MeshNavigationServer::initializeControllerPlugin(const std::string& name,
                                                       const mbf_abstract_core::AbstractController::Ptr& controller_ptr)
 {
-  ROS_DEBUG_STREAM("Initialize controller \"" << name << "\".");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Initialize controller \"" << name << "\".");
 
   if (!tf_listener_ptr_)
   {
-    ROS_FATAL_STREAM("The tf listener pointer has not been initialized!");
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "The tf listener pointer has not been initialized!");
     return false;
   }
 
   if (!mesh_ptr_)
   {
-    ROS_FATAL_STREAM("The mesh pointer has not been initialized!");
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
     return false;
   }
 
   mbf_mesh_core::MeshController::Ptr mesh_controller_ptr =
-      boost::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
-  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_);
-  ROS_DEBUG_STREAM("Controller plugin \"" << name << "\" initialized.");
+      std::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
+  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Controller plugin \"" << name << "\" initialized.");
   return true;
 }
 
@@ -179,14 +175,14 @@ mbf_abstract_core::AbstractRecovery::Ptr MeshNavigationServer::loadRecoveryPlugi
 
   try
   {
-    recovery_ptr = boost::static_pointer_cast<mbf_abstract_core::AbstractRecovery>(
-        recovery_plugin_loader_.createInstance(recovery_type));
+    recovery_ptr = std::static_pointer_cast<mbf_abstract_core::AbstractRecovery>(
+        recovery_plugin_loader_.createSharedInstance(recovery_type));
     std::string recovery_name = recovery_plugin_loader_.getName(recovery_type);
-    ROS_DEBUG_STREAM("mbf_mesh_core-based recovery behavior plugin " << recovery_name << " loaded.");
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based recovery behavior plugin " << recovery_name << " loaded.");
   }
   catch (pluginlib::PluginlibException& ex_mbf_core)
   {
-    ROS_FATAL_STREAM("Failed to load the " << recovery_type
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << recovery_type
                                            << " recovery behavior, are you sure it's properly registered"
                                            << " and that the containing library is built? " << ex_mbf_core.what());
   }
@@ -197,23 +193,23 @@ mbf_abstract_core::AbstractRecovery::Ptr MeshNavigationServer::loadRecoveryPlugi
 bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
                                                     const mbf_abstract_core::AbstractRecovery::Ptr& behavior_ptr)
 {
-  ROS_DEBUG_STREAM("Initialize recovery behavior \"" << name << "\".");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Initialize recovery behavior \"" << name << "\".");
 
   if (!tf_listener_ptr_)
   {
-    ROS_FATAL_STREAM("The tf listener pointer has not been initialized!");
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "The tf listener pointer has not been initialized!");
     return false;
   }
 
   if (!mesh_ptr_)
   {
-    ROS_FATAL_STREAM("The mesh map pointer has not been initialized!");
+    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh map pointer has not been initialized!");
     return false;
   }
 
-  mbf_mesh_core::MeshRecovery::Ptr behavior = boost::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
-  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_);
-  ROS_DEBUG_STREAM("Recovery behavior plugin \"" << name << "\" initialized.");
+  mbf_mesh_core::MeshRecovery::Ptr behavior = std::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
+  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Recovery behavior plugin \"" << name << "\" initialized.");
   return true;
 }
 
@@ -221,7 +217,7 @@ void MeshNavigationServer::stop()
 {
   AbstractNavigationServer::stop();
   // TODO
-  // ROS_INFO_STREAM_NAMED("mbf_mesh_nav", "Stopping mesh map for shutdown");
+  // RCLCPP_INFO_STREAM_NAMED(node_->get_logger(), "mbf_mesh_nav", "Stopping mesh map for shutdown");
   // mesh_ptr_->stop();
 }
 
@@ -229,59 +225,19 @@ MeshNavigationServer::~MeshNavigationServer()
 {
 }
 
-void MeshNavigationServer::reconfigure(mbf_mesh_nav::MoveBaseFlexConfig& config, uint32_t level)
-{
-  // Make sure we have the original configuration the first time we're called,
-  // so we can restore it if needed
-  if (!setup_reconfigure_)
-  {
-    default_config_ = config;
-    setup_reconfigure_ = true;
-  }
-
-  if (config.restore_defaults)
-  {
-    config = default_config_;
-    // if someone sets restore defaults on the parameter server, prevent looping
-    config.restore_defaults = false;
-  }
-
-  // fill the abstract configuration common to all MBF-based navigation
-  mbf_abstract_nav::MoveBaseFlexConfig abstract_config;
-  abstract_config.planner_frequency = config.planner_frequency;
-  abstract_config.planner_patience = config.planner_patience;
-  abstract_config.planner_max_retries = config.planner_max_retries;
-  abstract_config.controller_frequency = config.controller_frequency;
-  abstract_config.controller_patience = config.controller_patience;
-  abstract_config.controller_max_retries = config.controller_max_retries;
-  abstract_config.recovery_enabled = config.recovery_enabled;
-  abstract_config.recovery_patience = config.recovery_patience;
-  abstract_config.oscillation_timeout = config.oscillation_timeout;
-  abstract_config.oscillation_distance = config.oscillation_distance;
-  abstract_config.restore_defaults = config.restore_defaults;
-  mbf_abstract_nav::AbstractNavigationServer::reconfigure(abstract_config, level);
-
-  last_config_ = config;
-}
-
-bool MeshNavigationServer::callServiceCheckPoseCost(mbf_msgs::CheckPose::Request& request,
-                                                    mbf_msgs::CheckPose::Response& response)
+void MeshNavigationServer::callServiceCheckPoseCost(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<mbf_msgs::srv::CheckPose::Request> request, std::shared_ptr<mbf_msgs::srv::CheckPose::Response> response)
 {
   // TODO implement
-  return false;
 }
 
-bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request& request,
-                                                    mbf_msgs::CheckPath::Response& response)
+void MeshNavigationServer::callServiceCheckPathCost(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<mbf_msgs::srv::CheckPath::Request> request, std::shared_ptr<mbf_msgs::srv::CheckPath::Response> response)
 {
   // TODO implement
-  return false;
 }
 
-bool MeshNavigationServer::callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
+void MeshNavigationServer::callServiceClearMesh(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<std_srvs::srv::Empty::Request> request, std::shared_ptr<std_srvs::srv::Empty::Response> response)
 {
   mesh_ptr_->resetLayers();
-  return true;
 }
 
 } /* namespace mbf_mesh_nav */
