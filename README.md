@@ -1,11 +1,8 @@
 # Mesh Navigation
 
-The *Mesh Navigation* bundle provides software to perform efficient robot navigation on 2D-manifolds in 3D represented 
-as triangular meshes. It allows to safely navigate in various complex outdoor environments by using a modular extendable
-layerd mesh map. Layers can be loaded as plugins and represent certain geometric or semantic metrics of the terrain.
-The layered mesh map is integrated with Move Base Flex (MBF) which provides a universal ROS action interface for path
-planning and motion control, as well as for recovery behaviours. Thus, additional planner and controller plugins running
-on the layered mesh map are provided.
+The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
+layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
+The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
 Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)  
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
@@ -13,6 +10,7 @@ Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 * [Publications](#publications)
 * [Installation](#installation)
 * [Software Stack](#software-stack)
+* [Usage](#usage)
 * [Mesh Map](#mesh-map)
 * [Planners](#planners)
 * [Controllers](#controllers)
@@ -115,9 +113,21 @@ The package structure is as follows:
 
 - `mesh_client` Is an experimental package to additionally load navigation meshes from a server.
 
+## Usage
+
+See the **[pluto_robot](https://github.com/uos/pluto_robot)** bundle for example configurations of the mesh navigatoin stack and usage.
+
+### Mesh map configuratoin
+
+TODO
+
+### Planner and Controller configurations
+
+TODO
+
 ### Path Planning and Motion Control
 
-Use the `MeshGoal` tool to select a goal pose on the shown mesh in RViz. 
+Use the *MeshGoal* tool from the MeshTools bundle to select a goal pose on the shown mesh in *RViz*. This can be added to the top panel *RViz*. 
 
 ## Mesh Map
 
