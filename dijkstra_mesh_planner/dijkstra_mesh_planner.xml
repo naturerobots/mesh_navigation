@@ -1,4 +1,4 @@
-<library path="lib/libdijkstra_mesh_planner">
+<library path="dijkstra_mesh_planner">
     <class name="dijkstra_mesh_planner/DijkstraMeshPlanner" type="dijkstra_mesh_planner::DijkstraMeshPlanner"
            base_class_type="mbf_mesh_core::MeshPlanner">
         <description>
