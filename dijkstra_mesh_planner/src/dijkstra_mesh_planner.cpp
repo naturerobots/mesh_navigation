@@ -37,9 +37,9 @@
 
 #include <dijkstra_mesh_planner/dijkstra_mesh_planner.h>
 #include <lvr2/util/Meap.hpp>
-#include <mbf_msgs/GetPathResult.h>
+#include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/util.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(dijkstra_mesh_planner::DijkstraMeshPlanner, mbf_mesh_core::MeshPlanner);
 
@@ -53,9 +53,9 @@ DijkstraMeshPlanner::~DijkstraMeshPlanner()
 {
 }
 
-uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                                       double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                                       std::string& message)
+uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+                            std::string& message)
 {
   const auto& mesh = mesh_map->mesh();
   std::list<lvr2::VertexHandle> path;
@@ -126,8 +126,7 @@ bool DijkstraMeshPlanner::cancel()
   return true;
 }
 
-bool DijkstraMeshPlanner::initialize(const std::string& plugin_name,
-                                     const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+bool DijkstraMeshPlanner::initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node)
 {
   mesh_map = mesh_map_ptr;
   name = plugin_name;
@@ -156,7 +155,7 @@ lvr2::DenseVertexMap<mesh_map::Vector> DijkstraMeshPlanner::getVectorMap()
   return vector_map;
 }
 
-void DijkstraMeshPlanner::reconfigureCallback(dijkstra_mesh_planner::DijkstraMeshPlannerConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult DijkstraMeshPlanner::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
   ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
   if (first_config)

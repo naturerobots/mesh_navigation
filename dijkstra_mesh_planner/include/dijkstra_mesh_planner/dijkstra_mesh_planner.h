@@ -39,17 +39,16 @@
 #define MESH_NAVIGATION__DIJKSTRA_MESH_PLANNER_H
 
 #include <mbf_mesh_core/mesh_planner.h>
-#include <mbf_msgs/GetPathResult.h>
+#include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/mesh_map.h>
-#include <dijkstra_mesh_planner/DijkstraMeshPlannerConfig.h>
-#include <nav_msgs/Path.h>
+#include <nav_msgs/msg/path.hpp>
 
 namespace dijkstra_mesh_planner
 {
 class DijkstraMeshPlanner : public mbf_mesh_core::MeshPlanner
 {
 public:
-  typedef boost::shared_ptr<dijkstra_mesh_planner::DijkstraMeshPlanner> Ptr;
+  typedef std::shared_ptr<dijkstra_mesh_planner::DijkstraMeshPlanner> Ptr;
 
   DijkstraMeshPlanner();
 
@@ -84,9 +83,9 @@ public:
    *         INTERNAL_ERROR  = 60
    *         71..99 are reserved as plugin specific errors
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                            std::string& message);
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+                            std::string& message) override;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
@@ -94,7 +93,7 @@ public:
    * @return True if a cancel has been successfully requested, false if not
    * implemented.
    */
-  virtual bool cancel();
+  virtual bool cancel() override;
 
   /**
    * @brief initializes this planner with the given plugin name and map
@@ -104,7 +103,7 @@ public:
    *
    * @return true if initialization was successul; else false
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
+  virtual bool initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) override;
 
   /**
    * @brief delivers vector field which has been generated during the latest planning
@@ -152,12 +151,12 @@ protected:
   void computeVectorMap();
 
   /**
-   * @brief gets called on new incoming reconfigure parameters
+   * @brief gets called whenever the node's parameters change
    *
-   * @param cfg new configuration
-   * @param level level
+   * @param parameters vector of changed parameters.
+   *                   Note that this vector will also contain parameters not related to the dijkstra mesh planner.
    */
-  void reconfigureCallback(dijkstra_mesh_planner::DijkstraMeshPlannerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
 private:
   // current map
@@ -165,11 +164,11 @@ private:
   // name of this plugin
   std::string name;
   // node handle
-  ros::NodeHandle private_nh;
+  rclcpp::Node::SharedPtr node;
   // true if the abort of the current planning was requested; else false
   std::atomic_bool cancel_planning;
   // publisher of resulting path
-  ros::Publisher path_pub;
+  rclcpp::Publisher<nav_msgs::msg::Path> path_pub;
   // publisher of resulting vector fiels
   bool publish_vector_field;
   // publisher of per face vectorfield
@@ -178,12 +177,8 @@ private:
   std::string map_frame;
   // offset of maximum distance from goal position
   float goal_dist_offset;
-  // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>
-      reconfigure_server_ptr;
-  dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>::CallbackType config_callback;
-  bool first_config;
-  DijkstraMeshPlannerConfig config;
+  // handle of callback for changing parameters dynamically
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
 
   // predecessors while wave propagation
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
