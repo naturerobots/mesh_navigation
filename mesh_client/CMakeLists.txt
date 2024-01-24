@@ -27,6 +27,7 @@ add_library(${PROJECT_NAME}
   src/mesh_client.cpp
 )
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
+target_link_libraries(${PROJECT_NAME} jsoncpp)
 
 install(DIRECTORY include/
   DESTINATION include
