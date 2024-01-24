@@ -39,17 +39,16 @@
 #define MESH_NAVIGATION__MESH_PLANNER_H
 
 #include <mbf_mesh_core/mesh_planner.h>
-#include <mbf_msgs/GetPathResult.h>
+#include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/mesh_map.h>
-#include <cvp_mesh_planner/CVPMeshPlannerConfig.h>
-#include <nav_msgs/Path.h>
+#include <nav_msgs/msg/path.hpp>
 
 namespace cvp_mesh_planner
 {
 class CVPMeshPlanner : public mbf_mesh_core::MeshPlanner
 {
 public:
-  typedef boost::shared_ptr<cvp_mesh_planner::CVPMeshPlanner> Ptr;
+  typedef std::shared_ptr<cvp_mesh_planner::CVPMeshPlanner> Ptr;
 
   /**
    * @brief Constructor
@@ -71,15 +70,17 @@ public:
    * @param message a detailed outcome message
    * @return result outcome code, see the GetPath action definition
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                            std::string& message);
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start,
+                            const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, 
+                            std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+                            std::string& message) override;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
    * @return true if cancel has been successfully requested, false otherwise
    */
-  virtual bool cancel();
+  virtual bool cancel() override;
 
   /**
    * @brief Initializes the planner plugin with a user configured name and a shared pointer to the mesh map
@@ -87,7 +88,7 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map instance to access attributes and helper functions, etc.
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
+  virtual bool initialize(const std::string& plugin_name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) override;
 
 protected:
 

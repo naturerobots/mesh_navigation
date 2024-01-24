@@ -38,9 +38,8 @@
 #include <lvr2/geometry/Handles.hpp>
 #include <lvr2/util/Meap.hpp>
 
-#include <mbf_msgs/GetPathResult.h>
 #include <mesh_map/util.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 
 #include "cvp_mesh_planner/cvp_mesh_planner.h"
 //#define DEBUG
@@ -59,9 +58,11 @@ CVPMeshPlanner::~CVPMeshPlanner()
 {
 }
 
-uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                                    double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                                    std::string& message)
+uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
+                            const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, 
+                            std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+                            std::string& message)
 {
   const auto& mesh = mesh_map->mesh();
   std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> path;
@@ -130,8 +131,7 @@ bool CVPMeshPlanner::cancel()
   return true;
 }
 
-bool CVPMeshPlanner::initialize(const std::string& plugin_name,
-                                  const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) 
 {
   mesh_map = mesh_map_ptr;
   name = plugin_name;
