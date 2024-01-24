@@ -69,7 +69,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
   // mesh_map->combineVertexCosts(); // TODO should be outside the planner
 
-  ROS_INFO("start wave front propagation.");
+  RCLCPP_INFO(node_->get_logger(), "start wave front propagation.");
 
   mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
   mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
@@ -115,7 +115,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
   path_pub_.publish(path_msg);
   mesh_map_->publishVertexCosts(potential_, "Potential");
-  ROS_INFO_STREAM("Path length: " << cost << "m");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
 
   if (publish_vector_field)
   {
@@ -165,25 +165,26 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
   direction_ = lvr2::DenseVertexMap<float>(mesh.nextVertexIndex(), 0);
   // TODO check all map dependencies! (loaded layers etc...)
 
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>>(
-      new dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>(private_nh));
-
-  config_callback = boost::bind(&CVPMeshPlanner::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  reconfiguration_callback_handle_ = node_->add_on_set_parameters_callback(std::bind(
+      &CVPMeshPlanner::reconfigureCallback, this, std::placeholders::_1));
 
   return true;
 }
 
-void CVPMeshPlanner::reconfigureCallback(cvp_mesh_planner::CVPMeshPlannerConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult CVPMeshPlanner::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
+  rcl_interfaces::msg::SetParametersResult result;
+
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == name_ + ".cost_limit") {
+      config_.cost_limit = parameter.as_double();
+    } else if (parameter.get_name() == name_ + ".step_width") {
+      config_.step_width = parameter.as_double();
+    }
   }
-  config = cfg;
+
+  result.successful = true;
+  return result;
 }
 
 void CVPMeshPlanner::computeVectorMap()
@@ -390,7 +391,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 
   if (!std::isfinite(u3tmp))
   {
-    ROS_ERROR_STREAM("u3 tmp is not finite!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "u3 tmp is not finite!");
   }
   if (u3tmp < u3)
   {
@@ -444,32 +445,32 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 #ifdef DEBUG
     if (!std::isfinite(theta0 + theta1 + theta2))
     {
-      ROS_ERROR_STREAM("------------------");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "------------------");
       if (std::isnan(theta0))
-        ROS_ERROR_STREAM("Theta0 is NaN!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta0 is NaN!");
       if (std::isnan(theta1))
-        ROS_ERROR_STREAM("Theta1 is NaN!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta1 is NaN!");
       if (std::isnan(theta2))
-        ROS_ERROR_STREAM("Theta2 is NaN!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta2 is NaN!");
       if (std::isinf(theta2))
-        ROS_ERROR_STREAM("Theta2 is inf!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta2 is inf!");
       if (std::isinf(theta2))
-        ROS_ERROR_STREAM("Theta2 is inf!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta2 is inf!");
       if (std::isinf(theta2))
-        ROS_ERROR_STREAM("Theta2 is inf!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Theta2 is inf!");
       if (std::isnan(t1a))
-        ROS_ERROR_STREAM("t1a is NaN!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "t1a is NaN!");
       if (std::isnan(t2a))
-        ROS_ERROR_STREAM("t2a is NaN!");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "t2a is NaN!");
       if (std::fabs(t2a) > 1)
       {
-        ROS_ERROR_STREAM("|t2a| is > 1: " << t2a);
-        ROS_INFO_STREAM("a: " << a << ", u3: " << u3tmp << ", u2: " << u2 << ", a+u2: " << a + u2);
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "|t2a| is > 1: " << t2a);
+        RCLCPP_INFO_STREAM(node_->get_logger(), "a: " << a << ", u3: " << u3tmp << ", u2: " << u2 << ", a+u2: " << a + u2);
       }
       if (std::fabs(t1a) > 1)
       {
-        ROS_ERROR_STREAM("|t1a| is > 1: " << t1a);
-        ROS_INFO_STREAM("b: " << b << ", u3: " << u3tmp << ", u1: " << u1 << ", b+u1: " << b + u1);
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "|t1a| is > 1: " << t1a);
+        RCLCPP_INFO_STREAM(node_->get_logger(), "b: " << b << ", u3: " << u3tmp << ", u1: " << u1 << ", b+u1: " << b + u1);
       }
     }
 #endif
@@ -640,7 +641,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
                                                 lvr2::DenseVertexMap<float>& distances,
                                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
-  ROS_DEBUG_STREAM("Init wave front propagation.");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Init wave front propagation.");
 
   const auto& mesh = mesh_map_->mesh();
   const auto& vertex_costs = mesh_map_->vertexCosts();
@@ -662,9 +663,9 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   cancel_planning_ = false;
 
   if (!start_opt)
-    return mbf_msgs::GetPathResult::INVALID_START;
+    return mbf_msgs::action::GetPath::Result::INVALID_START;
   if (!goal_opt)
-    return mbf_msgs::GetPathResult::INVALID_GOAL;
+    return mbf_msgs::action::GetPath::Result::INVALID_GOAL;
 
   const auto& start_face = start_opt.unwrap();
   const auto& goal_face = goal_opt.unwrap();
@@ -678,7 +679,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 
   if (goal_face == start_face)
   {
-    return mbf_msgs::GetPathResult::SUCCESS;
+    return mbf_msgs::action::GetPath::Result::SUCCESS;
   }
 
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
@@ -709,7 +710,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   }
 
   std::array<lvr2::VertexHandle, 3> goal_vertices = mesh.getVerticesOfFace(goal_face);
-  ROS_DEBUG_STREAM("The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z << ") at the face ("
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z << ") at the face ("
                                      << goal_vertices[0] << ", " << goal_vertices[1] << ", " << goal_vertices[2]
                                      << ")");
   mesh_map_->publishDebugPoint(mesh.getVertexPosition(goal_vertices[0]), mesh_map::color(0, 0, 1), "goal_face_v1");
@@ -718,7 +719,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 
   float goal_dist = std::numeric_limits<float>::infinity();
 
-  ROS_DEBUG_STREAM("Start wavefront propagation...");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Start wavefront propagation...");
 
   size_t fixed_cnt = 0;
   size_t fixed_set_cnt = 0;
@@ -746,7 +747,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
       if (goal_dist == std::numeric_limits<float>::infinity() && fixed[goal_vertices[0]] && fixed[goal_vertices[1]] &&
           fixed[goal_vertices[2]])
       {
-        ROS_DEBUG_STREAM("Wave front reached the goal!");
+        RCLCPP_DEBUG_STREAM(node_->get_logger(), "Wave front reached the goal!");
         goal_dist = distances[current_vh] + goal_dist_offset;
       }
     }
@@ -840,26 +841,26 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     catch (lvr2::PanicException exception)
     {
       invalid.insert(current_vh, true);
-      ROS_ERROR_STREAM("Found invalid vertex!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Found invalid vertex!");
       continue;
     }
     catch (lvr2::VertexLoopException exception)
     {
       invalid.insert(current_vh, true);
-      ROS_ERROR_STREAM("Found invalid vertex!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Found invalid vertex!");
       continue;
     }
   }
 
   if (cancel_planning_)
   {
-    ROS_WARN_STREAM("Wave front propagation has been canceled!");
-    return mbf_msgs::GetPathResult::CANCELED;
+    RCLCPP_WARN_STREAM(node_->get_logger(), "Wave front propagation has been canceled!");
+    return mbf_msgs::action::GetPath::Result::CANCELED;
   }
   ros::WallTime t_wavefront_end = ros::WallTime::now();
   double wavefront_propagation_duration = (t_wavefront_end - t_wavefront_start).toNSec() * 1e-6;
-  ROS_DEBUG_STREAM("Finished wave front propagation.");
-  ROS_DEBUG_STREAM("Computing the vector map...");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Finished wave front propagation.");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Computing the vector map...");
   computeVectorMap();
 
   ros::WallTime t_vector_field_end = ros::WallTime::now();
@@ -877,37 +878,37 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 
   if (!path_exists)
   {
-    ROS_WARN("Predecessor of the goal is not set! No path found!");
-    return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+    RCLCPP_WARN(node_->get_logger(), "Predecessor of the goal is not set! No path found!");
+    return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
   }
 
-  ROS_DEBUG_STREAM("Start vector field back tracking!");
+  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Start vector field back tracking!");
 
   lvr2::FaceHandle current_face = goal_face;
   mesh_map::Vector current_pos = goal;
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
 
   // move from the goal position towards the start position
-  while (current_pos.distance2(start) > config.step_width && !cancel_planning_)
+  while (current_pos.distance2(start) > config_.step_width && !cancel_planning_)
   {
     // move current pos ahead on the surface following the vector field,
     // updates the current face if necessary
     try
     {
-      if (mesh_map_->meshAhead(current_pos, current_face, config.step_width))
+      if (mesh_map_->meshAhead(current_pos, current_face, config_.step_width))
       {
         path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(current_pos, current_face));
       }
       else
       {
-        ROS_WARN_STREAM("Could not find a valid path, while back-tracking from the goal");
-        return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+        RCLCPP_WARN_STREAM(node_->get_logger(), "Could not find a valid path, while back-tracking from the goal");
+        return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
       }
     }
     catch (lvr2::PanicException exception)
     {
-      ROS_ERROR_STREAM("Could not find a valid path, while back-tracking from the goal: HalfEdgeMesh panicked!");
-      return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not find a valid path, while back-tracking from the goal: HalfEdgeMesh panicked!");
+      return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
     }
   }
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(start, start_face));
@@ -915,20 +916,20 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   ros::WallTime t_path_backtracking = ros::WallTime::now();
   double path_backtracking_duration = (t_path_backtracking - t_vector_field_end).toNSec() * 1e-6;
 
-  ROS_INFO_STREAM("Processed " << fixed_set_cnt << " vertices in the fixed set.");
-  ROS_INFO_STREAM("Initialization duration (ms): " << initialization_duration);
-  ROS_INFO_STREAM("Execution time wavefront propagation (ms): "<< wavefront_propagation_duration);
-  ROS_INFO_STREAM("Vector field post computation (ms): " << vector_field_duration);
-  ROS_INFO_STREAM("Path backtracking duration (ms): " << path_backtracking_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Processed " << fixed_set_cnt << " vertices in the fixed set.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Initialization duration (ms): " << initialization_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time wavefront propagation (ms): "<< wavefront_propagation_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Vector field post computation (ms): " << vector_field_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration);
 
   if (cancel_planning_)
   {
-    ROS_WARN_STREAM("Wave front propagation has been canceled!");
-    return mbf_msgs::GetPathResult::CANCELED;
+    RCLCPP_WARN_STREAM(node_->get_logger(), "Wave front propagation has been canceled!");
+    return mbf_msgs::action::GetPath::Result::CANCELED;
   }
 
-  ROS_INFO_STREAM("Successfully finished vector field back tracking!");
-  return mbf_msgs::GetPathResult::SUCCESS;
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully finished vector field back tracking!");
+  return mbf_msgs::action::GetPath::Result::SUCCESS;
 }
 
 } /* namespace cvp_mesh_planner */
