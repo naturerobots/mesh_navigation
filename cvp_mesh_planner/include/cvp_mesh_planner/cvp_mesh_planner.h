@@ -42,6 +42,7 @@
 #include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/msg/path.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 namespace cvp_mesh_planner
 {
@@ -163,9 +164,16 @@ protected:
   void computeVectorMap();
 
   /**
-   * @brief Dynamic reconfigure callback
+   * @brief gets called on new incoming reconfigure parameters
+   *
+   * @param cfg new configuration
+   * @param level level
+   * @brief gets called whenever the node's parameters change
+   
+   * @param parameters vector of changed parameters.
+   *                   Note that this vector will also contain parameters not related to the cvp mesh planner
    */
-  void reconfigureCallback(cvp_mesh_planner::CVPMeshPlannerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
 private:
 
@@ -175,14 +183,14 @@ private:
   //! the user defined plugin name
   std::string name_;
 
-  //! the private node handle with the user defined namespace (name)
-  ros::NodeHandle private_nh;
+  //! pointer to the node in which this plugin is running
+  rclcpp::Node::SharedPtr node_;
 
   //! flag if cancel has been requested
   std::atomic_bool cancel_planning_;
 
   //! publisher for the backtracked path
-  ros::Publisher path_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
   //! the map coordinate frame / system id
   std::string map_frame_;
@@ -193,9 +201,13 @@ private:
     //! whether to publish the vector field or not
     bool publish_vector_field = false;
     //! whether to also publish direction vectors at the triangle centers
-    bool publish_face_vectors;
+    bool publish_face_vectors = false;
     //! an offset that determines how far beyond the goal (robot's position) is propagated.
-    float goal_dist_offset;
+    double goal_dist_offset = 0.3;
+    //! Defines the vertex cost limit with which it can be accessed.
+    double cost_limit = 1.0;
+    //! The vector field back tracking step width.
+    double step_width = 0.4;
   } config_;
 
   //! theta angles to the source of the wave front propagation

@@ -136,13 +136,31 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
   mesh_map_ = mesh_map_ptr;
   name_ = plugin_name;
   map_frame_ = mesh_map_->mapFrame();
-  private_nh = ros::NodeHandle("~/" + name_);
+  node_ = node;
 
-  private_nh.param("publish_vector_field", publish_vector_field, false);
-  private_nh.param("publish_face_vectors", publish_face_vectors, false);
-  private_nh.param("goal_dist_offset", goal_dist_offset, 0.3f);
+  config_.publish_vector_field = node_->declare_parameter("publish_vector_field", config_.publish_vector_field);
+  config_.publish_face_vectors = node_->declare_parameter("publish_face_vectors", config_.publish_face_vectors);
+  config_.goal_dist_offset = node_->declare_parameter("goal_dist_offset", config_.goal_dist_offset);
+  { // cost limit param
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Defines the vertex cost limit with which it can be accessed.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 10.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.cost_limit = node->declare_parameter("cost_limit", config_.cost_limit);
+  }
+  { // step width param
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The vector field back tracking step width.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.01;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.step_width = node->declare_parameter("step_width", config_.step_width);
+  }
 
-  path_pub_ = private_nh.advertise<nav_msgs::Path>("path", 1, true);
+  path_pub_ = node->create_publisher<nav_msgs::msg::Path>("~/path", rclcpp::QoS(1).transient_local());
   const auto& mesh = mesh_map_->mesh();
   direction_ = lvr2::DenseVertexMap<float>(mesh.nextVertexIndex(), 0);
   // TODO check all map dependencies! (loaded layers etc...)
