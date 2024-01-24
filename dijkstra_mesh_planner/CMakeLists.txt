@@ -10,9 +10,6 @@ find_package(rclcpp REQUIRED)
 
 pluginlib_export_plugin_description_file(mbf_mesh_core dijkstra_mesh_planner.xml)
 
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(JSONCPP jsoncpp)
-
 add_library(${PROJECT_NAME}
   src/dijkstra_mesh_planner.cpp
 )
