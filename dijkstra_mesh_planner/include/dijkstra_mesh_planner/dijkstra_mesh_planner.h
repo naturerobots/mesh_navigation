@@ -152,7 +152,7 @@ protected:
 
   /**
    * @brief gets called whenever the node's parameters change
-   *
+   
    * @param parameters vector of changed parameters.
    *                   Note that this vector will also contain parameters not related to the dijkstra mesh planner.
    */
@@ -168,17 +168,22 @@ private:
   // true if the abort of the current planning was requested; else false
   std::atomic_bool cancel_planning_;
   // publisher of resulting path
-  rclcpp::Publisher<nav_msgs::msg::Path> path_pub_;
-  // publisher of resulting vector fiels
-  bool publish_vector_field_;
-  // publisher of per face vectorfield
-  bool publish_face_vectors_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   // tf frame of the map
   std::string map_frame_;
-  // offset of maximum distance from goal position
-  float goal_dist_offset_;
   // handle of callback for changing parameters dynamically
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
+  // config determined by ROS params; Init values defined here are used as default ROS param value
+  struct {
+    // publisher of resulting vector fiels
+    bool publish_vector_field = false;
+    // publisher of per face vectorfield
+    bool publish_face_vectors = false;
+    // offset of maximum distance from goal position
+    double goal_dist_offset = 0.3;
+    // defines the vertex cost limit with which it can be accessed
+    double cost_limit = 1.0;
+  } config_;
 
   // predecessors while wave propagation
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors_;

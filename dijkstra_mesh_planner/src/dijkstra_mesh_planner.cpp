@@ -108,14 +108,14 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
   path_msg.poses = plan;
   path_msg.header = header;
 
-  path_pub_.publish(path_msg);
+  path_pub_->publish(path_msg);
   mesh_map_->publishVertexCosts(potential_, "Potential");
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
 
-  if (publish_vector_field_)
+  if (config_.publish_vector_field)
   {
-    mesh_map_->publishVectorField("vector_field", vector_map_, publish_face_vectors_);
+    mesh_map_->publishVectorField("vector_field", vector_map_, config_.publish_face_vectors);
   }
 
   return outcome;
@@ -134,19 +134,24 @@ bool DijkstraMeshPlanner::initialize(const std::string& plugin_name, const std::
   map_frame_ = mesh_map_->mapFrame();
   node_ = node;
 
-  private_nh.param("publish_vector_field", publish_vector_field_, false);
-  private_nh.param("publish_face_vectors", publish_face_vectors_, false);
-  private_nh.param("goal_dist_offset", goal_dist_offset_, 0.3f);
+  config_.publish_vector_field = node_->declare_parameter("publish_vector_field", config_.publish_vector_field);
+  config_.publish_face_vectors = node_->declare_parameter("publish_face_vectors", config_.publish_face_vectors);
+  config_.goal_dist_offset =  node->declare_parameter("goal_dist_offset", config_.goal_dist_offset);
+  { // cost limit param
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Defines the vertex cost limit with which it can be accessed.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 10.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.cost_limit =  node->declare_parameter("cost_limit", config_.cost_limit);
+  }
 
-  path_pub_ = private_nh.advertise<nav_msgs::msg::Path>("path", 1, true);
+  path_pub_ = node_->create_publisher<nav_msgs::msg::Path>("~/path", rclcpp::QoS(1).transient_local());
   const auto& mesh = mesh_map_->mesh();
 
-  reconfigure_server_ptr =
-      boost::shared_ptr<dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>(
-          new dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>(private_nh));
-
-  config_callback = boost::bind(&DijkstraMeshPlanner::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  reconfiguration_callback_handle_ = node_->add_on_set_parameters_callback(std::bind(
+      &DijkstraMeshPlanner::reconfigureCallback, this, std::placeholders::_1));
 
   return true;
 }
@@ -158,14 +163,15 @@ lvr2::DenseVertexMap<mesh_map::Vector> DijkstraMeshPlanner::getVectorMap()
 
 rcl_interfaces::msg::SetParametersResult DijkstraMeshPlanner::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "New height diff layer config through dynamic reconfigure.");
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
+  rcl_interfaces::msg::SetParametersResult result;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == name_ + ".cost_limit") {
+      config_.cost_limit = parameter.as_double();
+      RCLCPP_INFO_STREAM(node_->get_logger(), "New height diff layer config through dynamic reconfigure.");
+    }
   }
-  config = cfg;
+  result.successful = true;
+  return result;
 }
 
 void DijkstraMeshPlanner::computeVectorMap()
@@ -276,13 +282,13 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     if (current_vh == goal_vertex)
     {
       RCLCPP_INFO_STREAM(node_->get_logger(), "The Dijkstra Mesh Planner reached the goal.");
-      goal_dist = distances[current_vh] + goal_dist_offset_;
+      goal_dist = distances[current_vh] + config_.goal_dist_offset;
     }
 
     if (distances[current_vh] > goal_dist)
       continue;
 
-    if (vertex_costs[current_vh] > config.cost_limit)
+    if (vertex_costs[current_vh] > config_.cost_limit)
       continue;
 
     std::vector<lvr2::EdgeHandle> edges;
