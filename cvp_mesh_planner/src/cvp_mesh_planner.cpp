@@ -139,9 +139,9 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
   map_frame_ = mesh_map_->mapFrame();
   node_ = node;
 
-  config_.publish_vector_field = node_->declare_parameter("publish_vector_field", config_.publish_vector_field);
-  config_.publish_face_vectors = node_->declare_parameter("publish_face_vectors", config_.publish_face_vectors);
-  config_.goal_dist_offset = node_->declare_parameter("goal_dist_offset", config_.goal_dist_offset);
+  config_.publish_vector_field = node_->declare_parameter(name_ + ".publish_vector_field", config_.publish_vector_field);
+  config_.publish_face_vectors = node_->declare_parameter(name_ + ".publish_face_vectors", config_.publish_face_vectors);
+  config_.goal_dist_offset = node_->declare_parameter(name_ + ".goal_dist_offset", config_.goal_dist_offset);
   { // cost limit param
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Defines the vertex cost limit with which it can be accessed.";
@@ -149,7 +149,7 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
     range.from_value = 0.0;
     range.to_value = 10.0;
     descriptor.floating_point_range.push_back(range);
-    config_.cost_limit = node->declare_parameter("cost_limit", config_.cost_limit);
+    config_.cost_limit = node->declare_parameter(name_ + ".cost_limit", config_.cost_limit);
   }
   { // step width param
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -158,7 +158,7 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
     range.from_value = 0.01;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.step_width = node->declare_parameter("step_width", config_.step_width);
+    config_.step_width = node->declare_parameter(name_ + ".step_width", config_.step_width);
   }
 
   path_pub_ = node->create_publisher<nav_msgs::msg::Path>("~/path", rclcpp::QoS(1).transient_local());
