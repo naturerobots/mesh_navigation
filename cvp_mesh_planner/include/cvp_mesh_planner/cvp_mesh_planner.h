@@ -170,58 +170,48 @@ protected:
 private:
 
   //! shared pointer to the mesh map
-  mesh_map::MeshMap::Ptr mesh_map;
+  mesh_map::MeshMap::Ptr mesh_map_;
 
   //! the user defined plugin name
-  std::string name;
+  std::string name_;
 
   //! the private node handle with the user defined namespace (name)
   ros::NodeHandle private_nh;
 
   //! flag if cancel has been requested
-  std::atomic_bool cancel_planning;
+  std::atomic_bool cancel_planning_;
 
   //! publisher for the backtracked path
-  ros::Publisher path_pub;
-
-  //! whether to publish the vector field or not
-  bool publish_vector_field;
-
-  //! whether to also publish direction vectors at the triangle centers
-  bool publish_face_vectors;
+  ros::Publisher path_pub_;
 
   //! the map coordinate frame / system id
-  std::string map_frame;
+  std::string map_frame_;
 
-  //! an offset that determines how far beyond the goal (robot's position) is propagated.
-  float goal_dist_offset;
-
-  //! shared pointer to dynamic reconfigure server
-  boost::shared_ptr<dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>> reconfigure_server_ptr;
-
-  //! dynamic reconfigure callback function binding
-  dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>::CallbackType config_callback;
-
-  //! indicates if dynamic reconfigure has been called the first time
-  bool first_config;
-
-  //! the current dynamic reconfigure planner configuration
-  CVPMeshPlannerConfig config;
+  // handle of callback for changing parameters dynamically
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
+  struct {
+    //! whether to publish the vector field or not
+    bool publish_vector_field = false;
+    //! whether to also publish direction vectors at the triangle centers
+    bool publish_face_vectors;
+    //! an offset that determines how far beyond the goal (robot's position) is propagated.
+    float goal_dist_offset;
+  } config_;
 
   //! theta angles to the source of the wave front propagation
-  lvr2::DenseVertexMap<float> direction;
+  lvr2::DenseVertexMap<float> direction_;
 
   //! predecessors while wave propagation
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors_;
 
   //! the face which is cut by the computed line to the source
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
 
   //! stores the current vector map containing vectors pointing to the seed
-  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
 
   //! potential field / scalar distance field to the seed
-  lvr2::DenseVertexMap<float> potential;
+  lvr2::DenseVertexMap<float> potential_;
 };
 
 }  // namespace cvp_mesh_planner
