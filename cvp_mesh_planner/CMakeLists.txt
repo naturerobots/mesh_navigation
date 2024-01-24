@@ -1,58 +1,32 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.8)
 project(cvp_mesh_planner)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+find_package(ament_cmake_ros REQUIRED)
+find_package(mbf_mesh_core REQUIRED)
+find_package(mbf_msgs REQUIRED)
+find_package(mbf_utility REQUIRED)
+find_package(mesh_map REQUIRED)
+find_package(rclcpp REQUIRED)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  mbf_mesh_core
-  mbf_utility
-  mbf_msgs
-  mesh_map
-  dynamic_reconfigure
-)
+pluginlib_export_plugin_description_file(mbf_mesh_core cvp_mesh_planner.xml)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(JSONCPP jsoncpp)
+add_library(${PROJECT_NAME} src/cvp_mesh_planner.cpp)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_definitions(${PROJECT_NAME} PRIVATE "CVP_MESH_PLANNER_BUILDING_LIBRARY")
+ament_target_dependencies(${PROJECT_NAME} mbf_mesh_core mbf_msgs mbf_utility mesh_map rclcpp)
 
-generate_dynamic_reconfigure_options(
-  cfg/CVPMeshPlanner.cfg
-)
-
-catkin_package(
-  LIBRARIES cvp_mesh_planner
-  CATKIN_DEPENDS roscpp mbf_mesh_core mbf_utility mbf_msgs mesh_map dynamic_reconfigure
-)
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
-add_library(${PROJECT_NAME}
-  src/cvp_mesh_planner.cpp
-)
-
-add_dependencies(${PROJECT_NAME}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_gencfg
-)
-
-target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  ${JSONCPP_LIBRARIES}
-)
-
+install(DIRECTORY include DESTINATION include)
 install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-install(FILES cvp_mesh_planner.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_dependencies(mbf_mesh_core mbf_msgs mbf_utility mesh_map rclcpp)
+ament_package()

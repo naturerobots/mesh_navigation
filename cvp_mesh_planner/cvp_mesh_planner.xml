@@ -1,4 +1,4 @@
-<library path="lib/libcvp_mesh_planner">
+<library path="cvp_mesh_planner">
     <class name="cvp_mesh_planner/CVPMeshPlanner" type="cvp_mesh_planner::CVPMeshPlanner"
            base_class_type="mbf_mesh_core::MeshPlanner">
         <description>
