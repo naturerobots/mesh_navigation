@@ -35,6 +35,7 @@
  *
  */
 
+#include <chrono>
 #include <dijkstra_mesh_planner/dijkstra_mesh_planner.h>
 #include <lvr2/util/Meap.hpp>
 #include <mbf_msgs/action/get_path.hpp>
@@ -209,7 +210,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
                                        lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Init wave front propagation.");
-  ros::WallTime t_initialization_start = ros::WallTime::now();
+  const auto t_initialization_start = std::chrono::steady_clock::now();
 
   const auto& mesh = mesh_map_->mesh();
   const auto& vertex_costs = mesh_map_->vertexCosts();
@@ -247,8 +248,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   // clear vector field map
   vector_map_.clear();
 
-  ros::WallTime t_start, t_end;
-  t_start = ros::WallTime::now();
+  const auto t_start = std::chrono::steady_clock::now();
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
@@ -268,8 +268,8 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   float goal_dist = std::numeric_limits<float>::infinity();
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Start Dijkstra");
-  ros::WallTime t_propagation_start = ros::WallTime::now();
-  double initialization_duration = (t_propagation_start - t_initialization_start).toNSec() * 1e-6;
+  const auto t_propagation_start = std::chrono::steady_clock::now();
+  const auto initialization_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_propagation_start - t_initialization_start);
 
   size_t fixed_set_cnt = 0;
 
@@ -350,8 +350,8 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
   }
 
-  ros::WallTime t_propagation_end = ros::WallTime::now();
-  double propagation_duration = (t_propagation_end - t_propagation_start).toNSec() * 1e-6;
+  const auto t_propagation_end = std::chrono::steady_clock::now();
+  const auto propagation_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_propagation_end - t_propagation_start);
 
   auto vH = goal_vertex;
 
@@ -361,10 +361,10 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     path.push_front(vH);
   };
 
-  t_end = ros::WallTime::now();
-  double execution_time = (t_end - t_start).toNSec() * 1e-6;
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time (ms): " << execution_time << " for " << mesh.numVertices()
-                                          << " num vertices in the mesh.");
+  const auto t_end = std::chrono::steady_clock::now();
+  const auto execution_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution duration (ms): " << execution_duration_ms.count() 
+                                          << " for " << mesh.numVertices() << " num vertices in the mesh.");
 
   computeVectorMap();
 
@@ -374,13 +374,13 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     return mbf_msgs::action::GetPath::Result::CANCELED;
   }
 
-  ros::WallTime t_path_backtracking = ros::WallTime::now();
-  double path_backtracking_duration = (t_path_backtracking - t_propagation_end).toNSec() * 1e-6;
+  const auto t_path_backtracking = std::chrono::steady_clock::now();
+  const auto path_backtracking_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_path_backtracking - t_propagation_end);
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Processed " << fixed_set_cnt << " vertices in the fixed set.");
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Initialization duration (ms): " << initialization_duration);
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time wavefront propagation (ms): "<< propagation_duration);
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Initialization duration (ms): " << initialization_duration_ms.count());
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time wavefront propagation (ms): " << propagation_duration_ms.count());
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration_ms.count());
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully finished Dijkstra back tracking!");
   return mbf_msgs::action::GetPath::Result::SUCCESS;
