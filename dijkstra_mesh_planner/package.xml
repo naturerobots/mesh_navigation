@@ -7,7 +7,6 @@
     <license>BSD-3</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
-    <buildtool_depend>catkin</buildtool_depend>
     <depend>rclcpp</depend>
     <depend>mbf_mesh_core</depend>
     <depend>mbf_utility</depend>
