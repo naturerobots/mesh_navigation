@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(mbf_mesh_core)
 
 
-find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
 set(dependencies
   mbf_abstract_core
   mesh_map

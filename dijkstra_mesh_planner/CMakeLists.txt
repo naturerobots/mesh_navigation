@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 project(dijkstra_mesh_planner)
 
-find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(mbf_mesh_core REQUIRED)
 find_package(mbf_msgs REQUIRED)
