@@ -72,7 +72,7 @@ public:
   bool readMap();
 
   /**
-   * @brief Loads all configures layer plugins
+   * @brief Loads all configured layer plugins
    * @return true if the layer plugins have been load successfully.
    */
   bool loadLayerPlugins();
