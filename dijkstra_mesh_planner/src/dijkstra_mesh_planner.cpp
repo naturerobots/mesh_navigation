@@ -57,7 +57,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
                             double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message)
 {
-  const auto& mesh = mesh_map->mesh();
+  const auto& mesh = mesh_map_->mesh();
   std::list<lvr2::VertexHandle> path;
   ROS_INFO("start dijkstra mesh planner.");
 
@@ -71,13 +71,13 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
 
   std_msgs::Header header;
   header.stamp = ros::Time::now();
-  header.frame_id = mesh_map->mapFrame();
+  header.frame_id = mesh_map_->mapFrame();
 
   cost = 0;
   if (!path.empty())
   {
     mesh_map::Vector& vec = start_vec;
-    const auto& vertex_normals = mesh_map->vertexNormals();
+    const auto& vertex_normals = mesh_map_->vertexNormals();
     mesh_map::Normal normal = vertex_normals[path.front()];
 
     float dir_length;
@@ -107,14 +107,14 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
   path_msg.poses = plan;
   path_msg.header = header;
 
-  path_pub.publish(path_msg);
-  mesh_map->publishVertexCosts(potential, "Potential");
+  path_pub_.publish(path_msg);
+  mesh_map_->publishVertexCosts(potential_, "Potential");
 
   ROS_INFO_STREAM("Path length: " << cost << "m");
 
-  if (publish_vector_field)
+  if (publish_vector_field_)
   {
-    mesh_map->publishVectorField("vector_field", vector_map, publish_face_vectors);
+    mesh_map_->publishVectorField("vector_field", vector_map_, publish_face_vectors_);
   }
 
   return outcome;
@@ -122,23 +122,23 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
 
 bool DijkstraMeshPlanner::cancel()
 {
-  cancel_planning = true;
+  cancel_planning_ = true;
   return true;
 }
 
-bool DijkstraMeshPlanner::initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node)
+bool DijkstraMeshPlanner::initialize(const std::string& plugin_name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node)
 {
-  mesh_map = mesh_map_ptr;
-  name = plugin_name;
-  map_frame = mesh_map->mapFrame();
-  private_nh = ros::NodeHandle("~/" + name);
+  mesh_map_ = mesh_map_ptr;
+  name_ = plugin_name;
+  map_frame_ = mesh_map_->mapFrame();
+  node_ = node;
 
-  private_nh.param("publish_vector_field", publish_vector_field, false);
-  private_nh.param("publish_face_vectors", publish_face_vectors, false);
-  private_nh.param("goal_dist_offset", goal_dist_offset, 0.3f);
+  private_nh.param("publish_vector_field", publish_vector_field_, false);
+  private_nh.param("publish_face_vectors", publish_face_vectors_, false);
+  private_nh.param("goal_dist_offset", goal_dist_offset_, 0.3f);
 
-  path_pub = private_nh.advertise<nav_msgs::Path>("path", 1, true);
-  const auto& mesh = mesh_map->mesh();
+  path_pub_ = private_nh.advertise<nav_msgs::Path>("path", 1, true);
+  const auto& mesh = mesh_map_->mesh();
 
   reconfigure_server_ptr =
       boost::shared_ptr<dynamic_reconfigure::Server<dijkstra_mesh_planner::DijkstraMeshPlannerConfig>>(
@@ -152,7 +152,7 @@ bool DijkstraMeshPlanner::initialize(const std::string& name, const std::shared_
 
 lvr2::DenseVertexMap<mesh_map::Vector> DijkstraMeshPlanner::getVectorMap()
 {
-  return vector_map;
+  return vector_map_;
 }
 
 rcl_interfaces::msg::SetParametersResult DijkstraMeshPlanner::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
@@ -169,11 +169,11 @@ rcl_interfaces::msg::SetParametersResult DijkstraMeshPlanner::reconfigureCallbac
 
 void DijkstraMeshPlanner::computeVectorMap()
 {
-  const auto& mesh = mesh_map->mesh();
+  const auto& mesh = mesh_map_->mesh();
 
   for (auto v3 : mesh.vertices())
   {
-    const lvr2::VertexHandle& v1 = predecessors[v3];
+    const lvr2::VertexHandle& v1 = predecessors_[v3];
     // if predecessor is pointing to it self, continue with the next vertex.
     if (v1 == v3)
       continue;
@@ -184,15 +184,15 @@ void DijkstraMeshPlanner::computeVectorMap()
     // compute the direction vector and store it in the direction vertex map
     const auto dirVec = vec1 - vec3;
     // store the normalized rotated vector in the vector map
-    vector_map.insert(v3, dirVec.normalized());
+    vector_map_.insert(v3, dirVec.normalized());
   }
-  mesh_map->setVectorMap(vector_map);
+  mesh_map_->setVectorMap(vector_map_);
 }
 
 uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                                        std::list<lvr2::VertexHandle>& path)
 {
-  return dijkstra(start, goal, mesh_map->edgeDistances(), mesh_map->vertexCosts(), path, potential, predecessors);
+  return dijkstra(start, goal, mesh_map_->edgeDistances(), mesh_map_->vertexCosts(), path, potential_, predecessors_);
 }
 
 uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, const mesh_map::Vector& original_goal,
@@ -204,19 +204,19 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   ROS_INFO_STREAM("Init wave front propagation.");
   ros::WallTime t_initialization_start = ros::WallTime::now();
 
-  const auto& mesh = mesh_map->mesh();
-  const auto& vertex_costs = mesh_map->vertexCosts();
+  const auto& mesh = mesh_map_->mesh();
+  const auto& vertex_costs = mesh_map_->vertexCosts();
 
-  auto& invalid = mesh_map->invalid;
+  auto& invalid = mesh_map_->invalid;
 
-  mesh_map->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
-  mesh_map->publishDebugPoint(original_goal, mesh_map::color(0, 0, 1), "goal_point");
+  mesh_map_->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
+  mesh_map_->publishDebugPoint(original_goal, mesh_map::color(0, 0, 1), "goal_point");
 
   // Find the closest vertex handle of start and goal
-  const auto& start_opt = mesh_map->getNearestVertexHandle(original_start);
-  const auto& goal_opt = mesh_map->getNearestVertexHandle(original_goal);
+  const auto& start_opt = mesh_map_->getNearestVertexHandle(original_start);
+  const auto& goal_opt = mesh_map_->getNearestVertexHandle(original_goal);
   // reset cancel planning
-  cancel_planning = false;
+  cancel_planning_ = false;
 
   if (!start_opt)
     return mbf_msgs::GetPathResult::INVALID_START;
@@ -238,7 +238,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
 
   // clear vector field map
-  vector_map.clear();
+  vector_map_.clear();
 
   ros::WallTime t_start, t_end;
   t_start = ros::WallTime::now();
@@ -266,7 +266,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
 
   size_t fixed_set_cnt = 0;
 
-  while (!pq.isEmpty() && !cancel_planning)
+  while (!pq.isEmpty() && !cancel_planning_)
   {
     lvr2::VertexHandle current_vh = pq.popMin().key();
     fixed[current_vh] = true;
@@ -275,7 +275,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     if (current_vh == goal_vertex)
     {
       ROS_INFO_STREAM("The Dijkstra Mesh Planner reached the goal.");
-      goal_dist = distances[current_vh] + goal_dist_offset;
+      goal_dist = distances[current_vh] + goal_dist_offset_;
     }
 
     if (distances[current_vh] > goal_dist)
@@ -329,7 +329,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     }
   }
 
-  if (cancel_planning)
+  if (cancel_planning_)
   {
     ROS_WARN_STREAM("Wave front propagation has been canceled!");
     return mbf_msgs::GetPathResult::CANCELED;
@@ -348,7 +348,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
 
   auto vH = goal_vertex;
 
-  while (vH != start_vertex && !cancel_planning)
+  while (vH != start_vertex && !cancel_planning_)
   {
     vH = predecessors[vH];
     path.push_front(vH);
@@ -361,7 +361,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
 
   computeVectorMap();
 
-  if (cancel_planning)
+  if (cancel_planning_)
   {
     ROS_WARN_STREAM("Dijkstra has been canceled!");
     return mbf_msgs::GetPathResult::CANCELED;

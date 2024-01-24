@@ -103,7 +103,7 @@ public:
    *
    * @return true if initialization was successul; else false
    */
-  virtual bool initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) override;
+  virtual bool initialize(const std::string& plugin_name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) override;
 
   /**
    * @brief delivers vector field which has been generated during the latest planning
@@ -160,35 +160,35 @@ protected:
 
 private:
   // current map
-  mesh_map::MeshMap::Ptr mesh_map;
+  mesh_map::MeshMap::Ptr mesh_map_;
   // name of this plugin
-  std::string name;
+  std::string name_;
   // node handle
-  rclcpp::Node::SharedPtr node;
+  rclcpp::Node::SharedPtr node_;
   // true if the abort of the current planning was requested; else false
-  std::atomic_bool cancel_planning;
+  std::atomic_bool cancel_planning_;
   // publisher of resulting path
-  rclcpp::Publisher<nav_msgs::msg::Path> path_pub;
+  rclcpp::Publisher<nav_msgs::msg::Path> path_pub_;
   // publisher of resulting vector fiels
-  bool publish_vector_field;
+  bool publish_vector_field_;
   // publisher of per face vectorfield
-  bool publish_face_vectors;
+  bool publish_face_vectors_;
   // tf frame of the map
-  std::string map_frame;
+  std::string map_frame_;
   // offset of maximum distance from goal position
-  float goal_dist_offset;
+  float goal_dist_offset_;
   // handle of callback for changing parameters dynamically
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
 
   // predecessors while wave propagation
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors_;
   // the face which is cut by line to the source
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
   // stores the current vector map containing vectors pointing to the source
   // (path goal)
-  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
   // potential field or distance values to the source (path goal)
-  lvr2::DenseVertexMap<float> potential;
+  lvr2::DenseVertexMap<float> potential_;
 };
 
 }  // namespace dijkstra_mesh_planner
