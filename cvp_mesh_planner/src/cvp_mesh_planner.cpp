@@ -38,6 +38,7 @@
 #include <lvr2/geometry/Handles.hpp>
 #include <lvr2/util/Meap.hpp>
 
+#include <chrono>
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.hpp>
 
@@ -78,8 +79,8 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
   path.reverse();
 
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
+  std_msgs::msg::Header header;
+  header.stamp = node_->now();
   header.frame_id = mesh_map_->mapFrame();
 
   cost = 0;
@@ -93,7 +94,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
     const auto& face_normals = mesh_map_->faceNormals();
     for (auto& next : path)
     {
-      geometry_msgs::PoseStamped pose;
+      geometry_msgs::msg::PoseStamped pose;
       pose.header = header;
       pose.pose = mesh_map::calculatePoseFromPosition(vec, next.first, face_normals[fH], dir_length);
       cost += dir_length;
@@ -102,24 +103,24 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
       plan.push_back(pose);
     }
 
-    geometry_msgs::PoseStamped pose;
+    geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
     pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH], dir_length);
     cost += dir_length;
     plan.push_back(pose);
   }
 
-  nav_msgs::Path path_msg;
+  nav_msgs::msg::Path path_msg;
   path_msg.poses = plan;
   path_msg.header = header;
 
-  path_pub_.publish(path_msg);
+  path_pub_->publish(path_msg);
   mesh_map_->publishVertexCosts(potential_, "Potential");
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
 
-  if (publish_vector_field)
+  if (config_.publish_vector_field)
   {
-    mesh_map_->publishVectorField("vector_field", vector_map_, publish_face_vectors);
+    mesh_map_->publishVectorField("vector_field", vector_map_, config_.publish_face_vectors);
   }
 
   return outcome;
@@ -657,7 +658,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   const auto& start_opt = mesh_map_->getContainingFace(start, 0.4);
   const auto& goal_opt = mesh_map_->getContainingFace(goal, 0.4);
 
-  ros::WallTime t_initialization_start = ros::WallTime::now();
+  const auto t_initialization_start = std::chrono::steady_clock::now();
 
   // reset cancel planning
   cancel_planning_ = false;
@@ -723,8 +724,8 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 
   size_t fixed_cnt = 0;
   size_t fixed_set_cnt = 0;
-  ros::WallTime t_wavefront_start = ros::WallTime::now();
-  double initialization_duration = (t_wavefront_start - t_initialization_start).toNSec() * 1e-6;
+  const auto t_wavefront_start = std::chrono::steady_clock::now();
+  const auto initialization_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_wavefront_start - t_initialization_start);
 
   while (!pq.isEmpty() && !cancel_planning_)
   {
@@ -736,7 +737,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     if (distances[current_vh] > goal_dist)
       continue;
 
-    if (vertex_costs[current_vh] > config.cost_limit)
+    if (vertex_costs[current_vh] > config_.cost_limit)
       continue;
 
     if (invalid[current_vh])
@@ -748,7 +749,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
           fixed[goal_vertices[2]])
       {
         RCLCPP_DEBUG_STREAM(node_->get_logger(), "Wave front reached the goal!");
-        goal_dist = distances[current_vh] + goal_dist_offset;
+        goal_dist = distances[current_vh] + config_.goal_dist_offset;
       }
     }
 
@@ -857,14 +858,14 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     RCLCPP_WARN_STREAM(node_->get_logger(), "Wave front propagation has been canceled!");
     return mbf_msgs::action::GetPath::Result::CANCELED;
   }
-  ros::WallTime t_wavefront_end = ros::WallTime::now();
-  double wavefront_propagation_duration = (t_wavefront_end - t_wavefront_start).toNSec() * 1e-6;
+  const auto t_wavefront_end = std::chrono::steady_clock::now();
+  const auto wavefront_propagation_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_wavefront_end - t_wavefront_start);
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "Finished wave front propagation.");
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "Computing the vector map...");
   computeVectorMap();
 
-  ros::WallTime t_vector_field_end = ros::WallTime::now();
-  double vector_field_duration = (t_vector_field_end - t_wavefront_end).toNSec() * 1e-6;
+  const auto t_vector_field_end = std::chrono::steady_clock::now();
+  const auto vector_field_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_vector_field_end - t_wavefront_end);
 
   bool path_exists = false;
   for (auto goal_vertex : goal_vertices)
@@ -913,14 +914,14 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   }
   path.push_front(std::pair<mesh_map::Vector, lvr2::FaceHandle>(start, start_face));
 
-  ros::WallTime t_path_backtracking = ros::WallTime::now();
-  double path_backtracking_duration = (t_path_backtracking - t_vector_field_end).toNSec() * 1e-6;
+  const auto t_path_backtracking = std::chrono::steady_clock::now();
+  const auto path_backtracking_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_path_backtracking - t_vector_field_end);
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Processed " << fixed_set_cnt << " vertices in the fixed set.");
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Initialization duration (ms): " << initialization_duration);
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time wavefront propagation (ms): "<< wavefront_propagation_duration);
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Vector field post computation (ms): " << vector_field_duration);
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Initialization duration (ms): " << initialization_duration_ms.count());
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Execution time wavefront propagation (ms): "<< wavefront_propagation_duration_ms.count());
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Vector field post computation (ms): " << vector_field_duration_ms.count());
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration_ms.count());
 
   if (cancel_planning_)
   {
