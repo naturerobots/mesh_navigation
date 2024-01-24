@@ -64,14 +64,12 @@ public:
    */
   virtual uint32_t runBehavior(std::string& message) = 0;
 
-  MeshRecovery() = delete;
+  MeshRecovery() {};
 
   /**
    * @brief Virtual destructor for the interface
    */
-  virtual ~MeshRecovery()
-  {
-  }
+  virtual ~MeshRecovery() {};
 
   /**
    * @brief Requests the recovery behavior to cancel, e.g. if it takes too much

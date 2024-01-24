@@ -47,13 +47,10 @@ PLUGINLIB_EXPORT_CLASS(dijkstra_mesh_planner::DijkstraMeshPlanner, mbf_mesh_core
 
 namespace dijkstra_mesh_planner
 {
-DijkstraMeshPlanner::DijkstraMeshPlanner()
-{
-}
 
-DijkstraMeshPlanner::~DijkstraMeshPlanner()
-{
-}
+DijkstraMeshPlanner::DijkstraMeshPlanner() {}
+
+DijkstraMeshPlanner::~DijkstraMeshPlanner() {}
 
 uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
                             double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,

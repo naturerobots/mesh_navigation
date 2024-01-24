@@ -52,12 +52,10 @@ class MeshPlanner : public mbf_abstract_core::AbstractPlanner
 public:
   typedef std::shared_ptr<mbf_mesh_core::MeshPlanner> Ptr;
 
-  MeshPlanner() = delete;
-
   /**
    * @brief Destructor
    */
-  virtual ~MeshPlanner(){};
+  virtual ~MeshPlanner() {};
 
   /**
    * @brief Given a goal pose in the world, compute a plan
@@ -88,7 +86,11 @@ public:
    * @return true if the plugin has been initialized successfully
    */
   virtual bool initialize(const std::string& name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) = 0;
+
+protected:
+  MeshPlanner() {};
 };
+
 } /* namespace mbf_mesh_core */
 
 #endif /* MESH_MESH_CORE__MESH_PLANNER_H */

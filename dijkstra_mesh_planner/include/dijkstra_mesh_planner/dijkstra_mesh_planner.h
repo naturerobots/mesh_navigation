@@ -45,6 +45,7 @@
 
 namespace dijkstra_mesh_planner
 {
+
 class DijkstraMeshPlanner : public mbf_mesh_core::MeshPlanner
 {
 public:

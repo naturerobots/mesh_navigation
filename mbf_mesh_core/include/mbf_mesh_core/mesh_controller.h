@@ -53,12 +53,12 @@ class MeshController : public mbf_abstract_core::AbstractController
 public:
   typedef std::shared_ptr<mbf_mesh_core::MeshController> Ptr;
 
-  MeshController() = delete;
+  MeshController() {};
 
   /**
    * @brief Destructor
    */
-  virtual ~MeshController(){};
+  virtual ~MeshController() {};
 
   /**
    * @brief Given the current position, orientation, and velocity of the robot,
