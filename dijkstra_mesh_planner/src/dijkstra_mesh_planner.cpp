@@ -70,8 +70,8 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
 
   path.reverse();
 
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
+  std_msgs::msg::Header header;
+  header.stamp = node_->now();
   header.frame_id = mesh_map_->mapFrame();
 
   cost = 0;
@@ -82,7 +82,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
     mesh_map::Normal normal = vertex_normals[path.front()];
 
     float dir_length;
-    geometry_msgs::PoseStamped pose;
+    geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
 
     while (!path.empty())
@@ -104,7 +104,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
   }
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
-  nav_msgs::Path path_msg;
+  nav_msgs::msg::Path path_msg;
   path_msg.poses = plan;
   path_msg.header = header;
 
@@ -138,7 +138,7 @@ bool DijkstraMeshPlanner::initialize(const std::string& plugin_name, const std::
   private_nh.param("publish_face_vectors", publish_face_vectors_, false);
   private_nh.param("goal_dist_offset", goal_dist_offset_, 0.3f);
 
-  path_pub_ = private_nh.advertise<nav_msgs::Path>("path", 1, true);
+  path_pub_ = private_nh.advertise<nav_msgs::msg::Path>("path", 1, true);
   const auto& mesh = mesh_map_->mesh();
 
   reconfigure_server_ptr =
@@ -220,9 +220,9 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   cancel_planning_ = false;
 
   if (!start_opt)
-    return mbf_msgs::GetPathResult::INVALID_START;
+    return mbf_msgs::action::GetPath::Result::INVALID_START;
   if (!goal_opt)
-    return mbf_msgs::GetPathResult::INVALID_GOAL;
+    return mbf_msgs::action::GetPath::Result::INVALID_GOAL;
 
   const auto& start_vertex = start_opt.unwrap();
   const auto& goal_vertex = goal_opt.unwrap();
@@ -233,7 +233,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
 
   if (goal_vertex == start_vertex)
   {
-    return mbf_msgs::GetPathResult::SUCCESS;
+    return mbf_msgs::action::GetPath::Result::SUCCESS;
   }
 
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
@@ -333,7 +333,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   if (cancel_planning_)
   {
     RCLCPP_WARN_STREAM(node_->get_logger(), "Wave front propagation has been canceled!");
-    return mbf_msgs::GetPathResult::CANCELED;
+    return mbf_msgs::action::GetPath::Result::CANCELED;
   }
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "The Dijkstra Mesh Planner finished the propagation.");
@@ -341,7 +341,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   if (goal_vertex == predecessors[goal_vertex])
   {
     RCLCPP_WARN(node_->get_logger(), "Predecessor of the goal is not set! No path found!");
-    return mbf_msgs::GetPathResult::NO_PATH_FOUND;
+    return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
   }
 
   ros::WallTime t_propagation_end = ros::WallTime::now();
@@ -365,7 +365,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   if (cancel_planning_)
   {
     RCLCPP_WARN_STREAM(node_->get_logger(), "Dijkstra has been canceled!");
-    return mbf_msgs::GetPathResult::CANCELED;
+    return mbf_msgs::action::GetPath::Result::CANCELED;
   }
 
   ros::WallTime t_path_backtracking = ros::WallTime::now();
@@ -377,7 +377,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path backtracking duration (ms): " << path_backtracking_duration);
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully finished Dijkstra back tracking!");
-  return mbf_msgs::GetPathResult::SUCCESS;
+  return mbf_msgs::action::GetPath::Result::SUCCESS;
 }
 
 } /* namespace dijkstra_mesh_planner */
