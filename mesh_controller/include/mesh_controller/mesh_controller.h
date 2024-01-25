@@ -152,14 +152,17 @@ public:
   /**
    * @brief reconfigure callback function which is called if a dynamic reconfiguration were triggered.
    */
-  void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
 private:
   //! shared pointer to node in which this plugin runs
   rclcpp::Node::SharedPtr node_;
 
+  //! the user defined plugin name
+  std::string name_;
+
   //! shared pointer to the used mesh map
-  std::shared_ptr<mesh_map::MeshMap> map_ptr;
+  std::shared_ptr<mesh_map::MeshMap> map_ptr_;
 
   //! the current set plan
   vector<geometry_msgs::msg::PoseStamped> current_plan;
@@ -177,13 +180,24 @@ private:
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
   //! publishes the angle between the robots orientation and the goal vector field for debug purposes
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub_;
 
   //! flag to handle cancel requests
   std::atomic_bool cancel_requested;
 
   // handle of callback for changing parameters dynamically
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
+
+  struct {
+    double max_lin_velocity = 1.0;
+    double max_ang_velocity = 0.5;
+    double arrival_fading = 0.5;
+    double ang_vel_factor = 1.0;
+    double lin_vel_factor = 1.0;
+    double max_angle = 20.0;
+    double max_search_radius = 0.4;
+    double max_search_distance = 0.4;
+  } config_;
 };
 
 } /* namespace mesh_controller */
