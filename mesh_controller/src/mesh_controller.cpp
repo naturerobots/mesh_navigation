@@ -42,7 +42,7 @@
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.hpp>
 #include <std_msgs/msg/float32.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <mbf_utility/exe_path_exception.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_controller::MeshController, mbf_mesh_core::MeshController);
@@ -229,7 +229,7 @@ std::array<float, 2> MeshController::naiveControl(
   float phi = acos(mesh_dir.dot(robot_dir));
   float sign_phi = mesh_dir.cross(robot_dir).dot(mesh_normal);
   // debug output angle between supposed and current angle
-  DEBUG_CALL(std_msgs::msg:::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_.publish(angle32);)
+  DEBUG_CALL(std_msgs::msg::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_->publish(angle32);)
 
   float angular_velocity = copysignf(phi * config_.max_ang_velocity / M_PI, -sign_phi);
   const float max_angle = config_.max_angle * M_PI / 180.0;
