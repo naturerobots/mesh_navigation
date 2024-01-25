@@ -41,7 +41,6 @@
 #include <mesh_controller/mesh_controller.h>
 #include <mesh_map/util.h>
 #include <pluginlib/class_list_macros.hpp>
-#include <std_msgs/msg/float32.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <mbf_utility/exe_path_exception.h>
 
@@ -229,7 +228,7 @@ std::array<float, 2> MeshController::naiveControl(
   float phi = acos(mesh_dir.dot(robot_dir));
   float sign_phi = mesh_dir.cross(robot_dir).dot(mesh_normal);
   // debug output angle between supposed and current angle
-  DEBUG_CALL(std_msgs::msg::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_->publish(angle32);)
+  DEBUG_CALL(example_interfaces::msg::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_->publish(angle32);)
 
   float angular_velocity = copysignf(phi * config_.max_ang_velocity / M_PI, -sign_phi);
   const float max_angle = config_.max_angle * M_PI / 180.0;
@@ -275,7 +274,7 @@ bool MeshController::initialize(const std::string& plugin_name,
   map_ptr_ = mesh_map_ptr;
   name_ = plugin_name;
 
-  angle_pub_ = node_->create_publisher<std_msgs::msg::Float32>("~/current_angle", rclcpp::QoS(1).transient_local());
+  angle_pub_ = node_->create_publisher<example_interfaces::msg::Float32>("~/current_angle", rclcpp::QoS(1).transient_local());
 
   { // cost max_lin_velocity
     rcl_interfaces::msg::ParameterDescriptor descriptor;

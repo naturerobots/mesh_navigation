@@ -37,6 +37,7 @@
 
 #include <mbf_mesh_core/mesh_controller.h>
 #include <mbf_msgs/action/get_path.hpp>
+#include <example_interfaces/msg/float32.hpp>
 #include <mesh_map/mesh_map.h>
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -180,7 +181,7 @@ private:
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
 
   //! publishes the angle between the robots orientation and the goal vector field for debug purposes
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub_;
+  rclcpp::Publisher<example_interfaces::msg::Float32>::SharedPtr angle_pub_;
 
   //! flag to handle cancel requests
   std::atomic_bool cancel_requested_;
