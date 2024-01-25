@@ -72,24 +72,24 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
 {
   const auto& mesh = map_ptr_->mesh();
 
-  robot_pos = poseToPositionVector(pose);
-  robot_dir = poseToDirectionVector(pose);
+  robot_pos_ = poseToPositionVector(pose);
+  robot_dir_ = poseToDirectionVector(pose);
   std::array<float, 3> bary_coords;
   std::array<mesh_map::Vector, 3> vertices;
 
-  if (!current_face)
+  if (!current_face_)
   {
     // initially search current face on complete map
     if (auto search_res_opt = map_ptr_->searchContainingFace(
-            robot_pos, config_.max_search_distance))
+            robot_pos_, config_.max_search_distance))
     {
       auto search_res = *search_res_opt;
-      current_face = std::get<0>(search_res);
+      current_face_ = std::get<0>(search_res);
       vertices = std::get<1>(search_res);
       bary_coords = std::get<2>(search_res);
 
       // project position onto surface
-      robot_pos = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
+      robot_pos_ = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
     }
     else
     {
@@ -99,43 +99,43 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
   }
   else // current face is set
   {
-    lvr2::FaceHandle face = current_face.unwrap();
+    lvr2::FaceHandle face = current_face_.unwrap();
     vertices = mesh.getVertexPositionsOfFace(face);
     DEBUG_CALL(map_ptr_->publishDebugFace(face, mesh_map::color(1, 1, 1), "current_face");)
-    DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos, mesh_map::color(1, 1, 1), "robot_position");)
+    DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos_, mesh_map::color(1, 1, 1), "robot_position");)
 
     float dist_to_surface;
     // check whether or not the position matches the current face
     // if not search for new current face
     if (mesh_map::projectedBarycentricCoords(
-        robot_pos, vertices, bary_coords, dist_to_surface)
+        robot_pos_, vertices, bary_coords, dist_to_surface)
         && dist_to_surface < config_.max_search_distance)
     {
       // current position is located inside and close enough to the face
-      DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos, mesh_map::color(0, 0, 1), "current_position");)
+      DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos_, mesh_map::color(0, 0, 1), "current_position");)
     }
     else if (auto search_res_opt = map_ptr_->searchNeighbourFaces(
-                 robot_pos, face, config_.max_search_radius, config_.max_search_distance))
+                 robot_pos_, face, config_.max_search_radius, config_.max_search_distance))
     {
       // new face has been found out of the neighbour faces of the current face
       // update variables to new face
       auto search_res = *search_res_opt;
-      current_face = face = std::get<0>(search_res);
+      current_face_ = face = std::get<0>(search_res);
       vertices = std::get<1>(search_res);
       bary_coords = std::get<2>(search_res);
-      robot_pos = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
+      robot_pos_ = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
       DEBUG_CALL(map_ptr_->publishDebugFace(face, mesh_map::color(1, 0.5, 0), "search_neighbour_face");)
-      DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos, mesh_map::color(0, 0, 1), "search_neighbour_pos");)
+      DEBUG_CALL(map_ptr_->publishDebugPoint(robot_pos_, mesh_map::color(0, 0, 1), "search_neighbour_pos");)
     }
     else if(auto search_res_opt = map_ptr_->searchContainingFace(
-        robot_pos, config_.max_search_distance))
+        robot_pos_, config_.max_search_distance))
     {
       // update variables to new face
       auto search_res = *search_res_opt;
-      current_face = face = std::get<0>(search_res);
+      current_face_ = face = std::get<0>(search_res);
       vertices = std::get<1>(search_res);
       bary_coords = std::get<2>(search_res);
-      robot_pos = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
+      robot_pos_ = mesh_map::linearCombineBarycentricCoords(vertices, bary_coords);
     }
     else
     {
@@ -144,12 +144,12 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
     }
   }
 
-  const lvr2::FaceHandle& face = current_face.unwrap();
+  const lvr2::FaceHandle& face = current_face_.unwrap();
   std::array<lvr2::VertexHandle, 3> handles = map_ptr_->mesh_ptr->getVerticesOfFace(face);
 
   // update to which position of the plan the robot is closest
 
-  const auto& opt_dir = map_ptr_->directionAtPosition(vector_map, handles, bary_coords);
+  const auto& opt_dir = map_ptr_->directionAtPosition(vector_map_, handles, bary_coords);
   if (!opt_dir)
   {
     DEBUG_CALL(map_ptr_->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");)
@@ -159,12 +159,12 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
   mesh_map::Normal mesh_dir = opt_dir.get().normalized();
   float cost = map_ptr_->costAtPosition(handles, bary_coords);
   const mesh_map::Normal& mesh_normal = poseToDirectionVector(pose, tf2::Vector3(0,0,1));
-  std::array<float, 2> velocities = naiveControl(robot_pos, robot_dir, mesh_dir, mesh_normal, cost);
+  std::array<float, 2> velocities = naiveControl(robot_pos_, robot_dir_, mesh_dir, mesh_normal, cost);
   cmd_vel.twist.linear.x = std::min(config_.max_lin_velocity, velocities[0] * config_.lin_vel_factor);
   cmd_vel.twist.angular.z = std::min(config_.max_ang_velocity, velocities[1] * config_.ang_vel_factor);
-  cmd_vel.header.stamp = ros::Time::now();
+  cmd_vel.header.stamp = node_->now();
 
-  if (cancel_requested)
+  if (cancel_requested_)
   {
     return mbf_msgs::action::ExePath::Result::CANCELED;
   }
@@ -173,35 +173,35 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
 
 bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
 {
-  float goal_distance = (goal_pos - robot_pos).length();
-  float angle = acos(goal_dir.dot(robot_dir));
+  float goal_distance = (goal_pos_ - robot_pos_).length();
+  float angle = acos(goal_dir_.dot(robot_dir_));
   return goal_distance <= static_cast<float>(dist_tolerance) && angle <= static_cast<float>(angle_tolerance);
 }
 
 bool MeshController::setPlan(const std::vector<geometry_msgs::msg::PoseStamped>& plan)
 {
   // copy vector field // TODO just use vector field without copying
-  vector_map = map_ptr_->getVectorMap();
+  vector_map_ = map_ptr_->getVectorMap();
   DEBUG_CALL(map_ptr_->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");)
   DEBUG_CALL(map_ptr_->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");)
   current_plan_ = plan;
-  goal_pos = poseToPositionVector(current_plan_.back());
-  goal_dir = poseToDirectionVector(current_plan_.back());
+  goal_pos_ = poseToPositionVector(current_plan_.back());
+  goal_dir_ = poseToDirectionVector(current_plan_.back());
 
   // reset current and ahead face
-  cancel_requested = false;
-  current_face = lvr2::OptionalFaceHandle();
+  cancel_requested_ = false;
+  current_face_ = lvr2::OptionalFaceHandle();
   return true;
 }
 
 bool MeshController::cancel()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "The MeshController has been requested to cancel!");
-  cancel_requested = true;
+  cancel_requested_ = true;
   return true;
 }
 
-mesh_map::Normal MeshController::poseToDirectionVector(const geometry_msgs::PoseStamped& pose, const tf2::Vector3& axis)
+mesh_map::Normal MeshController::poseToDirectionVector(const geometry_msgs::msg::PoseStamped& pose, const tf2::Vector3& axis)
 {
   tf2::Stamped<tf2::Transform> transform;
   fromMsg(pose, transform);
@@ -209,7 +209,7 @@ mesh_map::Normal MeshController::poseToDirectionVector(const geometry_msgs::Pose
   return mesh_map::Normal(v.x(), v.y(), v.z());
 }
 
-mesh_map::Vector MeshController::poseToPositionVector(const geometry_msgs::PoseStamped& pose)
+mesh_map::Vector MeshController::poseToPositionVector(const geometry_msgs::msg::PoseStamped& pose)
 {
   return mesh_map::Vector(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
 }
@@ -229,7 +229,7 @@ std::array<float, 2> MeshController::naiveControl(
   float phi = acos(mesh_dir.dot(robot_dir));
   float sign_phi = mesh_dir.cross(robot_dir).dot(mesh_normal);
   // debug output angle between supposed and current angle
-  DEBUG_CALL(std_msgs::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_.publish(angle32);)
+  DEBUG_CALL(std_msgs::msg:::Float32 angle32; angle32.data = phi * 180 / M_PI; angle_pub_.publish(angle32);)
 
   float angular_velocity = copysignf(phi * config_.max_ang_velocity / M_PI, -sign_phi);
   const float max_angle = config_.max_angle * M_PI / 180.0;

@@ -165,25 +165,25 @@ private:
   std::shared_ptr<mesh_map::MeshMap> map_ptr_;
 
   //! the current set plan
-  vector<geometry_msgs::msg::PoseStamped> current_plan;
+  vector<geometry_msgs::msg::PoseStamped> current_plan_;
 
   //! the goal and robot pose
-  mesh_map::Vector goal_pos, robot_pos;
+  mesh_map::Vector goal_pos_, robot_pos_;
 
   //! the goal's and robot's orientation
-  mesh_map::Normal goal_dir, robot_dir;
+  mesh_map::Normal goal_dir_, robot_dir_;
 
   //! The triangle on which the robot is located
-  lvr2::OptionalFaceHandle current_face;
+  lvr2::OptionalFaceHandle current_face_;
 
   //! The vector field to the goal.
-  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
 
   //! publishes the angle between the robots orientation and the goal vector field for debug purposes
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub_;
 
   //! flag to handle cancel requests
-  std::atomic_bool cancel_requested;
+  std::atomic_bool cancel_requested_;
 
   // handle of callback for changing parameters dynamically
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
