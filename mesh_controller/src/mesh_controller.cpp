@@ -37,12 +37,11 @@
 
 #include <lvr2/geometry/HalfEdgeMesh.hpp>
 #include <lvr2/util/Meap.hpp>
-#include <mbf_msgs/ExePathResult.h>
-#include <mbf_msgs/GetPathResult.h>
+#include <mbf_msgs/action/exe_path.hpp>
 #include <mesh_controller/mesh_controller.h>
 #include <mesh_map/util.h>
-#include <pluginlib/class_list_macros.h>
-#include <std_msgs/Float32.h>
+#include <pluginlib/class_list_macros.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <mbf_utility/exe_path_exception.h>
 
@@ -95,7 +94,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
     else
     {
       // no corresponding face has been found
-      return mbf_msgs::ExePathResult::OUT_OF_MAP;
+      return mbf_msgs::action::ExePath::Result::OUT_OF_MAP;
     }
   }
   else // current face is set
@@ -141,7 +140,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
     else
     {
       // no corresponding face has been found
-      return mbf_msgs::ExePathResult::OUT_OF_MAP;
+      return mbf_msgs::action::ExePath::Result::OUT_OF_MAP;
     }
   }
 
@@ -154,8 +153,8 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
   if (!opt_dir)
   {
     DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");)
-    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not access vector field for the given face!");
-    return mbf_msgs::ExePathResult::FAILURE;
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not access vector field for the given face!");
+    return mbf_msgs::action::ExePath::Result::FAILURE;
   }
   mesh_map::Normal mesh_dir = opt_dir.get().normalized();
   float cost = map_ptr->costAtPosition(handles, bary_coords);
@@ -167,9 +166,9 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
 
   if (cancel_requested)
   {
-    return mbf_msgs::ExePathResult::CANCELED;
+    return mbf_msgs::action::ExePath::Result::CANCELED;
   }
-  return mbf_msgs::ExePathResult::SUCCESS;
+  return mbf_msgs::action::ExePath::Result::SUCCESS;
 }
 
 bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance)
@@ -197,7 +196,7 @@ bool MeshController::setPlan(const std::vector<geometry_msgs::msg::PoseStamped>&
 
 bool MeshController::cancel()
 {
-  RCLCPP_INFO_STREAM(node->get_logger(), "The MeshController has been requested to cancel!");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "The MeshController has been requested to cancel!");
   cancel_requested = true;
   return true;
 }
@@ -249,7 +248,7 @@ bool MeshController::initialize(const std::string& plugin_name,
                                 const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
                                 const rclcpp::Node::SharedPtr& node)
 {
-  ros::NodeHandle private_nh("~/" + plugin_name);
+  node_ = node;
   map_ptr = mesh_map_ptr;
   reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>>(
       new dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>(private_nh));

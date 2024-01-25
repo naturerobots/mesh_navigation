@@ -155,6 +155,8 @@ public:
   void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
 private:
+  //! shared pointer to node in which this plugin runs
+  rclcpp::Node::SharedPtr node_;
 
   //! shared pointer to the used mesh map
   std::shared_ptr<mesh_map::MeshMap> map_ptr;
