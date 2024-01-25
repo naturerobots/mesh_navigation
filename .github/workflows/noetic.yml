@@ -1,6 +1,17 @@
 name: Noetic CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - 'master'
+      - 'noetic'
+  pull_request:
+    branches:
+      - 'master'
+      - 'noetic'
+  workflow_dispatch:
+    branches:
+      - '*'
 
 jobs:
   build:
