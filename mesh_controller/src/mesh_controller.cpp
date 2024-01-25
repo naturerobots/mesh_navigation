@@ -154,7 +154,7 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
   if (!opt_dir)
   {
     DEBUG_CALL(map_ptr->publishDebugFace(face, mesh_map::color(0.3, 0.4, 0), "no_directions");)
-    ROS_ERROR_STREAM("Could not access vector field for the given face!");
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not access vector field for the given face!");
     return mbf_msgs::ExePathResult::FAILURE;
   }
   mesh_map::Normal mesh_dir = opt_dir.get().normalized();
@@ -197,7 +197,7 @@ bool MeshController::setPlan(const std::vector<geometry_msgs::msg::PoseStamped>&
 
 bool MeshController::cancel()
 {
-  ROS_INFO_STREAM("The MeshController has been requested to cancel!");
+  RCLCPP_INFO_STREAM(node->get_logger(), "The MeshController has been requested to cancel!");
   cancel_requested = true;
   return true;
 }
