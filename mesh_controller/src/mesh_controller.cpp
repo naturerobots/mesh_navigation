@@ -66,9 +66,10 @@ MeshController::~MeshController()
 {
 }
 
-uint32_t MeshController::computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
-                                                 const geometry_msgs::TwistStamped& velocity,
-                                                 geometry_msgs::TwistStamped& cmd_vel, std::string& message)
+uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseStamped& pose,
+                                                 const geometry_msgs::msg::TwistStamped& velocity,
+                                                 geometry_msgs::msg::TwistStamped& cmd_vel,
+                                                 std::string& message) 
 {
   const auto& mesh = map_ptr->mesh();
 
@@ -178,15 +179,15 @@ bool MeshController::isGoalReached(double dist_tolerance, double angle_tolerance
   return goal_distance <= static_cast<float>(dist_tolerance) && angle <= static_cast<float>(angle_tolerance);
 }
 
-bool MeshController::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
+bool MeshController::setPlan(const std::vector<geometry_msgs::msg::PoseStamped>& plan)
 {
   // copy vector field // TODO just use vector field without copying
   vector_map = map_ptr->getVectorMap();
   DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.front()), mesh_map::color(0, 1, 0), "plan_start");)
   DEBUG_CALL(map_ptr->publishDebugPoint(poseToPositionVector(plan.back()), mesh_map::color(1, 0, 0), "plan_goal");)
-  current_plan = plan;
-  goal_pos = poseToPositionVector(current_plan.back());
-  goal_dir = poseToDirectionVector(current_plan.back());
+  current_plan_ = plan;
+  goal_pos = poseToPositionVector(current_plan_.back());
+  goal_dir = poseToDirectionVector(current_plan_.back());
 
   // reset current and ahead face
   cancel_requested = false;
@@ -243,8 +244,10 @@ void MeshController::reconfigureCallback(mesh_controller::MeshControllerConfig& 
   config = cfg;
 }
 
-bool MeshController::initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                                const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr)
+bool MeshController::initialize(const std::string& plugin_name,
+                                const std::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                                const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                                const rclcpp::Node::SharedPtr& node)
 {
   ros::NodeHandle private_nh("~/" + plugin_name);
   map_ptr = mesh_map_ptr;
@@ -253,7 +256,7 @@ bool MeshController::initialize(const std::string& plugin_name, const boost::sha
 
   config_callback = boost::bind(&MeshController::reconfigureCallback, this, _1, _2);
   reconfigure_server_ptr->setCallback(config_callback);
-  angle_pub = private_nh.advertise<std_msgs::Float32>("current_angle", 1);
+  angle_pub = private_nh.advertise<std_msgs::msg::Float32>("current_angle", 1);
   return true;
 }
 } /* namespace mesh_controller */

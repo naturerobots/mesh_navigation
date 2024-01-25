@@ -36,10 +36,9 @@
 #define MESH_NAVIGATION__MESH_CONTROLLER_H
 
 #include <mbf_mesh_core/mesh_controller.h>
-#include <mbf_msgs/GetPathResult.h>
-#include <mesh_controller/MeshControllerConfig.h>
+#include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/mesh_map.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace mesh_controller
 {
@@ -48,7 +47,7 @@ class MeshController : public mbf_mesh_core::MeshController
 public:
 
   //! shared pointer typedef to simplify pointer access of the mesh controller
-  typedef boost::shared_ptr<mesh_controller::MeshController> Ptr;
+  typedef std::shared_ptr<mesh_controller::MeshController> Ptr;
 
   /**
    * @brief Constructor
@@ -69,9 +68,9 @@ public:
    * @param message Detailed outcome as string message
    * @return An mbf_msgs/ExePathResult outcome code
    */
-  virtual uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
-                                           const geometry_msgs::TwistStamped& velocity,
-                                           geometry_msgs::TwistStamped& cmd_vel, std::string& message);
+  virtual uint32_t computeVelocityCommands(const geometry_msgs::msg::PoseStamped& pose,
+                                           const geometry_msgs::msg::TwistStamped& velocity,
+                                           geometry_msgs::msg::TwistStamped& cmd_vel, std::string& message) override;
 
   /**
    * @brief Checks if the robot reached to goal pose
@@ -82,20 +81,32 @@ public:
    * be partly accepted as reached goal
    * @return true if the goal is reached
    */
-  virtual bool isGoalReached(double dist_tolerance, double angle_tolerance);
+  virtual bool isGoalReached(double dist_tolerance, double angle_tolerance) override;
 
   /**
    * @brief Sets the current plan to follow, it also sets the vector field
    * @param plan The plan to follow
    * @return true if the plan was set successfully, false otherwise
    */
-  virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
+  virtual bool setPlan(const std::vector<geometry_msgs::msg::PoseStamped>& plan) override;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time
    * @return True if cancel has been successfully requested, false otherwise
    */
-  virtual bool cancel();
+  virtual bool cancel() override;
+
+  /**
+   * @brief Initializes the controller plugin with a name, a tf pointer and a mesh map pointer
+   * @param plugin_name The controller plugin name, defined by the user. It defines the controller namespace
+   * @param tf_ptr A shared pointer to a transformation buffer
+   * @param mesh_map_ptr A shared pointer to the mesh map
+   * @return true if the plugin has been initialized successfully
+   */
+  virtual bool initialize(const std::string& plugin_name,
+                          const std::shared_ptr<tf2_ros::Buffer>& tf_ptr,
+                          const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr,
+                          const rclcpp::Node::SharedPtr& node) override;
 
   /**
    * Converts the orientation of a geometry_msgs/PoseStamped message to a direction vector
@@ -103,7 +114,7 @@ public:
    * @return          direction normal vector
    */
   mesh_map::Normal poseToDirectionVector(
-      const geometry_msgs::PoseStamped& pose,
+      const geometry_msgs::msg::PoseStamped& pose,
       const tf2::Vector3& axis=tf2::Vector3(1,0,0));
 
 
@@ -113,7 +124,7 @@ public:
    * @return          position vector
    */
   mesh_map::Vector poseToPositionVector(
-      const geometry_msgs::PoseStamped& pose);
+      const geometry_msgs::msg::PoseStamped& pose);
 
   /**
    * A normal distribution / gaussian function
@@ -143,23 +154,13 @@ public:
    */
   void reconfigureCallback(mesh_controller::MeshControllerConfig& cfg, uint32_t level);
 
-  /**
-   * @brief Initializes the controller plugin with a name, a tf pointer and a mesh map pointer
-   * @param plugin_name The controller plugin name, defined by the user. It defines the controller namespace
-   * @param tf_ptr A shared pointer to a transformation buffer
-   * @param mesh_map_ptr A shared pointer to the mesh map
-   * @return true if the plugin has been initialized successfully
-   */
-  virtual bool initialize(const std::string& plugin_name, const boost::shared_ptr<tf2_ros::Buffer>& tf_ptr,
-                          const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
-
 private:
 
   //! shared pointer to the used mesh map
-  boost::shared_ptr<mesh_map::MeshMap> map_ptr;
+  std::shared_ptr<mesh_map::MeshMap> map_ptr;
 
   //! the current set plan
-  vector<geometry_msgs::PoseStamped> current_plan;
+  vector<geometry_msgs::msg::PoseStamped> current_plan;
 
   //! the goal and robot pose
   mesh_map::Vector goal_pos, robot_pos;
@@ -173,20 +174,14 @@ private:
   //! The vector field to the goal.
   lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
 
-  //! shared pointer to dynamic reconfigure server
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>> reconfigure_server_ptr;
-
-  //! dynamic reconfigure callback function binding
-  dynamic_reconfigure::Server<mesh_controller::MeshControllerConfig>::CallbackType config_callback;
-
-  //! current mesh controller configuration
-  MeshControllerConfig config;
-
   //! publishes the angle between the robots orientation and the goal vector field for debug purposes
-  ros::Publisher angle_pub;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub;
 
   //! flag to handle cancel requests
   std::atomic_bool cancel_requested;
+
+  // handle of callback for changing parameters dynamically
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
 };
 
 } /* namespace mesh_controller */
