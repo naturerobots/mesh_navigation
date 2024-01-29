@@ -138,6 +138,11 @@ class RoughnessLayer : public mesh_map::AbstractLayer
   std::set<lvr2::VertexHandle> lethal_vertices_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+  struct {
+    double threshold = 0.3;
+    double radius = 0.3;
+    double factor = 1.0;
+  } config_;
 };
 
 } /* namespace mesh_layers */
