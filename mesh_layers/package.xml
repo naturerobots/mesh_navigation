@@ -10,6 +10,7 @@
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <depend>mesh_map</depend>
+    <depend>lvr2</depend>
 
     <export>
         <build_type>ament_cmake</build_type>

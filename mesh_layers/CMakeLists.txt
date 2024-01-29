@@ -3,6 +3,7 @@ project(mesh_layers)
 
 find_package(ament_cmake COMPONENTS)
 find_package(mesh_map)
+find_package(LVR2)
 
 pluginlib_export_plugin_description_file(mesh_map mesh_layers.xml)
 
@@ -17,7 +18,7 @@ target_compile_features(${PROJECT_NAME} PUBLIC c_std_99 cxx_std_17)  # Require C
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(${PROJECT_NAME} ${dependencies})
+ament_target_dependencies(${PROJECT_NAME} mesh_map LVR2)
 target_compile_definitions(${PROJECT_NAME} PRIVATE "MESH_LAYERS_BUILDING_LIBRARY")
 
 install(DIRECTORY include/
