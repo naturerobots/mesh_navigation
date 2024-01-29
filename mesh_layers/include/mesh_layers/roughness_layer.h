@@ -92,7 +92,7 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return true if successfull; else false
    */
-  bool computeLethals() override;
+  bool computeLethals();
 
   /**
    * @brief deliver the current costmap
@@ -126,7 +126,7 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return true if initialization was successfull; else false
    */
-  virtual bool initialize(const std::string& name, const rclcpp::Node::SharedPtr& node) = 0;
+  virtual bool initialize() override;
 
   /**
    * @brief callback for incoming param changes

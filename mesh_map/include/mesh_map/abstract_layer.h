@@ -151,7 +151,7 @@ public:
   /**
    * @brief Initializes the layer plugin with the given name.
    */
-  virtual bool initialize(const std::string& name, const rclcpp::Node::SharedPtr& node) = 0;
+  virtual bool initialize() = 0;
 
   /**
    * @brief Initializes the layer plugin under the mesh_map namespace ans sets some basic attributes.
@@ -160,32 +160,32 @@ public:
                           std::shared_ptr<mesh_map::MeshMap>& map, std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh,
                           std::shared_ptr<lvr2::AttributeMeshIOBase>& io, const rclcpp::Node::SharedPtr& node)
   {
-    layer_name = name;
+    layer_name_ = name;
     node_ = node;
     layer_namespace_ = "mesh_map/" + name;
-    notify = notify_update;
-    mesh_ptr = mesh;
-    map_ptr = map;
-    mesh_io_ptr = io;
-    return initialize(name);
+    notify_ = notify_update;
+    mesh_ptr_ = mesh;
+    map_ptr_ = map;
+    mesh_io_ptr_ = io;
+    return initialize();
   }
 
   void notifyChange()
   {
-    this->notify(layer_name);
+    this->notify_(layer_name_);
   }
 
 protected:
-  std::string layer_name;
-  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
-  std::shared_ptr<mesh_map::MeshMap> map_ptr;
+  std::string layer_name_;
+  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr_;
+  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr_;
+  std::shared_ptr<mesh_map::MeshMap> map_ptr_;
 
   rclcpp::Node::SharedPtr node_;
   std::string layer_namespace_;
 
 private:
-  notify_func notify;
+  notify_func notify_;
 };
 
 } /* namespace mesh_map */
