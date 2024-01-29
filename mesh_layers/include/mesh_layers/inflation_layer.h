@@ -38,9 +38,8 @@
 #ifndef MESH_MAP__INFLATION_LAYER_H
 #define MESH_MAP__INFLATION_LAYER_H
 
-#include <dynamic_reconfigure/server.h>
-#include <mesh_layers/InflationLayerConfig.h>
 #include <mesh_map/abstract_layer.h>
+#include <rclcpp/rclcpp.hpp>
 
 namespace mesh_layers
 {
@@ -56,21 +55,21 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return true if successul; else false
    */
-  virtual bool readLayer();
+  virtual bool readLayer() override;
 
   /**
    * @brief try to write layer to map file
    *
    * @return true if successfull; else false
    */
-  virtual bool writeLayer();
+  virtual bool writeLayer() override;
 
   /**
    * @brief delivers the default layer value
    *
    * @return default value used for this layer
    */
-  virtual float defaultValue()
+  virtual float defaultValue() override
   {
     return 0;
   }
@@ -80,7 +79,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return lethal threshold
    */
-  virtual float threshold();
+  virtual float threshold() override;
 
   /**
    * @brief inflate around lethal vertices by inflating to neighbours on mesh and using squared distances and assign
@@ -167,7 +166,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    */
   const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
   {
-    return vector_map;
+    return vector_map_;
   }
 
   /**
@@ -186,23 +185,23 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return true if successfull; else false
    */
-  virtual bool computeLayer();
+  virtual bool computeLayer() override;
 
   /**
    * @brief deliver the current costmap
    *
    * @return calculated costmap
    */
-  virtual lvr2::VertexMap<float>& costs();
+  virtual lvr2::VertexMap<float>& costs() override;
 
   /**
    * @brief deliver set containing all vertices marked as lethal
    *
    * @return lethal vertices
    */
-  virtual std::set<lvr2::VertexHandle>& lethals()
+  virtual std::set<lvr2::VertexHandle>& lethals() override
   {
-    return lethal_vertices;
+    return lethal_vertices_;
   }  // TODO remove... layer types
 
   /**
@@ -216,39 +215,37 @@ class InflationLayer : public mesh_map::AbstractLayer
   /**
    * @brief initializes this layer plugin
    *
-   * @param name name of this plugin
-   *
    * @return true if initialization was successfull; else false
    */
-  virtual bool initialize(const std::string& name);
-
-  lvr2::DenseVertexMap<float> riskiness;
-
-  lvr2::DenseVertexMap<float> direction;
-
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
-
-  lvr2::DenseVertexMap<lvr2::BaseVector<float>> vector_map;
-
-  lvr2::DenseVertexMap<float> distances;
-
-  std::set<lvr2::VertexHandle> lethal_vertices;
-
-  // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig>> reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_layers::InflationLayerConfig>::CallbackType config_callback;
-  // true if the first reconfigure config has been received; else false
-  bool first_config;
-  // current reconfigure config
-  InflationLayerConfig config;
+  virtual bool initialize() override;
 
   /**
-   * @brief callback for incoming reconfigure configs
-   *
-   * @param cfg new config
-   * @param level level
+   * @brief callback for incoming param changes
    */
-  void reconfigureCallback(mesh_layers::InflationLayerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
+
+  lvr2::DenseVertexMap<float> riskiness_;
+
+  lvr2::DenseVertexMap<float> direction_;
+
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
+
+  lvr2::DenseVertexMap<lvr2::BaseVector<float>> vector_map_;
+
+  lvr2::DenseVertexMap<float> distances_;
+
+  std::set<lvr2::VertexHandle> lethal_vertices_;
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+  struct {
+    double inscribed_radius = 0.25;
+    double inflation_radius = 0.4;
+    double factor = 1.0;
+    double lethal_value = 2.0;
+    double inscribed_value = 1.0;
+    int min_contour_size = 3;
+    bool repulsive_field = true;
+  } config_;
 };
 
 } /* namespace mesh_layers */
