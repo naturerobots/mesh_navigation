@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <rclcpp/rclcpp.hpp>
 #include <mesh_map/mesh_map.h>
 
-struct MeshMapTest : public testing::Test
+using namespace ::testing;
+
+struct MeshMapTest : public Test
 {
 protected:
 

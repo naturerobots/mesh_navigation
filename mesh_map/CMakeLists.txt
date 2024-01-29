@@ -44,10 +44,10 @@ install(TARGETS ${PROJECT_NAME}
 
 if(BUILD_TESTING)
   find_package(mesh_layers REQUIRED)
-  find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_gmock REQUIRED)
 
-  ament_add_gtest(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
-  target_include_directories(${PROJECT_NAME}_layer_plugin_loading_test PUBLIC
+  ament_add_gmock(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
+  target_include_directories(${PROJECT_NAME}_mesh_map_test PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   )
