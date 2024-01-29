@@ -39,7 +39,7 @@
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::HeightDiffLayer, mesh_map::AbstractLayer)
 
@@ -47,12 +47,12 @@ namespace mesh_layers
 {
 bool HeightDiffLayer::readLayer()
 {
-  ROS_INFO_STREAM("Try to read height differences from map file...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read height differences from map file...");
   auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
 
   if (height_diff_opt)
   {
-    ROS_INFO_STREAM("Height differences have been read successfully.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Height differences have been read successfully.");
     height_diff = height_diff_opt.get();
 
     return computeLethals();
@@ -63,7 +63,7 @@ bool HeightDiffLayer::readLayer()
 
 bool HeightDiffLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold "
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold "
                                            << config.threshold);
   lethal_vertices.clear();
   for (auto vH : height_diff)
@@ -71,21 +71,21 @@ bool HeightDiffLayer::computeLethals()
     if (height_diff[vH] > config.threshold)
       lethal_vertices.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices.size() << " lethal vertices.");
   return true;
 }
 
 bool HeightDiffLayer::writeLayer()
 {
-  ROS_INFO_STREAM("Saving height_differences to map file...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Saving height_differences to map file...");
   if (mesh_io_ptr->addDenseAttributeMap(height_diff, "height_diff"))
   {
-    ROS_INFO_STREAM("Saved height differences to map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved height differences to map file.");
     return true;
   }
   else
   {
-    ROS_ERROR_STREAM("Could not save height differences to map file!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save height differences to map file!");
     return false;
   }
 }
@@ -109,7 +109,7 @@ lvr2::VertexMap<float>& HeightDiffLayer::costs()
 void HeightDiffLayer::reconfigureCallback(mesh_layers::HeightDiffLayerConfig& cfg, uint32_t level)
 {
   bool notify = false;
-  ROS_INFO_STREAM("New height diff layer config through dynamic reconfigure.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "New height diff layer config through dynamic reconfigure.");
 
   if (first_config)
   {
