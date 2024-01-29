@@ -42,6 +42,18 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin
 )
 
+if(BUILD_TESTING)
+  find_package(mesh_layers REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
+  target_include_directories(${PROJECT_NAME}_layer_plugin_loading_test PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(${PROJECT_NAME}_mesh_map_test ${PROJECT_NAME})
+endif()
+
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${dependencies})
