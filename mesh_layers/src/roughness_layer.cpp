@@ -170,8 +170,8 @@ bool RoughnessLayer::initialize() {
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Threshold for the local roughness to be counted as lethal.";
     rcl_interfaces::msg::FloatingPointRange range;
-    range.from_value = 0.0;
-    range.to_value = 5.0;
+    range.from_value = 0.01;
+    range.to_value = 3.1415;
     descriptor.floating_point_range.push_back(range);
     config_.threshold = node_->declare_parameter(layer_name_ + ".threshold", config_.threshold);
   }
@@ -179,8 +179,8 @@ bool RoughnessLayer::initialize() {
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "The radius used for calculating the local roughness.";
     rcl_interfaces::msg::FloatingPointRange range;
-    range.from_value = 0.0;
-    range.to_value = 5.0;
+    range.from_value = 0.02;
+    range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
     config_.radius = node_->declare_parameter(layer_name_ + ".radius", config_.radius);
   }
@@ -189,7 +189,7 @@ bool RoughnessLayer::initialize() {
     descriptor.description = "The local roughness factor to weight this layer.";
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.0;
-    range.to_value = 5.0;
+    range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
     config_.factor = node_->declare_parameter(layer_name_ + ".factor", config_.factor);
   }
