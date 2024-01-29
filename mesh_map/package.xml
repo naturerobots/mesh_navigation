@@ -17,7 +17,7 @@
     <depend>tf2</depend>
     <depend>visualization_msgs</depend>
 
-    <test_depend>mesh_layers</test_depend>
+    <test_depend>ament_cmake_gmock</test_depend>
 
     <export>
         <build_type>ament_cmake</build_type>

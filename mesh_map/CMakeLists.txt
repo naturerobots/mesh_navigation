@@ -43,7 +43,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
-  find_package(mesh_layers REQUIRED)
   find_package(ament_cmake_gmock REQUIRED)
 
   ament_add_gmock(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
