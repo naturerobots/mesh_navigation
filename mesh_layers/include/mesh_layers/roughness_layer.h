@@ -133,12 +133,10 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    */
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
-  std::string layer_name_;
   // latest costmap
   lvr2::DenseVertexMap<float> roughness_;
   // set of all current lethal vertices
   std::set<lvr2::VertexHandle> lethal_vertices_;
-  rclcpp::Node::SharedPtr node_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   struct {
