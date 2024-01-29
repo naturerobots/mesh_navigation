@@ -60,7 +60,7 @@ bool RoughnessLayer::readLayer() {
 }
 
 bool RoughnessLayer::writeLayer() {
-  if (mesh_io_ptr->addDenseAttributeMap(roughness, "roughness")) {
+  if (mesh_io_ptr->addDenseAttributeMap(roughness_, "roughness")) {
     ROS_INFO_STREAM("Saved roughness to map file.");
     return true;
   } else {
@@ -71,17 +71,17 @@ bool RoughnessLayer::writeLayer() {
 
 bool RoughnessLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config.threshold );
-  lethal_vertices.clear();
-  for (auto vH : roughness) {
-    if (roughness[vH] > config.threshold)
-      lethal_vertices.insert(vH);
+  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config_.threshold);
+  lethal_vertices_.clear();
+  for (auto vH : roughness_) {
+    if (roughness_[vH] > config_.threshold)
+      lethal_vertices_.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+  ROS_INFO_STREAM("Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
-float RoughnessLayer::threshold() { return config.threshold; }
+float RoughnessLayer::threshold() { return config_.threshold; }
 
 bool RoughnessLayer::computeLayer() {
   ROS_INFO_STREAM("Computing roughness...");
@@ -131,13 +131,13 @@ bool RoughnessLayer::computeLayer() {
     }
   }
 
-  roughness =
-      lvr2::calcVertexRoughness(*mesh_ptr, config.radius, vertex_normals);
+  roughness_ =
+      lvr2::calcVertexRoughness(*mesh_ptr, config_.radius, vertex_normals);
 
   return computeLethals();
 }
 
-lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness; }
+lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness_; }
 
 void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg, uint32_t level) {
   bool notify = false;
@@ -149,7 +149,7 @@ void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg,
     return;
   }
 
-  if(config.threshold != cfg.threshold)
+  if(config_.threshold != cfg.threshold)
   {
     computeLethals();
     notify = true;

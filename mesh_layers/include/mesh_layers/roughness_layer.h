@@ -127,26 +127,17 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    */
   virtual bool initialize(const std::string& name) override;
 
-  // latest costmap
-  lvr2::DenseVertexMap<float> roughness;
-  // set of all current lethal vertices
-  std::set<lvr2::VertexHandle> lethal_vertices;
-
-  // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>> reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>::CallbackType config_callback;
-  // true if the first reconfigure config has been received; else false
-  bool first_config;
-  // current reconfigure config
-  RoughnessLayerConfig config;
-
   /**
-   * @brief callback for incoming reconfigure configs
-   *
-   * @param cfg new config
-   * @param level level
+   * @brief callback for incoming param changes
    */
-  void reconfigureCallback(mesh_layers::RoughnessLayerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
+
+  // latest costmap
+  lvr2::DenseVertexMap<float> roughness_;
+  // set of all current lethal vertices
+  std::set<lvr2::VertexHandle> lethal_vertices_;
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 };
 
 } /* namespace mesh_layers */
