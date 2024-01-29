@@ -129,14 +129,37 @@ void HeightDiffLayer::reconfigureCallback(mesh_layers::HeightDiffLayerConfig& cf
     notifyChange();
 }
 
-bool HeightDiffLayer::initialize(const std::string& name)
+bool HeightDiffLayer::initialize()
 {
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::HeightDiffLayerConfig>(private_nh));
-
-  config_callback = boost::bind(&HeightDiffLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  { // threshold
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Threshold for the local height difference to be counted as lethal.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.05;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.threshold = node_->declare_parameter(layer_name_ + ".threshold", config_.threshold);
+  }
+  { // radius
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The radius used for calculating the local height difference.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.02;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.radius = node_->declare_parameter(layer_name_ + ".radius", config_.radius);
+  }
+  { // factor
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Using this factor to weight this layer.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.factor = node_->declare_parameter(layer_name_ + ".factor", config_.factor);
+  }
+  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
+      &HeightDiffLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 
