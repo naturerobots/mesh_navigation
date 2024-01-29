@@ -1,5 +1,5 @@
 <class_libraries>
-    <library path="lib/libmesh_layers">
+    <library path="mesh_layers">
         <class name="mesh_layers/RoughnessLayer"
                type="mesh_layers::RoughnessLayer"
                base_class_type="mesh_map::AbstractLayer">
