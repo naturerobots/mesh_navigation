@@ -48,12 +48,12 @@ namespace mesh_layers
 bool HeightDiffLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read height differences from map file...");
-  auto height_diff_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
+  auto height_diff_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("height_diff");
 
   if (height_diff_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Height differences have been read successfully.");
-    height_diff = height_diff_opt.get();
+    height_diff_ = height_diff_opt.get();
 
     return computeLethals();
   }
@@ -63,22 +63,22 @@ bool HeightDiffLayer::readLayer()
 
 bool HeightDiffLayer::computeLethals()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name << "\" (Height Differences Layer) with threshold "
-                                           << config.threshold);
-  lethal_vertices.clear();
-  for (auto vH : height_diff)
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Height Differences Layer) with threshold "
+                                           << config_.threshold);
+  lethal_vertices_.clear();
+  for (auto vH : height_diff_)
   {
-    if (height_diff[vH] > config.threshold)
-      lethal_vertices.insert(vH);
+    if (height_diff_[vH] > config_.threshold)
+      lethal_vertices_.insert(vH);
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 bool HeightDiffLayer::writeLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Saving height_differences to map file...");
-  if (mesh_io_ptr->addDenseAttributeMap(height_diff, "height_diff"))
+  if (mesh_io_ptr_->addDenseAttributeMap(height_diff_, "height_diff"))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved height differences to map file.");
     return true;
@@ -92,42 +92,46 @@ bool HeightDiffLayer::writeLayer()
 
 float HeightDiffLayer::threshold()
 {
-  return config.threshold;
+  return config_.threshold;
 }
 
 bool HeightDiffLayer::computeLayer()
 {
-  height_diff = lvr2::calcVertexHeightDifferences(*mesh_ptr, config.radius);
+  height_diff_ = lvr2::calcVertexHeightDifferences(*mesh_ptr_, config_.radius);
   return computeLethals();
 }
 
 lvr2::VertexMap<float>& HeightDiffLayer::costs()
 {
-  return height_diff;
+  return height_diff_;
 }
 
-void HeightDiffLayer::reconfigureCallback(mesh_layers::HeightDiffLayerConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult HeightDiffLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  bool notify = false;
-  RCLCPP_INFO_STREAM(node_->get_logger(), "New height diff layer config through dynamic reconfigure.");
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
 
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
+  bool has_threshold_changed = false;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == layer_name_ + ".threshold") {
+      config_.threshold = parameter.as_double();
+      has_threshold_changed = true;
+    } else if (parameter.get_name() == layer_name_ + ".radius") {
+      config_.radius = parameter.as_double();
+    } else if (parameter.get_name() == layer_name_ + ".factor") {
+      config_.factor = parameter.as_double();
+    }
   }
 
-  if (config.threshold != cfg.threshold)
-  {
+  if (has_threshold_changed) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
-    notify = true;
+    notifyChange();
   }
 
-  config = cfg;
-  if (notify)
-    notifyChange();
+  return result;
 }
+
 
 bool HeightDiffLayer::initialize()
 {
