@@ -121,8 +121,6 @@ class HeightDiffLayer : public mesh_map::AbstractLayer
   /**
    * @brief initializes this layer plugin
    *
-   * @param name name of this plugin
-   *
    * @return true if initialization was successfull; else false
    */
   virtual bool initialize() override;
