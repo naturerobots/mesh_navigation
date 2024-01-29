@@ -157,7 +157,7 @@ rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std
   }
 
   if (has_threshold_changed) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from roughness layer due to cfg change.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
     notifyChange();
   }
