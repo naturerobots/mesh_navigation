@@ -125,13 +125,14 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return true if initialization was successfull; else false
    */
-  virtual bool initialize(const std::string& name) override;
+  virtual bool initialize(const std::string& name, const rclcpp::Node::SharedPtr& node) = 0;
 
   /**
    * @brief callback for incoming param changes
    */
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
+  std::string layer_name_;
   // latest costmap
   lvr2::DenseVertexMap<float> roughness_;
   // set of all current lethal vertices

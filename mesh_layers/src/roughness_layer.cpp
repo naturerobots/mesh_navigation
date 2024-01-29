@@ -139,37 +139,36 @@ bool RoughnessLayer::computeLayer() {
 
 lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness_; }
 
-void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg, uint32_t level) {
-  bool notify = false;
+rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
 
-  ROS_INFO_STREAM("New roughness layer config through dynamic reconfigure.");
-  if (first_config) {
-    config = cfg;
-    first_config = false;
-    return;
+  bool has_threshold_changed = false;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == layer_name_ + ".threshold") {
+      config_.threshold = parameter.as_double();
+      has_threshold_changed = true;
+    } else if (parameter.get_name() == layer_name_ + ".radius") {
+      config_.radius = parameter.as_double();
+    } else if (parameter.get_name() == layer_name_ + ".factor") {
+      config_.factor = parameter.as_double();
+    }
   }
 
-  if(config_.threshold != cfg.threshold)
-  {
+  if (has_threshold_changed) {
+    ROS_INFO_STREAM("Recompute lethals and notify change from roughness layer due to cfg change.");
     computeLethals();
-    notify = true;
+    notifyChange();
   }
 
-  if(notify) notifyChange();
-
-  config = cfg;
+  return result;
 }
 
-bool RoughnessLayer::initialize(const std::string &name) {
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>(
-          private_nh));
-
-  config_callback =
-      boost::bind(&RoughnessLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+bool RoughnessLayer::initialize(const std::string &name, const rclcpp::Node::SharedPtr& node) {
+  dyn_params_handler_ = node->add_on_set_parameters_callback(std::bind(
+      &RoughnessLayer::reconfigureCallback, this, std::placeholders::_1));
+  layer_name_ = name;
   return true;
 }
 

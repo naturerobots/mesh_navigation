@@ -149,9 +149,9 @@ public:
   }
 
   /**
-   * @brief Initializes the layer plugin with the giben name.
+   * @brief Initializes the layer plugin with the given name.
    */
-  virtual bool initialize(const std::string& name) = 0;
+  virtual bool initialize(const std::string& name, const rclcpp::Node::SharedPtr& node) = 0;
 
   /**
    * @brief Initializes the layer plugin under the mesh_map namespace ans sets some basic attributes.
