@@ -39,6 +39,7 @@
 #define MESH_MAP__ROUGHNESS_LAYER_H
 
 #include <mesh_map/abstract_layer.h>
+#include <rclcpp/rclcpp.hpp>
 
 namespace mesh_layers
 {
@@ -137,6 +138,7 @@ class RoughnessLayer : public mesh_map::AbstractLayer
   lvr2::DenseVertexMap<float> roughness_;
   // set of all current lethal vertices
   std::set<lvr2::VertexHandle> lethal_vertices_;
+  rclcpp::Node::SharedPtr node_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   struct {

@@ -46,13 +46,13 @@ PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer)
 namespace mesh_layers {
 
 bool RoughnessLayer::readLayer() {
-  ROS_INFO_STREAM("Try to read roughness from map file...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read roughness from map file...");
   auto roughness_opt =
       mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
           "roughness");
   if (roughness_opt) {
-    ROS_INFO_STREAM("Successfully read roughness from map file.");
-    roughness = roughness_opt.get();
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read roughness from map file.");
+    roughness_ = roughness_opt.get();
     return computeLethals();
   }
 
@@ -61,30 +61,30 @@ bool RoughnessLayer::readLayer() {
 
 bool RoughnessLayer::writeLayer() {
   if (mesh_io_ptr->addDenseAttributeMap(roughness_, "roughness")) {
-    ROS_INFO_STREAM("Saved roughness to map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved roughness to map file.");
     return true;
   } else {
-    ROS_ERROR_STREAM("Could not save roughness to map file!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save roughness to map file!");
     return false;
   }
 }
 
 bool RoughnessLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config_.threshold);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config_.threshold);
   lethal_vertices_.clear();
   for (auto vH : roughness_) {
     if (roughness_[vH] > config_.threshold)
       lethal_vertices_.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 float RoughnessLayer::threshold() { return config_.threshold; }
 
 bool RoughnessLayer::computeLayer() {
-  ROS_INFO_STREAM("Computing roughness...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing roughness...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
@@ -94,18 +94,18 @@ bool RoughnessLayer::computeLayer() {
 
   if (face_normals_opt) {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues()
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues()
                              << " face normals in map file.");
   } else {
-    ROS_INFO_STREAM(
+    RCLCPP_INFO_STREAM(node_->get_logger(), 
         "No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed " << face_normals.numValues()
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues()
                                 << " face normals.");
     if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals")) {
-      ROS_INFO_STREAM("Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     } else {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
@@ -117,16 +117,16 @@ bool RoughnessLayer::computeLayer() {
 
   if (vertex_normals_opt) {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues()
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues()
                              << " vertex normals in map file!");
   } else {
-    ROS_INFO_STREAM(
+    RCLCPP_INFO_STREAM(node_->get_logger(), 
         "No vertex normals found in the given map file, computing them...");
     vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
     if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals")) {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     } else {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
@@ -157,7 +157,7 @@ rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std
   }
 
   if (has_threshold_changed) {
-    ROS_INFO_STREAM("Recompute lethals and notify change from roughness layer due to cfg change.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from roughness layer due to cfg change.");
     computeLethals();
     notifyChange();
   }
@@ -166,9 +166,10 @@ rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std
 }
 
 bool RoughnessLayer::initialize(const std::string &name, const rclcpp::Node::SharedPtr& node) {
-  dyn_params_handler_ = node->add_on_set_parameters_callback(std::bind(
-      &RoughnessLayer::reconfigureCallback, this, std::placeholders::_1));
+  node_ = node;
   layer_name_ = name;
+  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
+      &RoughnessLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 
