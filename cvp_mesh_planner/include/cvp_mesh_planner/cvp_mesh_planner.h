@@ -39,17 +39,17 @@
 #define MESH_NAVIGATION__MESH_PLANNER_H
 
 #include <mbf_mesh_core/mesh_planner.h>
-#include <mbf_msgs/GetPathResult.h>
+#include <mbf_msgs/action/get_path.hpp>
 #include <mesh_map/mesh_map.h>
-#include <cvp_mesh_planner/CVPMeshPlannerConfig.h>
-#include <nav_msgs/Path.h>
+#include <nav_msgs/msg/path.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 namespace cvp_mesh_planner
 {
 class CVPMeshPlanner : public mbf_mesh_core::MeshPlanner
 {
 public:
-  typedef boost::shared_ptr<cvp_mesh_planner::CVPMeshPlanner> Ptr;
+  typedef std::shared_ptr<cvp_mesh_planner::CVPMeshPlanner> Ptr;
 
   /**
    * @brief Constructor
@@ -71,15 +71,15 @@ public:
    * @param message a detailed outcome message
    * @return result outcome code, see the GetPath action definition
    */
-  virtual uint32_t makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan, double& cost,
-                            std::string& message);
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+                            std::string& message) override;
 
   /**
    * @brief Requests the planner to cancel, e.g. if it takes too much time.
    * @return true if cancel has been successfully requested, false otherwise
    */
-  virtual bool cancel();
+  virtual bool cancel() override;
 
   /**
    * @brief Initializes the planner plugin with a user configured name and a shared pointer to the mesh map
@@ -87,7 +87,7 @@ public:
    * @param mesh_map_ptr A shared pointer to the mesh map instance to access attributes and helper functions, etc.
    * @return true if the plugin has been initialized successfully
    */
-  virtual bool initialize(const std::string& name, const boost::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr);
+  virtual bool initialize(const std::string& plugin_name, const std::shared_ptr<mesh_map::MeshMap>& mesh_map_ptr, const rclcpp::Node::SharedPtr& node) override;
 
 protected:
 
@@ -162,65 +162,66 @@ protected:
   void computeVectorMap();
 
   /**
-   * @brief Dynamic reconfigure callback
+   * @brief gets called on new incoming reconfigure parameters
+   *
+   * @param cfg new configuration
+   * @param level level
+   * @brief gets called whenever the node's parameters change
+   
+   * @param parameters vector of changed parameters.
+   *                   Note that this vector will also contain parameters not related to the cvp mesh planner
    */
-  void reconfigureCallback(cvp_mesh_planner::CVPMeshPlannerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
 private:
 
   //! shared pointer to the mesh map
-  mesh_map::MeshMap::Ptr mesh_map;
+  mesh_map::MeshMap::Ptr mesh_map_;
 
   //! the user defined plugin name
-  std::string name;
+  std::string name_;
 
-  //! the private node handle with the user defined namespace (name)
-  ros::NodeHandle private_nh;
+  //! pointer to the node in which this plugin is running
+  rclcpp::Node::SharedPtr node_;
 
   //! flag if cancel has been requested
-  std::atomic_bool cancel_planning;
+  std::atomic_bool cancel_planning_;
 
   //! publisher for the backtracked path
-  ros::Publisher path_pub;
-
-  //! whether to publish the vector field or not
-  bool publish_vector_field;
-
-  //! whether to also publish direction vectors at the triangle centers
-  bool publish_face_vectors;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
   //! the map coordinate frame / system id
-  std::string map_frame;
+  std::string map_frame_;
 
-  //! an offset that determines how far beyond the goal (robot's position) is propagated.
-  float goal_dist_offset;
-
-  //! shared pointer to dynamic reconfigure server
-  boost::shared_ptr<dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>> reconfigure_server_ptr;
-
-  //! dynamic reconfigure callback function binding
-  dynamic_reconfigure::Server<cvp_mesh_planner::CVPMeshPlannerConfig>::CallbackType config_callback;
-
-  //! indicates if dynamic reconfigure has been called the first time
-  bool first_config;
-
-  //! the current dynamic reconfigure planner configuration
-  CVPMeshPlannerConfig config;
+  // handle of callback for changing parameters dynamically
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr reconfiguration_callback_handle_;
+  struct {
+    //! whether to publish the vector field or not
+    bool publish_vector_field = false;
+    //! whether to also publish direction vectors at the triangle centers
+    bool publish_face_vectors = false;
+    //! an offset that determines how far beyond the goal (robot's position) is propagated.
+    double goal_dist_offset = 0.3;
+    //! Defines the vertex cost limit with which it can be accessed.
+    double cost_limit = 1.0;
+    //! The vector field back tracking step width.
+    double step_width = 0.4;
+  } config_;
 
   //! theta angles to the source of the wave front propagation
-  lvr2::DenseVertexMap<float> direction;
+  lvr2::DenseVertexMap<float> direction_;
 
   //! predecessors while wave propagation
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
+  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors_;
 
   //! the face which is cut by the computed line to the source
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces;
+  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
 
   //! stores the current vector map containing vectors pointing to the seed
-  lvr2::DenseVertexMap<mesh_map::Vector> vector_map;
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
 
   //! potential field / scalar distance field to the seed
-  lvr2::DenseVertexMap<float> potential;
+  lvr2::DenseVertexMap<float> potential_;
 };
 
 }  // namespace cvp_mesh_planner
