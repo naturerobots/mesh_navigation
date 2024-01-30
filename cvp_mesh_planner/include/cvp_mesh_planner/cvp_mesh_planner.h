@@ -71,10 +71,8 @@ public:
    * @param message a detailed outcome message
    * @return result outcome code, see the GetPath action definition
    */
-  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start,
-                            const geometry_msgs::msg::PoseStamped& goal,
-                            double tolerance, 
-                            std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
+  virtual uint32_t makePlan(const geometry_msgs::msg::PoseStamped& start, const geometry_msgs::msg::PoseStamped& goal,
+                            double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message) override;
 
   /**
