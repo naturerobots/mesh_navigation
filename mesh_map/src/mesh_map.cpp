@@ -119,6 +119,29 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
+  // params for map layer names to types:
+  const auto layer_names = node->declare_parameter(MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>());
+  const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
+  for(const std::string& layer_name : layer_names)
+  {
+    if (configured_layers.find(layer_name) != configured_layers.end())
+    {
+      throw rclcpp::exceptions::InvalidParametersException("The layer name " + layer_name + " is used more than once. Layer names must be unique!");
+    }
+    // This will throws rclcpp::ParameterValue exception if mesh_map.layer_name.type is not set
+    const std::string layer_type = node->declare_parameter(MESH_MAP_NAMESPACE + "." + layer_name + ".type", ros_param_type).get<std::string>();
+
+    // populate map from layer name to layer type, which will be used in loadLayerPlugins()
+    configured_layers.emplace(layer_name, layer_type);
+  }
+  // output warning if no layer plugins were configured
+  if (configured_layers.size() == 0)
+  {
+    RCLCPP_WARN_STREAM(node->get_logger(), "No MeshMap layer plugins configured!"
+      << " - Use the param \"" << MESH_MAP_NAMESPACE << ".layers\", which must be a list of strings with arbitrary layer names. "
+      << "For each layer_name, also define layer_name.type with the respective type that shall be loaded via pluginlib.");
+  }
+
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1);
   vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("vertex_costs", 1);
@@ -291,71 +314,24 @@ bool MeshMap::readMap()
 
 bool MeshMap::loadLayerPlugins()
 {
-  const std::vector<std::string> plugin_param_list = node->declare_parameter<std::vector<std::string>>(MESH_MAP_NAMESPACE + ".layers", {});
-  if (plugin_param_list.empty())
+  for (const auto &[layer_name, layer_type] : configured_layers)
   {
-    RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "
-                    "in the namespace \""
-                    << MESH_MAP_NAMESPACE
-                    << "\". \"layers\" must be must be a list of "
-                       "tuples with a name and a type.");
-    return false;
-  }
-
-  //try
-  //{
-    for (int i = 0; i < plugin_param_list.size(); i++)
+    try 
     {
-      //XmlRpc::XmlRpcValue elem = plugin_param_list[i];
-
-      // TODO figure out how to load the plugin configuration with ROS2 param
-      std::string name = "todo";// TODO elem["name"];
-      std::string type = "todo";// TODO elem["type"];
-
-      typename AbstractLayer::Ptr plugin_ptr;
-
-      if (layer_names.find(name) != layer_names.end())
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), "The plugin \"" << name << "\" has already been loaded! Names must be unique!");
-        return false;
-      }
-
-      try
-      {
-        plugin_ptr = layer_loader.createSharedInstance(type);
-      }
-      catch (pluginlib::LibraryLoadException& e)
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), e.what());
-      }
-
-      if (plugin_ptr)
-      {
-        std::pair<std::string, typename mesh_map::AbstractLayer::Ptr> elem(name, plugin_ptr);
-
-        layers.push_back(elem);
-        layer_names.insert(elem);
-
-        RCLCPP_INFO_STREAM(node->get_logger(), "The layer plugin with the type \""
-                        << type << "\" has been loaded successfully under the name \"" << name << "\".");
-      }
-      else
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
-                                                                            << "\"!");
-      }
+      typename AbstractLayer::Ptr layer_ptr = layer_loader.createSharedInstance(layer_type);
+      loaded_layers.emplace(layer_name, layer_ptr);
+      RCLCPP_INFO(node->get_logger(),
+                  "The layer with the type \"%s\" has been loaded successfully under the name \"%s\".", layer_type.c_str(),
+                  layer_name.c_str());
     }
-  //}
-  //catch (XmlRpc::XmlRpcException& e)
-  //{
-  //  RCLCPP_ERROR_STREAM(node->get_logger(), "Invalid parameter structure. The \"layers\" parameter "
-  //                   "has to be a list of structs "
-  //                   << "with fields \"name\" and \"type\"!");
-  //  RCLCPP_ERROR_STREAM(node->get_logger(), e.getMessage());
-  //  return false;
-  //}
-  // is there any layer plugin loaded for the map?
-  return !layers.empty();
+    catch (pluginlib::LibraryLoadException& e)
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer with the name \"" << layer_name << "\" and the type \"" << layer_type << "\"! Error: " << e.what());
+    }
+  }
+  
+  // did we load any layer?
+  return loaded_layers.empty() ? false : true;
 }
 
 void MeshMap::layerChanged(const std::string& layer_name)

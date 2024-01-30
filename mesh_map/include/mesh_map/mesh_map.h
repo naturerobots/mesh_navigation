@@ -41,6 +41,7 @@
 #include <atomic>
 #include <mutex>
 #include <tuple>
+#include <unordered_map>
 #include <geometry_msgs/msg/point.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/HDF5IO.hpp>
@@ -405,11 +406,11 @@ private:
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
-  //! mapping from name to layer instance
-  std::map<std::string, mesh_map::AbstractLayer::Ptr> layer_names;
+  //! mapping from layer name to layer type, as configured via ros params
+  std::unordered_map<std::string, std::string> configured_layers;
 
-  //! vector of name and layer instances
-  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> layers;
+  //! mapping from layer name to instance of respective layer
+  std::unordered_map<std::string, mesh_map::AbstractLayer::Ptr> loaded_layers;
 
   //! each layer maps to a set of impassable indices
   std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
