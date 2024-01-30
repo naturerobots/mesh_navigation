@@ -36,9 +36,9 @@ protected:
 
 TEST_F(MeshMapTest, loadsSinglePlugin)
 {
-  const std::vector<std::string> plugin_names{"roughness"};
+  const std::vector<std::string> layer_names{"roughness"};
   initNodeAndPluginManager(rclcpp::NodeOptions()
-    .append_parameter_override("test_plugins", plugin_names)
+    .append_parameter_override("layers", layer_names)
     .append_parameter_override("roughness.type", "mesh_layers/RoughnessLayer")
   );
   ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
