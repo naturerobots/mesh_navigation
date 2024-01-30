@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
     <name>mesh_navigation</name>
     <version>1.0.1</version>
     <description>The mesh_navigation package provides a layered mesh_map implementation, a Move Base Flex mesh navigation server, as well as mesh navigation plugins for path planning and navigation control.</description>
@@ -7,7 +7,6 @@
     <license>BSD-3</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
-    <buildtool_depend>catkin</buildtool_depend>
     <exec_depend>mbf_mesh_core</exec_depend>
     <exec_depend>mbf_mesh_nav</exec_depend>
     <exec_depend>mesh_client</exec_depend>
@@ -18,6 +17,6 @@
     <exec_depend>dijkstra_mesh_planner</exec_depend>
 
     <export>
-        <metapackage/>
+        <build_type>ament_cmake</build_type>
     </export>
 </package>
