@@ -634,22 +634,22 @@ rcl_interfaces::msg::SetParametersResult InflationLayer::reconfigureCallback(std
   bool has_inflation_radius_changed = false;
   bool has_vector_field_parameter_changed = false;
   for (auto parameter : parameters) {
-    if (parameter.get_name() == layer_name_ + ".inflation_radius") {
+    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inflation_radius") {
       config_.inflation_radius = parameter.as_double();
       has_inflation_radius_changed = true;
       has_vector_field_parameter_changed = true;
-    } else if (parameter.get_name() == layer_name_ + ".inscribed_radius") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_radius") {
       config_.inscribed_radius = parameter.as_double();
       has_vector_field_parameter_changed = true;
-    } else if (parameter.get_name() == layer_name_ + ".lethal_value") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".lethal_value") {
       config_.lethal_value = parameter.as_double();
       has_vector_field_parameter_changed = true;
-    } else if (parameter.get_name() == layer_name_ + ".inscribed_value") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_value") {
       config_.inscribed_value = parameter.as_double();
       has_vector_field_parameter_changed = true;
-    } else if (parameter.get_name() == layer_name_ + ".min_contour_size") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".min_contour_size") {
       config_.min_contour_size = parameter.as_int();
-    } else if (parameter.get_name() == layer_name_ + ".repulsive_field") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".repulsive_field") {
       config_.repulsive_field = parameter.as_bool();
     }
   }
@@ -681,7 +681,7 @@ bool InflationLayer::initialize()
     range.from_value = 0.01;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.inscribed_radius = node_->declare_parameter(layer_name_ + ".inscribed_radius", config_.inscribed_radius);
+    config_.inscribed_radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_radius", config_.inscribed_radius);
   }
   { // inflation_radius
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -690,7 +690,7 @@ bool InflationLayer::initialize()
     range.from_value = 0.01;
     range.to_value = 3.0;
     descriptor.floating_point_range.push_back(range);
-    config_.inflation_radius = node_->declare_parameter(layer_name_ + ".inflation_radius", config_.inflation_radius);
+    config_.inflation_radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inflation_radius", config_.inflation_radius);
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -699,7 +699,7 @@ bool InflationLayer::initialize()
     range.from_value = 0.0;
     range.to_value = 1.-0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
   }
   { // lethal_value
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -708,7 +708,7 @@ bool InflationLayer::initialize()
     range.from_value = -1.0;
     range.to_value = 100000.0;
     descriptor.floating_point_range.push_back(range);
-    config_.lethal_value = node_->declare_parameter(layer_name_ + ".lethal_value", config_.lethal_value);
+    config_.lethal_value = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".lethal_value", config_.lethal_value);
   }
   { // inscribed_value
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -717,7 +717,7 @@ bool InflationLayer::initialize()
     range.from_value = 0.0;
     range.to_value = 100000.0;
     descriptor.floating_point_range.push_back(range);
-    config_.inscribed_value = node_->declare_parameter(layer_name_ + ".inscribed_value", config_.inscribed_value);
+    config_.inscribed_value = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_value", config_.inscribed_value);
   }
   { // min_contour_size
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -726,12 +726,12 @@ bool InflationLayer::initialize()
     range.from_value = 0;
     range.to_value = 100000;
     descriptor.integer_range.push_back(range);
-    config_.min_contour_size = node_->declare_parameter(layer_name_ + ".min_contour_size", config_.min_contour_size);
+    config_.min_contour_size = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".min_contour_size", config_.min_contour_size);
   }
   { // repulsive_field
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Enable the repulsive vector field.";
-    config_.repulsive_field = node_->declare_parameter(layer_name_ + ".repulsive_field", config_.repulsive_field);
+    config_.repulsive_field = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".repulsive_field", config_.repulsive_field);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(&InflationLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;

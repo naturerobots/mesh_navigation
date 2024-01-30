@@ -291,7 +291,7 @@ bool MeshMap::readMap()
 
 bool MeshMap::loadLayerPlugins()
 {
-  const std::vector<std::string> plugin_param_list = node->declare_parameter<std::vector<std::string>>("layers", {});
+  const std::vector<std::string> plugin_param_list = node->declare_parameter<std::vector<std::string>>(MESH_MAP_NAMESPACE + ".layers", {});
   if (plugin_param_list.empty())
   {
     RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "

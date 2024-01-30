@@ -172,10 +172,10 @@ rcl_interfaces::msg::SetParametersResult SteepnessLayer::reconfigureCallback(std
 
   bool has_threshold_changed = false;
   for (auto parameter : parameters) {
-    if (parameter.get_name() == layer_name_ + ".threshold") {
+    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
       config_.threshold = parameter.as_double();
       has_threshold_changed = true;
-    } else if (parameter.get_name() == layer_name_ + ".factor") {
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
       config_.factor = parameter.as_double();
     }
   }
@@ -198,7 +198,7 @@ bool SteepnessLayer::initialize()
     range.from_value = 0.01;
     range.to_value = 3.1415;
     descriptor.floating_point_range.push_back(range);
-    config_.threshold = node_->declare_parameter(layer_name_ + ".threshold", config_.threshold);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -207,7 +207,7 @@ bool SteepnessLayer::initialize()
     range.from_value = 0.0;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
       &SteepnessLayer::reconfigureCallback, this, std::placeholders::_1));

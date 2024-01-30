@@ -38,8 +38,8 @@ TEST_F(MeshMapTest, loadsSinglePlugin)
 {
   const std::vector<std::string> layer_names{"roughness"};
   initNodeAndPluginManager(rclcpp::NodeOptions()
-    .append_parameter_override("layers", layer_names)
-    .append_parameter_override("roughness.type", "mesh_layers/RoughnessLayer")
+    .append_parameter_override("mesh_map.layers", layer_names)
+    .append_parameter_override("mesh_map.roughness.type", "mesh_layers/RoughnessLayer")
   );
   ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
   EXPECT_THAT(mesh_map_ptr_->layer("roughness"), NotNull());
