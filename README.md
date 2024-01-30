@@ -51,7 +51,7 @@ Please reference the following papers when using the navigation stack in your sc
 
 Please use the official released ros package or install more recent versions from source.  
 
-`sudo apt install ros-melodic-mesh-navigation`
+`sudo apt install ros-noetic-mesh-navigation`
 
 **Installation from source**  
 All dependencies can be installed using rosdep  
@@ -59,11 +59,21 @@ All dependencies can be installed using rosdep
 
 As explicit dependencies we refer to the following ROS packages, which are also developed by us:
 
-* **[lvr2](https://github.com/uos/lvr2)**
+* **[lvr2](https://github.com/uos/lvr2)* **
 * **[mesh_tools](https://github.com/uos/mesh_tools/)**
 * **[move_base_flex](https://github.com/magazino/move_base_flex/)**
 
 Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for example HDF5 map datasets, Gazebo simulations, and example configurations.
+ 
+ Install:
+git clone https://github.com/naturerobots/organized_fast_mesh Branch feature/use_mesh_tools
+git clone https://github.com/naturerobots/mesh_tools.git
+git clone https://github.com/magazino/move_base_flex.git
+sudo apt install ros-noetic-costmap-2d
+sudo apt-get install ros-noetic-navigation
+
+
+
 
 ## Software Stack
 

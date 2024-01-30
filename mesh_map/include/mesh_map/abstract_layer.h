@@ -89,7 +89,7 @@ public:
    * layer information could not be loaded or if another layer triggered an update
    * @return true, if the layer costs have been computed successfully.
    */
-  virtual bool computeLayer() = 0;
+  virtual bool computeLayer(bool hasIO = true ) = 0;
 
   /**
    * @brief Returns a vertex map, which associates a cost to each vertex handle.
@@ -173,11 +173,10 @@ public:
 
 protected:
   std::string layer_name;
-  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
   std::shared_ptr<mesh_map::MeshMap> map_ptr;
-
-  ros::NodeHandle private_nh;
+    std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
+    ros::NodeHandle private_nh;
 
 private:
   notify_func notify;

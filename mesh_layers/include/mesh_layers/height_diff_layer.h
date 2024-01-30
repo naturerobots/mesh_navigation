@@ -85,7 +85,7 @@ class HeightDiffLayer : public mesh_map::AbstractLayer
    *
    * @return true if successfull; else false
    */
-  virtual bool computeLayer();
+  virtual bool computeLayer(bool hasIO = true);
 
   /**
    * @brief mark vertices with values above the threshold as lethal

@@ -39,7 +39,6 @@
 #include <mbf_abstract_nav/MoveBaseFlexConfig.h>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/Path.h>
-
 #include "mbf_mesh_nav/mesh_navigation_server.h"
 
 namespace mbf_mesh_nav
@@ -50,8 +49,11 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   , controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController")
   , planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner")
   , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_))
+  , live_mesh_ptr(new live_mesh_map::LiveMeshMap(*tf_listener_ptr_))
   , setup_reconfigure_(false)
 {
+
+
   // advertise services and current goal topic
   check_pose_cost_srv_ =
       private_nh_.advertiseService("check_pose_cost", &MeshNavigationServer::callServiceCheckPoseCost, this);
@@ -63,9 +65,14 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   // abstract server parameters
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
-
-  ROS_INFO_STREAM("Reading map file...");
-  mesh_ptr_->readMap();
+  bool load_gloable_map = true;
+  bool subscirbe_to_live_scan = false;
+  if(load_gloable_map) {
+      mesh_ptr_->readMap();
+  }
+  if(subscirbe_to_live_scan){
+      live_mesh_ptr->readMap();
+  }
 
   // initialize all plugins
   initializeServerComponents();
@@ -74,6 +81,7 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   startActionServers();
 }
 
+//auch mit gloabel map ???
 mbf_abstract_nav::AbstractPlannerExecution::Ptr MeshNavigationServer::newPlannerExecution(
     const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr)
 {
@@ -280,7 +288,7 @@ bool MeshNavigationServer::callServiceCheckPathCost(mbf_msgs::CheckPath::Request
 
 bool MeshNavigationServer::callServiceClearMesh(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
 {
-  mesh_ptr_->resetLayers();
+    mesh_ptr_->resetLayers();
   return true;
 }
 

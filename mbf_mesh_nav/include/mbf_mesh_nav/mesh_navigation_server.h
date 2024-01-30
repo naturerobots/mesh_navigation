@@ -50,6 +50,7 @@
 #include <std_srvs/Empty.h>
 
 #include <pluginlib/class_loader.h>
+#include "mesh_map/live_mesh_map.h"
 
 namespace mbf_mesh_nav
 {
@@ -74,6 +75,7 @@ class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
 {
 public:
   typedef boost::shared_ptr<mesh_map::MeshMap> MeshPtr;
+  typedef boost::shared_ptr<live_mesh_map::LiveMeshMap> LiveMeshPtr;
 
   typedef boost::shared_ptr<MeshNavigationServer> Ptr;
 
@@ -92,6 +94,7 @@ public:
 
 private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
+
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
   newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 
@@ -217,9 +220,12 @@ private:
   //! true, if the dynamic reconfigure has been setup
   bool setup_reconfigure_;
 
-  //! Shared pointer to the common global mesh
-  MeshPtr mesh_ptr_;
+  ros::NodeHandle nh_;
 
+    //! Shared pointer to the common global mesh
+  MeshPtr mesh_ptr_;
+    //! Shared pointer to the common local mesh
+    LiveMeshPtr live_mesh_ptr;
   //! Service Server to clear the mesh
   ros::ServiceServer clear_mesh_srv_;
 

@@ -1,0 +1,79 @@
+/snap/clion/229/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" -S /home/lukas/catkin_ws/src/mesh_navigation/mesh_map -B /home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug
+CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 2.8.12 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value or use a ...<max> suffix to tell
+  CMake that the project does not need compatibility with older versions.
+
+
+-- The C compiler identification is GNU 9.4.0
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Using CATKIN_DEVEL_PREFIX: /home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug/devel
+-- Using CMAKE_PREFIX_PATH: /opt/ros/noetic
+-- This workspace overlays: /opt/ros/noetic
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3") 
+-- Using PYTHON_EXECUTABLE: /usr/bin/python3
+-- Using Debian Python package layout
+-- Found PY_em: /usr/lib/python3/dist-packages/em.py  
+-- Using empy: /usr/lib/python3/dist-packages/em.py
+-- Using CATKIN_ENABLE_TESTING: ON
+-- Call enable_testing()
+-- Using CATKIN_TEST_RESULTS_DIR: /home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug/test_results
+-- Forcing gtest/gmock from source, though one was otherwise available.
+-- Found gtest sources under '/usr/src/googletest': gtests will be built
+-- Found gmock sources under '/usr/src/googletest': gmock will be built
+CMake Deprecation Warning at /usr/src/googletest/CMakeLists.txt:4 (cmake_minimum_required):
+  Compatibility with CMake < 2.8.12 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value or use a ...<max> suffix to tell
+  CMake that the project does not need compatibility with older versions.
+
+
+CMake Deprecation Warning at /usr/src/googletest/googlemock/CMakeLists.txt:45 (cmake_minimum_required):
+  Compatibility with CMake < 2.8.12 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value or use a ...<max> suffix to tell
+  CMake that the project does not need compatibility with older versions.
+
+
+CMake Deprecation Warning at /usr/src/googletest/googletest/CMakeLists.txt:56 (cmake_minimum_required):
+  Compatibility with CMake < 2.8.12 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value or use a ...<max> suffix to tell
+  CMake that the project does not need compatibility with older versions.
+
+
+-- Found PythonInterp: /usr/bin/python3 (found version "3.8.10") 
+-- Found Threads: TRUE  
+-- Using Python nosetests: /usr/bin/nosetests3
+-- catkin 0.8.10
+-- BUILD_SHARED_LIBS is on
+CMake Error at /opt/ros/noetic/share/mesh_client/cmake/mesh_clientConfig.cmake:113 (message):
+  Project 'mesh_client' specifies
+  '/opt/ros/noetic/include/lvr2/ext/nanoflann' as an include dir, which is
+  not found.  It does neither exist as an absolute directory nor in
+  '${prefix}//opt/ros/noetic/include/lvr2/ext/nanoflann'.  Report the problem
+  to the maintainer 'Sebastian Pütz <spuetz@uos.de>' and request to fix the
+  problem.
+Call Stack (most recent call first):
+  /opt/ros/noetic/share/catkin/cmake/catkinConfig.cmake:76 (find_package)
+  CMakeLists.txt:7 (find_package)
+
+
+-- Configuring incomplete, errors occurred!
+See also "/home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug/CMakeFiles/CMakeOutput.log".
+See also "/home/lukas/catkin_ws/src/mesh_navigation/mesh_map/cmake-build-debug/CMakeFiles/CMakeError.log".
