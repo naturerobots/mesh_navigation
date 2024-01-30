@@ -49,7 +49,7 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   , recovery_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshRecovery")
   , controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController")
   , planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner")
-  , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_))
+  , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_,true))
   , setup_reconfigure_(false)
 {
   // advertise services and current goal topic
@@ -64,8 +64,14 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr)
   dsrv_mesh_ = boost::make_shared<dynamic_reconfigure::Server<mbf_mesh_nav::MoveBaseFlexConfig>>(private_nh_);
   dsrv_mesh_->setCallback(boost::bind(&MeshNavigationServer::reconfigure, this, _1, _2));
 
-  ROS_INFO_STREAM("Reading map file...");
-  mesh_ptr_->readMap();
+
+    if(!mesh_ptr_->getsubscribe()) {
+      ROS_INFO_STREAM("Reading map file...");
+      mesh_ptr_->readMap();
+  }
+
+
+
 
   // initialize all plugins
   initializeServerComponents();

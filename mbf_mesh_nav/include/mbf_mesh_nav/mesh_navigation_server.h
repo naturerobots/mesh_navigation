@@ -92,6 +92,7 @@ public:
 
 private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
+
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
   newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 

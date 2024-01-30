@@ -17,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
-find_package(LVR2 2 REQUIRED)
+find_package(LVR2 REQUIRED)
 
 generate_dynamic_reconfigure_options(
   cfg/MoveBaseFlex.cfg

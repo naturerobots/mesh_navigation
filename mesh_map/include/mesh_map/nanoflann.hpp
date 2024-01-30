@@ -30,7 +30,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *************************************************************************/
 
-/** \mainpage nanoflann C++ API documentation
+/** \mainpage nanoflann C++ APISSE documentation
  *  nanoflann is a C++ header-only library for building KD-Trees, mostly
  *  optimized for 2D or 3D point clouds.
  *
@@ -38,7 +38,7 @@
  *  #include <nanoflann.hpp> in your code.
  *
  *  See:
- *   - <a href="modules.html" >C++ API organized by modules</a>
+ *   - <a href="modules.html" >C++ APISSE organized by modules</a>
  *   - <a href="https://github.com/jlblancoc/nanoflann" >Online README</a>
  *   - <a href="http://jlblancoc.github.io/nanoflann/" >Doxygen
  * documentation</a>
@@ -75,7 +75,7 @@ namespace nanoflann {
 /** @addtogroup nanoflann_grp nanoflann C++ library for ANN
  *  @{ */
 
-/** the PI constant (required to avoid MSVC missing symbols) */
+/** the pi constant (required to avoid MSVC missing symbols) */
 template <typename T> T pi_const() {
   return static_cast<T>(3.14159265358979323846);
 }
@@ -470,12 +470,12 @@ struct SO2_Adaptor {
   template <typename U, typename V>
   inline DistanceType accum_dist(const U a, const V b, const size_t) const {
     DistanceType result = DistanceType();
-    DistanceType PI = pi_const<DistanceType>();
+    DistanceType PI_M = pi_const<DistanceType>();
     result = b - a;
-    if (result > PI)
-      result -= 2 * PI;
-    else if (result < -PI)
-      result += 2 * PI;
+    if (result > PI_M)
+      result -= 2 * PI_M;
+    else if (result < -PI_M)
+      result += 2 * PI_M;
     return result;
   }
 };
