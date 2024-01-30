@@ -90,7 +90,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   min_contour_size_desc.description = "Defines the minimum size for a contour to be classified as 'lethal'.";
   auto min_contour_size_range = rcl_interfaces::msg::IntegerRange{};
   min_contour_size_range.from_value = 0;
-  min_contour_size_range.from_value = 100000;
+  min_contour_size_range.to_value = 100000;
   min_contour_size_desc.integer_range.push_back(min_contour_size_range);
   min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_contour_size", 3);
 
@@ -100,7 +100,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
   auto layer_factor_range = rcl_interfaces::msg::FloatingPointRange{};
   layer_factor_range.from_value = 0.0;
-  layer_factor_range.from_value = 10.0;
+  layer_factor_range.to_value = 10.0;
   layer_factor_desc.floating_point_range.push_back(layer_factor_range);
   layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + "/layer_factor", 1.0, layer_factor_desc);
 
@@ -110,7 +110,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   cost_limit_desc.description = "Defines the vertex cost limit with which it can be accessed.";
   auto cost_limit_range = rcl_interfaces::msg::FloatingPointRange{};
   cost_limit_range.from_value = 0.0;
-  cost_limit_range.from_value = 10.0;
+  cost_limit_range.to_value = 10.0;
   cost_limit_desc.floating_point_range.push_back(cost_limit_range);
   cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + "/cost_limit", 1.0);
 
