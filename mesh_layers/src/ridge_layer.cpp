@@ -40,7 +40,7 @@
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <math.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::RidgeLayer, mesh_map::AbstractLayer)
@@ -49,12 +49,12 @@ namespace mesh_layers
 {
 bool RidgeLayer::readLayer()
 {
-  ROS_INFO_STREAM("Try to read ridge from map file...");
-  auto ridge_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("ridge");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read ridge from map file...");
+  auto ridge_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("ridge");
   if (ridge_opt)
   {
-    ROS_INFO_STREAM("Successfully read ridge from map file.");
-    ridge = ridge_opt.get();
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read ridge from map file.");
+    ridge_ = ridge_opt.get();
     return computeLethals();
   }
 
@@ -63,96 +63,96 @@ bool RidgeLayer::readLayer()
 
 bool RidgeLayer::writeLayer()
 {
-  if (mesh_io_ptr->addDenseAttributeMap(ridge, "ridge"))
+  if (mesh_io_ptr_->addDenseAttributeMap(ridge_, "ridge"))
   {
-    ROS_INFO_STREAM("Saved ridge to map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved ridge to map file.");
     return true;
   }
   else
   {
-    ROS_ERROR_STREAM("Could not save ridge to map file!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save ridge to map file!");
     return false;
   }
 }
 
 bool RidgeLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Ridge Layer) with threshold " << config.threshold);
-  lethal_vertices.clear();
-  for (auto vH : ridge)
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Ridge Layer) with threshold " << config_.threshold);
+  lethal_vertices_.clear();
+  for (auto vH : ridge_)
   {
-    if (ridge[vH] > config.threshold)
-      lethal_vertices.insert(vH);
+    if (ridge_[vH] > config_.threshold)
+      lethal_vertices_.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 float RidgeLayer::threshold()
 {
-  return config.threshold;
+  return config_.threshold;
 }
 
 bool RidgeLayer::computeLayer()
 {
-  ROS_INFO_STREAM("Computing ridge...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing ridge...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
+  auto face_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
 
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues() << " face normals in map file.");
   }
   else
   {
-    ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
-    if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
+    RCLCPP_INFO_STREAM(node_->get_logger(), "No face normals found in the given map file, computing them...");
+    face_normals = lvr2::calcFaceNormals(*mesh_ptr_);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
+    if (mesh_io_ptr_->addDenseAttributeMap(face_normals, "face_normals"))
     {
-      ROS_INFO_STREAM("Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-  auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
+  auto vertex_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
 
   if (vertex_normals_opt)
   {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues() << " vertex normals in map file!");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues() << " vertex normals in map file!");
   }
   else
   {
-    ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-    if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
+    RCLCPP_INFO_STREAM(node_->get_logger(), "No vertex normals found in the given map file, computing them...");
+    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr_, face_normals);
+    if (mesh_io_ptr_->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
 
-  ridge.reserve(mesh_ptr->nextVertexIndex());
+  ridge_.reserve(mesh_ptr_->nextVertexIndex());
 
-  for (size_t i = 0; i < mesh_ptr->nextVertexIndex(); i++)
+  for (size_t i = 0; i < mesh_ptr_->nextVertexIndex(); i++)
   {
     auto vH = lvr2::VertexHandle(i);
-    if (!mesh_ptr->containsVertex(vH))
+    if (!mesh_ptr_->containsVertex(vH))
     {
-      ridge.insert(vH, config.threshold + 0.1);
+      ridge_.insert(vH, config_.threshold + 0.1);
       continue;
     }
 
@@ -160,20 +160,20 @@ bool RidgeLayer::computeLayer()
 
     float value = 0.0;
     int num_neighbours = 0;
-    lvr2::BaseVector<float> reference = mesh_ptr->getVertexPosition(vH) + vertex_normals[vH];
-    visitLocalVertexNeighborhood(*mesh_ptr.get(), invalid, vH, config.radius, [&](auto vertex) {
-      lvr2::BaseVector<float> current_point = mesh_ptr->getVertexPosition(vertex) + vertex_normals[vertex];
+    lvr2::BaseVector<float> reference = mesh_ptr_->getVertexPosition(vH) + vertex_normals[vH];
+    visitLocalVertexNeighborhood(*mesh_ptr_.get(), invalid, vH, config_.radius, [&](auto vertex) {
+      lvr2::BaseVector<float> current_point = mesh_ptr_->getVertexPosition(vertex) + vertex_normals[vertex];
       value += (current_point - reference).length();
       num_neighbours++;
     });
 
     if (num_neighbours == 0)
     {
-      ridge.insert(vH, config.threshold + 0.1);
+      ridge_.insert(vH, config_.threshold + 0.1);
       continue;
     }
 
-    ridge.insert(vH, value / num_neighbours);
+    ridge_.insert(vH, value / num_neighbours);
   }
 
   return computeLethals();
@@ -181,47 +181,70 @@ bool RidgeLayer::computeLayer()
 
 lvr2::VertexMap<float>& RidgeLayer::costs()
 {
-  return ridge;
+  return ridge_;
 }
 
-void RidgeLayer::reconfigureCallback(mesh_layers::RidgeLayerConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult RidgeLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  bool notify = false;
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  bool has_radius_changed = false;
+  bool has_threshold_changed = false;
 
-  ROS_INFO_STREAM("New ridge layer config through dynamic reconfigure.");
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == layer_name_ + ".threshold") {
+      config_.threshold = parameter.as_double();
+      has_threshold_changed = true;
+    } else if (parameter.get_name() == layer_name_ + ".radius") {
+      config_.radius = parameter.as_double();
+      has_radius_changed = true;
+    } else if (parameter.get_name() == layer_name_ + ".factor") {
+      config_.factor = parameter.as_double();
+    }
   }
 
-  if (config.threshold != cfg.threshold)
+  if (has_threshold_changed) { computeLethals(); }
+  if (has_radius_changed) { computeLayer(); }
+  if (has_radius_changed || has_threshold_changed) 
   {
-    computeLethals();
-    notify = true;
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Notify change from " << layer_name_ << " (RidgeLayer) due to cfg change.");
+    notifyChange(); 
   }
 
-  if (config.radius != cfg.radius)
-  {
-    computeLayer();
-    notify = true;
-  }
-
-  if (notify)
-    notifyChange();
-
-  config = cfg;
+  return result;
 }
 
-bool RidgeLayer::initialize(const std::string& name)
+bool RidgeLayer::initialize()
 {
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::RidgeLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::RidgeLayerConfig>(private_nh));
-
-  config_callback = boost::bind(&RidgeLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  { // threshold
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Threshold for the local ridge to be counted as lethal.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.01;
+    range.to_value = 3.1415;
+    descriptor.floating_point_range.push_back(range);
+    config_.threshold = node_->declare_parameter(layer_name_ + ".threshold", config_.threshold);
+  }
+  { // radius
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Radius of the inscribed area.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.01;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.radius = node_->declare_parameter(layer_name_ + ".radius", config_.radius);
+  }
+  { // factor
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The local ridge factor to weight this layer.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.factor = node_->declare_parameter(layer_name_ + ".factor", config_.factor);
+  }
+  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
+      &RidgeLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 
