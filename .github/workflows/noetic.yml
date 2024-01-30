@@ -2,11 +2,16 @@ name: Noetic CI
 
 on:
   push:
-    branches-ignore:
-      - "humble**"
+    branches:
+      - 'master'
+      - 'noetic'
   pull_request:
-    branches-ignore:
-      - "humble**"
+    branches:
+      - 'master'
+      - 'noetic'
+  workflow_dispatch:
+    branches:
+      - '*'
 
 jobs:
   build:
