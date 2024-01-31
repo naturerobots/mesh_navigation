@@ -406,11 +406,13 @@ private:
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
-  //! mapping from layer name to layer type, as configured via ros params
-  std::unordered_map<std::string, std::string> configured_layers;
+  //! mapping from layer name to layer type, as configured via ros params. 
+  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
+  std::vector<std::pair<std::string, std::string>> configured_layers;
 
   //! mapping from layer name to instance of respective layer
-  std::unordered_map<std::string, mesh_map::AbstractLayer::Ptr> loaded_layers;
+  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
+  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> loaded_layers;
 
   //! each layer maps to a set of impassable indices
   std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;

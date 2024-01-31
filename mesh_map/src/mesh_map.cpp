@@ -35,6 +35,7 @@
  *
  */
 #include <algorithm>
+#include <unordered_set>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -122,9 +123,10 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   // params for map layer names to types:
   const auto layer_names = node->declare_parameter(MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>());
   const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
+  std::unordered_set<std::string> layer_names_in_use;
   for(const std::string& layer_name : layer_names)
   {
-    if (configured_layers.find(layer_name) != configured_layers.end())
+    if (layer_names_in_use.find(layer_name) != layer_names_in_use.end())
     {
       throw rclcpp::exceptions::InvalidParametersException("The layer name " + layer_name + " is used more than once. Layer names must be unique!");
     }
@@ -132,7 +134,8 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
     const std::string layer_type = node->declare_parameter(MESH_MAP_NAMESPACE + "." + layer_name + ".type", ros_param_type).get<std::string>();
 
     // populate map from layer name to layer type, which will be used in loadLayerPlugins()
-    configured_layers.emplace(layer_name, layer_type);
+    configured_layers.push_back(std::make_pair(layer_name, layer_type));
+    layer_names_in_use.emplace(layer_name);
   }
   // output warning if no layer plugins were configured
   if (configured_layers.size() == 0)
@@ -319,7 +322,7 @@ bool MeshMap::loadLayerPlugins()
     try 
     {
       typename AbstractLayer::Ptr layer_ptr = layer_loader.createSharedInstance(layer_type);
-      loaded_layers.emplace(layer_name, layer_ptr);
+      loaded_layers.push_back(std::make_pair(layer_name, layer_ptr));
       RCLCPP_INFO(node->get_logger(),
                   "The layer with the type \"%s\" has been loaded successfully under the name \"%s\".", layer_type.c_str(),
                   layer_name.c_str());
@@ -345,8 +348,8 @@ void MeshMap::layerChanged(const std::string& layer_name)
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine underlining lethal sets...");
 
   // TODO pre-compute combined lethals upto a layer level
-  auto layer_iter = layers.begin();
-  for (; layer_iter != layers.end(); layer_iter++)
+  auto layer_iter = loaded_layers.begin();
+  for (; layer_iter != loaded_layers.end(); layer_iter++)
   {
     // TODO add lethal and removae lethal sets
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
@@ -359,12 +362,12 @@ void MeshMap::layerChanged(const std::string& layer_name)
                                                          layer_iter->second->defaultValue(), layer_iter->first,
                                                          global_frame, uuid_str));
 
-  if (layer_iter != layers.end())
+  if (layer_iter != loaded_layers.end())
     layer_iter++;
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine  lethal sets...");
 
-  for (; layer_iter != layers.end(); layer_iter++)
+  for (; layer_iter != loaded_layers.end(); layer_iter++)
   {
     // TODO add lethal and remove lethal sets as param
     layer_iter->second->updateLethal(lethals, lethals);
@@ -390,7 +393,7 @@ bool MeshMap::initLayerPlugins()
 
   std::shared_ptr<mesh_map::MeshMap> map(this);
 
-  for (auto& layer : layers)
+  for (auto& layer : loaded_layers)
   {
     auto& layer_plugin = layer.second;
     const auto& layer_name = layer.first;
@@ -426,7 +429,7 @@ void MeshMap::combineVertexCosts()
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
   bool hasNaN = false;
-  for (auto layer : layers)
+  for (auto layer : loaded_layers)
   {
     const auto& costs = layer.second->costs();
     float min, max;
@@ -718,10 +721,9 @@ void MeshMap::publishCombinedVectorField()
   vertex_vectors.reserve(mesh_ptr->nextVertexIndex());
   face_vectors.reserve(mesh_ptr->nextFaceIndex());
 
-  for (auto layer_iter : layer_names)
+  for (const auto& [_, layer] : loaded_layers)
   {
     lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
-    AbstractLayer::Ptr layer = layer_iter.second;
     auto opt_vec_map = layer->vectorMap();
     if (!opt_vec_map)
       continue;
@@ -1018,7 +1020,7 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
     Vector dir = opt_dir.get().normalized();
     std::array<lvr2::VertexHandle, 3> handels = mesh_ptr->getVerticesOfFace(face);
     // iter over all layer vector fields
-    for (auto layer : layers)
+    for (auto layer : loaded_layers)
     {
       dir += layer.second->vectorAt(handels, bary_coords);
     }
@@ -1111,7 +1113,10 @@ bool MeshMap::projectedBarycentricCoords(const Vector& p, const lvr2::FaceHandle
 
 mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
 {
-  return layer_names[layer_name];
+  return std::find_if(loaded_layers.begin(), loaded_layers.end(), 
+    [&layer_name](const std::pair<std::string, mesh_map::AbstractLayer::Ptr>& item) {
+      return item.first == layer_name;
+    })->second;
 }
 
 bool MeshMap::barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w)
@@ -1187,10 +1192,10 @@ bool MeshMap::resetLayers()
 
 void MeshMap::publishCostLayers()
 {
-  for (auto& layer : layers)
+  for (const auto& [layer_name, layer_ptr] : loaded_layers)
   {
-    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                           layer.second->defaultValue(), layer.first, global_frame,
+    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
+                                                           layer_ptr->defaultValue(), layer_name, global_frame,
                                                            uuid_str));
   }
   vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
