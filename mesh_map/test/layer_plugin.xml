@@ -1,0 +1,9 @@
+<library path="mesh_map_test_layer_plugin">
+    <class name="mesh_map/TestLayer"
+            type="mesh_map::TestLayer"
+            base_class_type="mesh_map::AbstractLayer">
+        <description>
+            A mesh layer meant for unit testing.
+        </description>
+    </class>
+</library>

@@ -43,8 +43,24 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
-  find_package(ament_cmake_gmock REQUIRED)
+  # Add test lib with layer plugin(s)
+  # -> Why a test plugin? Concrete plugin are available in the mesh_layers package.
+  #    However, mesh_map cannot test_depend on it without introducing a circular dependency (on colcon pkg level, the build order would be unclear).
+  add_library(${PROJECT_NAME}_test_layer_plugin
+    test/layer_plugin.cpp
+  )
+  ament_target_dependencies(${PROJECT_NAME}_test_layer_plugin pluginlib)
+  target_link_libraries(${PROJECT_NAME}_test_layer_plugin mesh_map)
+  pluginlib_export_plugin_description_file(mesh_map test/layer_plugin.xml)
+  install(TARGETS 
+    ${PROJECT_NAME}_test_layer_plugin
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
 
+  # add gmock test suites
+  find_package(ament_cmake_gmock REQUIRED)
   ament_add_gmock(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
   target_include_directories(${PROJECT_NAME}_mesh_map_test PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

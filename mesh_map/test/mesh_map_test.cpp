@@ -36,28 +36,28 @@ protected:
 
 TEST_F(MeshMapTest, loadsSinglePlugin)
 {
-  const std::vector<std::string> layer_names{"roughness"};
+  const std::vector<std::string> layer_names{"test_layer"};
   initNodeAndPluginManager(rclcpp::NodeOptions()
     .append_parameter_override("mesh_map.layers", layer_names)
-    .append_parameter_override("mesh_map.roughness.type", "mesh_layers/RoughnessLayer")
+    .append_parameter_override("mesh_map.test_layer.type", "mesh_map/TestLayer")
   );
   ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
-  EXPECT_THAT(mesh_map_ptr_->layer("roughness"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("test_layer"), NotNull());
 }
 
 TEST_F(MeshMapTest, loadsMultiplePlugins)
 {
-  const std::vector<std::string> layer_names{"2roughness", "roughness", "1roughness"};
+  const std::vector<std::string> layer_names{"t3", "t1", "t2"};
   initNodeAndPluginManager(rclcpp::NodeOptions()
     .append_parameter_override("mesh_map.layers", layer_names)
-    .append_parameter_override("mesh_map.roughness.type", "mesh_layers/RoughnessLayer")
-    .append_parameter_override("mesh_map.1roughness.type", "mesh_layers/RoughnessLayer")
-    .append_parameter_override("mesh_map.2roughness.type", "mesh_layers/RoughnessLayer")
+    .append_parameter_override("mesh_map.t1.type", "mesh_map/TestLayer")
+    .append_parameter_override("mesh_map.t2.type", "mesh_map/TestLayer")
+    .append_parameter_override("mesh_map.t3.type", "mesh_map/TestLayer")
   );
   ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
-  EXPECT_THAT(mesh_map_ptr_->layer("roughness"), NotNull());
-  EXPECT_THAT(mesh_map_ptr_->layer("1roughness"), NotNull());
-  EXPECT_THAT(mesh_map_ptr_->layer("2roughness"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("t1"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("t2"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("t3"), NotNull());
 }
 
 int main(int argc, char** argv)
