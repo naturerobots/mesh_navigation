@@ -45,6 +45,21 @@ TEST_F(MeshMapTest, loadsSinglePlugin)
   EXPECT_THAT(mesh_map_ptr_->layer("roughness"), NotNull());
 }
 
+TEST_F(MeshMapTest, loadsMultiplePlugins)
+{
+  const std::vector<std::string> layer_names{"2roughness", "roughness", "1roughness"};
+  initNodeAndPluginManager(rclcpp::NodeOptions()
+    .append_parameter_override("mesh_map.layers", layer_names)
+    .append_parameter_override("mesh_map.roughness.type", "mesh_layers/RoughnessLayer")
+    .append_parameter_override("mesh_map.1roughness.type", "mesh_layers/RoughnessLayer")
+    .append_parameter_override("mesh_map.2roughness.type", "mesh_layers/RoughnessLayer")
+  );
+  ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
+  EXPECT_THAT(mesh_map_ptr_->layer("roughness"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("1roughness"), NotNull());
+  EXPECT_THAT(mesh_map_ptr_->layer("2roughness"), NotNull());
+}
+
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
