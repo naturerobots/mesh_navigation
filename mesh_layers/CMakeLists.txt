@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(mesh_layers)
 
-find_package(ament_cmake COMPONENTS)
+find_package(ament_cmake_ros COMPONENTS)
 find_package(mesh_map)
 find_package(LVR2)
 
