@@ -39,20 +39,20 @@
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer)
 
 namespace mesh_layers {
 
 bool RoughnessLayer::readLayer() {
-  ROS_INFO_STREAM("Try to read roughness from map file...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read roughness from map file...");
   auto roughness_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
+      mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
           "roughness");
   if (roughness_opt) {
-    ROS_INFO_STREAM("Successfully read roughness from map file.");
-    roughness = roughness_opt.get();
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read roughness from map file.");
+    roughness_ = roughness_opt.get();
     return computeLethals();
   }
 
@@ -60,116 +60,141 @@ bool RoughnessLayer::readLayer() {
 }
 
 bool RoughnessLayer::writeLayer() {
-  if (mesh_io_ptr->addDenseAttributeMap(roughness, "roughness")) {
-    ROS_INFO_STREAM("Saved roughness to map file.");
+  if (mesh_io_ptr_->addDenseAttributeMap(roughness_, "roughness")) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved roughness to map file.");
     return true;
   } else {
-    ROS_ERROR_STREAM("Could not save roughness to map file!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save roughness to map file!");
     return false;
   }
 }
 
 bool RoughnessLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Roughness Layer) with threshold " << config.threshold );
-  lethal_vertices.clear();
-  for (auto vH : roughness) {
-    if (roughness[vH] > config.threshold)
-      lethal_vertices.insert(vH);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Roughness Layer) with threshold " << config_.threshold);
+  lethal_vertices_.clear();
+  for (auto vH : roughness_) {
+    if (roughness_[vH] > config_.threshold)
+      lethal_vertices_.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
-float RoughnessLayer::threshold() { return config.threshold; }
+float RoughnessLayer::threshold() { return config_.threshold; }
 
 bool RoughnessLayer::computeLayer() {
-  ROS_INFO_STREAM("Computing roughness...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing roughness...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
   auto face_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(
+      mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(
           "face_normals");
 
   if (face_normals_opt) {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues()
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues()
                              << " face normals in map file.");
   } else {
-    ROS_INFO_STREAM(
+    RCLCPP_INFO_STREAM(node_->get_logger(), 
         "No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed " << face_normals.numValues()
+    face_normals = lvr2::calcFaceNormals(*mesh_ptr_);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues()
                                 << " face normals.");
-    if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals")) {
-      ROS_INFO_STREAM("Saved face normals to map file.");
+    if (mesh_io_ptr_->addDenseAttributeMap(face_normals, "face_normals")) {
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     } else {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
   auto vertex_normals_opt =
-      mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>(
+      mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>(
           "vertex_normals");
 
   if (vertex_normals_opt) {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues()
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues()
                              << " vertex normals in map file!");
   } else {
-    ROS_INFO_STREAM(
+    RCLCPP_INFO_STREAM(node_->get_logger(), 
         "No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-    if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals")) {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
+    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr_, face_normals);
+    if (mesh_io_ptr_->addDenseAttributeMap(vertex_normals, "vertex_normals")) {
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     } else {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
 
-  roughness =
-      lvr2::calcVertexRoughness(*mesh_ptr, config.radius, vertex_normals);
+  roughness_ =
+      lvr2::calcVertexRoughness(*mesh_ptr_, config_.radius, vertex_normals);
 
   return computeLethals();
 }
 
-lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness; }
+lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness_; }
 
-void RoughnessLayer::reconfigureCallback(mesh_layers::RoughnessLayerConfig &cfg, uint32_t level) {
-  bool notify = false;
+rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
 
-  ROS_INFO_STREAM("New roughness layer config through dynamic reconfigure.");
-  if (first_config) {
-    config = cfg;
-    first_config = false;
-    return;
+  bool has_threshold_changed = false;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
+      config_.threshold = parameter.as_double();
+      has_threshold_changed = true;
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius") {
+      config_.radius = parameter.as_double();
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
+      config_.factor = parameter.as_double();
+    }
   }
 
-  if(config.threshold != cfg.threshold)
-  {
+  if (has_threshold_changed) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
-    notify = true;
+    notifyChange();
   }
 
-  if(notify) notifyChange();
-
-  config = cfg;
+  return result;
 }
 
-bool RoughnessLayer::initialize(const std::string &name) {
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<
-      dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>(
-          private_nh));
-
-  config_callback =
-      boost::bind(&RoughnessLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+bool RoughnessLayer::initialize() {
+  { // threshold
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Threshold for the local roughness to be counted as lethal.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.01;
+    range.to_value = 3.1415;
+    descriptor.floating_point_range.push_back(range);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
+  }
+  { // radius
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The radius used for calculating the local roughness.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.02;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius", config_.radius);
+  }
+  { // factor
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The local roughness factor to weight this layer.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+  }
+  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
+      &RoughnessLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 

@@ -39,7 +39,7 @@
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <math.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::SteepnessLayer, mesh_map::AbstractLayer)
@@ -48,12 +48,12 @@ namespace mesh_layers
 {
 bool SteepnessLayer::readLayer()
 {
-  ROS_INFO_STREAM("Try to read steepness from map file...");
-  auto steepness_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("steepness");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read steepness from map file...");
+  auto steepness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("steepness");
   if (steepness_opt)
   {
-    ROS_INFO_STREAM("Successfully read steepness from map file.");
-    steepness = steepness_opt.get();
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read steepness from map file.");
+    steepness_ = steepness_opt.get();
     return computeLethals();
   }
 
@@ -62,99 +62,99 @@ bool SteepnessLayer::readLayer()
 
 bool SteepnessLayer::writeLayer()
 {
-  if (mesh_io_ptr->addDenseAttributeMap(steepness, "steepness"))
+  if (mesh_io_ptr_->addDenseAttributeMap(steepness_, "steepness"))
   {
-    ROS_INFO_STREAM("Saved steepness to map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved steepness to map file.");
     return true;
   }
   else
   {
-    ROS_ERROR_STREAM("Could not save steepness to map file!");
+    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save steepness to map file!");
     return false;
   }
 }
 
 bool SteepnessLayer::computeLethals()
 {
-  ROS_INFO_STREAM("Compute lethals for \"" << layer_name << "\" (Steepness Layer) with threshold " << config.threshold);
-  lethal_vertices.clear();
-  for (auto vH : steepness)
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Steepness Layer) with threshold " << config_.threshold);
+  lethal_vertices_.clear();
+  for (auto vH : steepness_)
   {
-    if (steepness[vH] > config.threshold)
-      lethal_vertices.insert(vH);
+    if (steepness_[vH] > config_.threshold)
+      lethal_vertices_.insert(vH);
   }
-  ROS_INFO_STREAM("Found " << lethal_vertices.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 float SteepnessLayer::threshold()
 {
-  return config.threshold;
+  return config_.threshold;
 }
 
 bool SteepnessLayer::computeLayer()
 {
-  ROS_INFO_STREAM("Computing steepness...");
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing steepness...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
+  auto face_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
 
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
-    ROS_INFO_STREAM("Found " << face_normals.numValues() << " face normals in map file.");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues() << " face normals in map file.");
   }
   else
   {
-    ROS_INFO_STREAM("No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
-    ROS_INFO_STREAM("Computed " << face_normals.numValues() << " face normals.");
-    if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
+    RCLCPP_INFO_STREAM(node_->get_logger(), "No face normals found in the given map file, computing them...");
+    face_normals = lvr2::calcFaceNormals(*mesh_ptr_);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
+    if (mesh_io_ptr_->addDenseAttributeMap(face_normals, "face_normals"))
     {
-      ROS_INFO_STREAM("Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-  auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
+  auto vertex_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
 
   if (vertex_normals_opt)
   {
     vertex_normals = vertex_normals_opt.get();
-    ROS_INFO_STREAM("Found " << vertex_normals.numValues() << " vertex normals in map file!");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues() << " vertex normals in map file!");
   }
   else
   {
-    ROS_INFO_STREAM("No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr, face_normals);
-    if (mesh_io_ptr->addDenseAttributeMap(vertex_normals, "vertex_normals"))
+    RCLCPP_INFO_STREAM(node_->get_logger(), "No vertex normals found in the given map file, computing them...");
+    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr_, face_normals);
+    if (mesh_io_ptr_->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
-      ROS_INFO_STREAM("Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     }
     else
     {
-      ROS_ERROR_STREAM("Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
 
-  steepness.reserve(mesh_ptr->nextVertexIndex());
+  steepness_.reserve(mesh_ptr_->nextVertexIndex());
 
-  for (size_t i = 0; i < mesh_ptr->nextVertexIndex(); i++)
+  for (size_t i = 0; i < mesh_ptr_->nextVertexIndex(); i++)
   {
     auto vH = lvr2::VertexHandle(i);
-    if (!mesh_ptr->containsVertex(vH))
+    if (!mesh_ptr_->containsVertex(vH))
     {
       continue;
     }
 
-    steepness.insert(vH, acos(vertex_normals[vH].z));
+    steepness_.insert(vH, acos(vertex_normals[vH].z));
   }
 
   return computeLethals();
@@ -162,41 +162,55 @@ bool SteepnessLayer::computeLayer()
 
 lvr2::VertexMap<float>& SteepnessLayer::costs()
 {
-  return steepness;
+  return steepness_;
 }
 
-void SteepnessLayer::reconfigureCallback(mesh_layers::SteepnessLayerConfig& cfg, uint32_t level)
+rcl_interfaces::msg::SetParametersResult SteepnessLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  bool notify = false;
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
 
-  ROS_INFO_STREAM("New steepness layer config through dynamic reconfigure.");
-  if (first_config)
-  {
-    config = cfg;
-    first_config = false;
-    return;
+  bool has_threshold_changed = false;
+  for (auto parameter : parameters) {
+    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
+      config_.threshold = parameter.as_double();
+      has_threshold_changed = true;
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
+      config_.factor = parameter.as_double();
+    }
   }
 
-  if (config.threshold != cfg.threshold)
-  {
+  if (has_threshold_changed) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
-    notify = true;
+    notifyChange();
   }
 
-  if (notify)
-    notifyChange();
-
-  config = cfg;
+  return result;
 }
 
-bool SteepnessLayer::initialize(const std::string& name)
+bool SteepnessLayer::initialize()
 {
-  first_config = true;
-  reconfigure_server_ptr = boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>>(
-      new dynamic_reconfigure::Server<mesh_layers::SteepnessLayerConfig>(private_nh));
-
-  config_callback = boost::bind(&SteepnessLayer::reconfigureCallback, this, _1, _2);
-  reconfigure_server_ptr->setCallback(config_callback);
+  { // threshold
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Threshold for the local steepness to be counted as lethal.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.01;
+    range.to_value = 3.1415;
+    descriptor.floating_point_range.push_back(range);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
+  }
+  { // factor
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "The local steepness factor to weight this layer.";
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 1.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+  }
+  dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
+      &SteepnessLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 

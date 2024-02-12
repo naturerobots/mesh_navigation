@@ -1,33 +1,11 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.8)
 project(mesh_layers)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+find_package(ament_cmake_ros COMPONENTS)
+find_package(mesh_map)
+find_package(LVR2)
 
-find_package(catkin REQUIRED COMPONENTS
-  mesh_map
-  dynamic_reconfigure
-)
-
-generate_dynamic_reconfigure_options(
-  cfg/HeightDiffLayer.cfg
-  cfg/InflationLayer.cfg
-  cfg/RoughnessLayer.cfg
-  cfg/SteepnessLayer.cfg
-  cfg/RidgeLayer.cfg
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES mesh_layers
-  CATKIN_DEPENDS mesh_map dynamic_reconfigure
-)
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
+pluginlib_export_plugin_description_file(mesh_map mesh_layers.xml)
 
 add_library(${PROJECT_NAME}
   src/roughness_layer.cpp
@@ -35,32 +13,28 @@ add_library(${PROJECT_NAME}
   src/inflation_layer.cpp
   src/steepness_layer.cpp
   src/ridge_layer.cpp
-  )
+)
+target_compile_features(${PROJECT_NAME} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(${PROJECT_NAME} mesh_map LVR2)
+target_compile_definitions(${PROJECT_NAME} PRIVATE "MESH_LAYERS_BUILDING_LIBRARY")
 
-add_dependencies(${PROJECT_NAME}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_gencfg
+install(DIRECTORY include/
+  DESTINATION include
 )
 
-target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+install(TARGETS 
+  ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-)
-
-install(FILES
-  mesh_layers.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_dependencies(mesh_map)
+ament_package()

@@ -35,6 +35,7 @@
  *
  */
 #include <algorithm>
+#include <unordered_set>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -69,55 +70,80 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
   , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
-  srv_url = node->declare_parameter(MESH_MAP_NAMESPACE + "/server_url", "");
-  srv_username = node->declare_parameter(MESH_MAP_NAMESPACE + "/server_username", "");
-  srv_password = node->declare_parameter(MESH_MAP_NAMESPACE + "server_password", "");
-  mesh_layer = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_layer", "mesh0");
-  min_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_roughness", 0.0);
-  max_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + "/max_roughness", 0.0);
-  min_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_height_diff", 0.0);
-  max_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + "/max_height_diff", 0.0);
-  bb_min_x = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_x", 0.0);
-  bb_min_y = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_y", 0.0);
-  bb_min_z = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_min_z", 0.0);
-  bb_max_x = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_x", 0.0);
-  bb_max_y = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_y", 0.0);
-  bb_max_z = node->declare_parameter(MESH_MAP_NAMESPACE + "/bb_max_z", 0.0);
+  srv_url = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_url", "");
+  srv_username = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_username", "");
+  srv_password = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_password", "");
+  mesh_layer = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_layer", "mesh0");
+  min_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_roughness", 0.0);
+  max_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_roughness", 0.0);
+  min_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_height_diff", 0.0);
+  max_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_height_diff", 0.0);
+  bb_min_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_x", 0.0);
+  bb_min_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_y", 0.0);
+  bb_min_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_z", 0.0);
+  bb_max_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_x", 0.0);
+  bb_max_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_y", 0.0);
+  bb_max_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_z", 0.0);
 
   auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  min_contour_size_desc.name = MESH_MAP_NAMESPACE + "/min_contour_size";
+  min_contour_size_desc.name = MESH_MAP_NAMESPACE + ".min_contour_size";
   min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
   min_contour_size_desc.description = "Defines the minimum size for a contour to be classified as 'lethal'.";
   auto min_contour_size_range = rcl_interfaces::msg::IntegerRange{};
   min_contour_size_range.from_value = 0;
-  min_contour_size_range.from_value = 100000;
+  min_contour_size_range.to_value = 100000;
   min_contour_size_desc.integer_range.push_back(min_contour_size_range);
-  min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + "/min_contour_size", 3);
+  min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_contour_size", 3);
 
   auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  layer_factor_desc.name = MESH_MAP_NAMESPACE + "/layer_factor";
+  layer_factor_desc.name = MESH_MAP_NAMESPACE + ".layer_factor";
   layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
   auto layer_factor_range = rcl_interfaces::msg::FloatingPointRange{};
   layer_factor_range.from_value = 0.0;
-  layer_factor_range.from_value = 10.0;
+  layer_factor_range.to_value = 10.0;
   layer_factor_desc.floating_point_range.push_back(layer_factor_range);
-  layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + "/layer_factor", 1.0, layer_factor_desc);
+  layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + ".layer_factor", 1.0, layer_factor_desc);
 
   auto cost_limit_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  cost_limit_desc.name = MESH_MAP_NAMESPACE + "/cost_limit";
+  cost_limit_desc.name = MESH_MAP_NAMESPACE + ".cost_limit";
   cost_limit_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   cost_limit_desc.description = "Defines the vertex cost limit with which it can be accessed.";
   auto cost_limit_range = rcl_interfaces::msg::FloatingPointRange{};
   cost_limit_range.from_value = 0.0;
-  cost_limit_range.from_value = 10.0;
+  cost_limit_range.to_value = 10.0;
   cost_limit_desc.floating_point_range.push_back(cost_limit_range);
-  cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + "/cost_limit", 1.0);
+  cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + ".cost_limit", 1.0);
 
-  mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_file", "");
-  mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + "/mesh_part", "");
-  global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + "/global_frame", "map");
+  mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
+  mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
+  global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
+
+  // params for map layer names to types:
+  const auto layer_names = node->declare_parameter(MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>());
+  const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
+  std::unordered_set<std::string> layer_names_in_use;
+  for(const std::string& layer_name : layer_names)
+  {
+    if (layer_names_in_use.find(layer_name) != layer_names_in_use.end())
+    {
+      throw rclcpp::exceptions::InvalidParametersException("The layer name " + layer_name + " is used more than once. Layer names must be unique!");
+    }
+    // This will throws rclcpp::ParameterValue exception if mesh_map.layer_name.type is not set
+    const std::string layer_type = node->declare_parameter(MESH_MAP_NAMESPACE + "." + layer_name + ".type", ros_param_type).get<std::string>();
+
+    // populate map from layer name to layer type, which will be used in loadLayerPlugins()
+    configured_layers.push_back(std::make_pair(layer_name, layer_type));
+    layer_names_in_use.emplace(layer_name);
+  }
+  // output warning if no layer plugins were configured
+  if (configured_layers.size() == 0)
+  {
+    RCLCPP_WARN_STREAM(node->get_logger(), "No MeshMap layer plugins configured!"
+      << " - Use the param \"" << MESH_MAP_NAMESPACE << ".layers\", which must be a list of strings with arbitrary layer names. "
+      << "For each layer_name, also define layer_name.type with the respective type that shall be loaded via pluginlib.");
+  }
 
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1);
@@ -291,71 +317,24 @@ bool MeshMap::readMap()
 
 bool MeshMap::loadLayerPlugins()
 {
-  const std::vector<std::string> plugin_param_list = node->declare_parameter<std::vector<std::string>>("layers", {});
-  if (plugin_param_list.empty())
+  for (const auto &[layer_name, layer_type] : configured_layers)
   {
-    RCLCPP_WARN_STREAM(node->get_logger(), "No layer plugins configured! - Use the param \"layers\" "
-                    "in the namespace \""
-                    << MESH_MAP_NAMESPACE
-                    << "\". \"layers\" must be must be a list of "
-                       "tuples with a name and a type.");
-    return false;
-  }
-
-  //try
-  //{
-    for (int i = 0; i < plugin_param_list.size(); i++)
+    try 
     {
-      //XmlRpc::XmlRpcValue elem = plugin_param_list[i];
-
-      // TODO figure out how to load the plugin configuration with ROS2 param
-      std::string name = "todo";// TODO elem["name"];
-      std::string type = "todo";// TODO elem["type"];
-
-      typename AbstractLayer::Ptr plugin_ptr;
-
-      if (layer_names.find(name) != layer_names.end())
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), "The plugin \"" << name << "\" has already been loaded! Names must be unique!");
-        return false;
-      }
-
-      try
-      {
-        plugin_ptr = layer_loader.createSharedInstance(type);
-      }
-      catch (pluginlib::LibraryLoadException& e)
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), e.what());
-      }
-
-      if (plugin_ptr)
-      {
-        std::pair<std::string, typename mesh_map::AbstractLayer::Ptr> elem(name, plugin_ptr);
-
-        layers.push_back(elem);
-        layer_names.insert(elem);
-
-        RCLCPP_INFO_STREAM(node->get_logger(), "The layer plugin with the type \""
-                        << type << "\" has been loaded successfully under the name \"" << name << "\".");
-      }
-      else
-      {
-        RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer plugin with the name \"" << name << "\" and the type \"" << type
-                                                                            << "\"!");
-      }
+      typename AbstractLayer::Ptr layer_ptr = layer_loader.createSharedInstance(layer_type);
+      loaded_layers.push_back(std::make_pair(layer_name, layer_ptr));
+      RCLCPP_INFO(node->get_logger(),
+                  "The layer with the type \"%s\" has been loaded successfully under the name \"%s\".", layer_type.c_str(),
+                  layer_name.c_str());
     }
-  //}
-  //catch (XmlRpc::XmlRpcException& e)
-  //{
-  //  RCLCPP_ERROR_STREAM(node->get_logger(), "Invalid parameter structure. The \"layers\" parameter "
-  //                   "has to be a list of structs "
-  //                   << "with fields \"name\" and \"type\"!");
-  //  RCLCPP_ERROR_STREAM(node->get_logger(), e.getMessage());
-  //  return false;
-  //}
-  // is there any layer plugin loaded for the map?
-  return !layers.empty();
+    catch (pluginlib::LibraryLoadException& e)
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer with the name \"" << layer_name << "\" and the type \"" << layer_type << "\"! Error: " << e.what());
+    }
+  }
+  
+  // did we load any layer?
+  return loaded_layers.empty() ? false : true;
 }
 
 void MeshMap::layerChanged(const std::string& layer_name)
@@ -369,8 +348,8 @@ void MeshMap::layerChanged(const std::string& layer_name)
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine underlining lethal sets...");
 
   // TODO pre-compute combined lethals upto a layer level
-  auto layer_iter = layers.begin();
-  for (; layer_iter != layers.end(); layer_iter++)
+  auto layer_iter = loaded_layers.begin();
+  for (; layer_iter != loaded_layers.end(); layer_iter++)
   {
     // TODO add lethal and removae lethal sets
     lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
@@ -383,12 +362,12 @@ void MeshMap::layerChanged(const std::string& layer_name)
                                                          layer_iter->second->defaultValue(), layer_iter->first,
                                                          global_frame, uuid_str));
 
-  if (layer_iter != layers.end())
+  if (layer_iter != loaded_layers.end())
     layer_iter++;
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine  lethal sets...");
 
-  for (; layer_iter != layers.end(); layer_iter++)
+  for (; layer_iter != loaded_layers.end(); layer_iter++)
   {
     // TODO add lethal and remove lethal sets as param
     layer_iter->second->updateLethal(lethals, lethals);
@@ -414,7 +393,7 @@ bool MeshMap::initLayerPlugins()
 
   std::shared_ptr<mesh_map::MeshMap> map(this);
 
-  for (auto& layer : layers)
+  for (auto& layer : loaded_layers)
   {
     auto& layer_plugin = layer.second;
     const auto& layer_name = layer.first;
@@ -450,7 +429,7 @@ void MeshMap::combineVertexCosts()
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
   bool hasNaN = false;
-  for (auto layer : layers)
+  for (auto layer : loaded_layers)
   {
     const auto& costs = layer.second->costs();
     float min, max;
@@ -742,10 +721,9 @@ void MeshMap::publishCombinedVectorField()
   vertex_vectors.reserve(mesh_ptr->nextVertexIndex());
   face_vectors.reserve(mesh_ptr->nextFaceIndex());
 
-  for (auto layer_iter : layer_names)
+  for (const auto& [_, layer] : loaded_layers)
   {
     lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
-    AbstractLayer::Ptr layer = layer_iter.second;
     auto opt_vec_map = layer->vectorMap();
     if (!opt_vec_map)
       continue;
@@ -1042,7 +1020,7 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
     Vector dir = opt_dir.get().normalized();
     std::array<lvr2::VertexHandle, 3> handels = mesh_ptr->getVerticesOfFace(face);
     // iter over all layer vector fields
-    for (auto layer : layers)
+    for (auto layer : loaded_layers)
     {
       dir += layer.second->vectorAt(handels, bary_coords);
     }
@@ -1135,7 +1113,10 @@ bool MeshMap::projectedBarycentricCoords(const Vector& p, const lvr2::FaceHandle
 
 mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
 {
-  return layer_names[layer_name];
+  return std::find_if(loaded_layers.begin(), loaded_layers.end(), 
+    [&layer_name](const std::pair<std::string, mesh_map::AbstractLayer::Ptr>& item) {
+      return item.first == layer_name;
+    })->second;
 }
 
 bool MeshMap::barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w)
@@ -1211,10 +1192,10 @@ bool MeshMap::resetLayers()
 
 void MeshMap::publishCostLayers()
 {
-  for (auto& layer : layers)
+  for (const auto& [layer_name, layer_ptr] : loaded_layers)
   {
-    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer.second->costs(), mesh_ptr->numVertices(),
-                                                           layer.second->defaultValue(), layer.first, global_frame,
+    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
+                                                           layer_ptr->defaultValue(), layer_name, global_frame,
                                                            uuid_str));
   }
   vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
@@ -1268,15 +1249,15 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vecto
     for (const rclcpp::Parameter& param : parameters)
     {
       const auto& param_name = param.get_name();
-      if (param_name == MESH_MAP_NAMESPACE + "/min_contour_size")
+      if (param_name == MESH_MAP_NAMESPACE + ".min_contour_size")
       {
         min_contour_size = param.as_int();
       }
-      else if (param_name == MESH_MAP_NAMESPACE + "/layer_factor")
+      else if (param_name == MESH_MAP_NAMESPACE + ".layer_factor")
       {
         layer_factor = param.as_double();
       }
-      else if (param_name == MESH_MAP_NAMESPACE + "/cost_limit")
+      else if (param_name == MESH_MAP_NAMESPACE + ".cost_limit")
       {
         cost_limit = param.as_double();
         combineVertexCosts();

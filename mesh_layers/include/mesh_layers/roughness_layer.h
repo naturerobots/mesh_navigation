@@ -38,9 +38,8 @@
 #ifndef MESH_MAP__ROUGHNESS_LAYER_H
 #define MESH_MAP__ROUGHNESS_LAYER_H
 
-#include <dynamic_reconfigure/server.h>
-#include <mesh_layers/RoughnessLayerConfig.h>
 #include <mesh_map/abstract_layer.h>
+#include <rclcpp/rclcpp.hpp>
 
 namespace mesh_layers
 {
@@ -55,28 +54,28 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return true if successul; else false
    */
-  virtual bool readLayer();
+  virtual bool readLayer() override;
 
   /**
    * @brief try to write layer to map file
    *
    * @return true if successfull; else false
    */
-  virtual bool writeLayer();
+  virtual bool writeLayer() override;
 
   /**
    * @brief delivers the threshold above which vertices are marked lethal
    *
    * @return lethal threshold
    */
-  virtual float threshold();
+  virtual float threshold() override;
 
   /**
    * @brief delivers the default layer value
    *
    * @return default value used for this layer
    */
-  virtual float defaultValue()
+  virtual float defaultValue() override
   {
     return std::numeric_limits<float>::infinity();
   }
@@ -86,7 +85,7 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return true if successfull; else false
    */
-  virtual bool computeLayer();
+  virtual bool computeLayer() override;
 
   /**
    * @brief mark vertices with values above the threshold as lethal
@@ -100,16 +99,16 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return calculated costmap
    */
-  virtual lvr2::VertexMap<float>& costs();
+  virtual lvr2::VertexMap<float>& costs() override;
 
   /**
    * @brief deliver set containing all vertices marked as lethal
    *
    * @return lethal vertices
    */
-  virtual std::set<lvr2::VertexHandle>& lethals()
+  virtual std::set<lvr2::VertexHandle>& lethals() override
   {
-    return lethal_vertices;
+    return lethal_vertices_;
   }
 
   /**
@@ -118,37 +117,31 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    * @param added_lethal vertices to be marked as lethal
    * @param removed_lethal vertices to be removed from the set of lethal vertices
    */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal){};
+  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal) override {};
 
   /**
    * @brief initializes this layer plugin
    *
-   * @param name name of this plugin
-   *
    * @return true if initialization was successfull; else false
    */
-  virtual bool initialize(const std::string& name);
-
-  // latest costmap
-  lvr2::DenseVertexMap<float> roughness;
-  // set of all current lethal vertices
-  std::set<lvr2::VertexHandle> lethal_vertices;
-
-  // Server for Reconfiguration
-  boost::shared_ptr<dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>> reconfigure_server_ptr;
-  dynamic_reconfigure::Server<mesh_layers::RoughnessLayerConfig>::CallbackType config_callback;
-  // true if the first reconfigure config has been received; else false
-  bool first_config;
-  // current reconfigure config
-  RoughnessLayerConfig config;
+  virtual bool initialize() override;
 
   /**
-   * @brief callback for incoming reconfigure configs
-   *
-   * @param cfg new config
-   * @param level level
+   * @brief callback for incoming param changes
    */
-  void reconfigureCallback(mesh_layers::RoughnessLayerConfig& cfg, uint32_t level);
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
+
+  // latest costmap
+  lvr2::DenseVertexMap<float> roughness_;
+  // set of all current lethal vertices
+  std::set<lvr2::VertexHandle> lethal_vertices_;
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+  struct {
+    double threshold = 0.3;
+    double radius = 0.3;
+    double factor = 1.0;
+  } config_;
 };
 
 } /* namespace mesh_layers */
