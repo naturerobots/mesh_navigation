@@ -109,7 +109,7 @@ typename AbstractThing::Ptr loadPlugin(const std::string& thing_type, pluginlib:
   else
   {
     // thing was not found
-    RCLCPP_ERROR_STREAM(logger, "Failed to find the " << thing_type << " thing. "
+    RCLCPP_ERROR_STREAM(logger, "Failed to find the " << thing_type << " " << which_thing << ". "
                                 << "Are you sure it's properly registered and that the containing library is built? "
                                 << "Registered mesh " << which_thing << " are: " << stringVectorToString(available_mesh_things)
                                 << ". Registered simple " << which_thing << " are: " << stringVectorToString(available_simple_things));
