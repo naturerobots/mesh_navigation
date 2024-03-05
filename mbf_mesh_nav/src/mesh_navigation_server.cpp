@@ -272,7 +272,6 @@ bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
     return false;
   }
 
-  /////////////////
   mbf_mesh_core::MeshRecovery::Ptr mesh_behavior_ptr =
       std::dynamic_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
   if (mesh_behavior_ptr) 
