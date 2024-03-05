@@ -37,12 +37,93 @@
 
 #include "mbf_mesh_nav/mesh_navigation_server.h"
 
+#include <algorithm>
 #include <functional>
 
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <mesh_map/mesh_map.h>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/logging.hpp>
+
+namespace {
+//! Helper function, intended for formatting available plugin types.
+//! Returns a string like this: [el1, el2, el3, ..., eln]
+std::string stringVectorToString(const std::vector<std::string>& vec) 
+{
+  std::stringstream s;
+  s << "[";
+  bool is_first = true;
+  for (const auto& item : vec)
+  {
+    s << (is_first ? "" : ", ") << item;
+    is_first = false;
+  }
+  s << "]";
+  return s.str();
+};
+
+/*!
+ * Helper function to reduce code duplication when loading plugins.
+ * Things can be either planners, controllers or recovery behaviors.
+ * @tparam AbstractThing Abstract type of the thing to load. Needs to be the base class of SimpleThing and MeshThing. E.g. mbf_abstract_core::AbstractPlanner.
+ * @tparam SimpleThing Simple type of the thing to load. E.g. mbf_simple_core::SimplePlanner
+ * @tparam MeshThing Mesh type of the thing to load. E.g. mbf_simple_core::MeshPlanner
+ * @param thing_type typename of the thing that shall be loaded, usually configured by user via ros params.
+ * @param which_thing should be "planner", "controller", or "recovery behavior", used only for logging.
+ */
+template<typename AbstractThing, typename MeshThing, typename SimpleThing>
+typename AbstractThing::Ptr loadPlugin(const std::string& thing_type, pluginlib::ClassLoader<MeshThing>& mesh_thing_loader, pluginlib::ClassLoader<SimpleThing>& simple_thing_loader, const std::string& which_thing, rclcpp::Logger logger)
+{
+  // support both simple core and mesh core things. We cannot see which type a thing is from planner_type, so we need to rely on try catch.
+  const auto available_mesh_things= mesh_thing_loader.getDeclaredClasses();
+  const auto available_simple_things = simple_thing_loader.getDeclaredClasses();
+
+  typename AbstractThing::Ptr thing_ptr;
+  std::string thing_name;
+  if (std::find(available_mesh_things.begin(), available_mesh_things.end(), thing_type) != available_mesh_things.end())
+  {
+    // thing_type is available as mesh thing
+    try
+    {
+      thing_ptr = std::dynamic_pointer_cast<AbstractThing>(mesh_thing_loader.createSharedInstance(thing_type));
+      thing_name = mesh_thing_loader.getName(thing_type);
+    }
+    catch (const pluginlib::PluginlibException& ex_mbf_core)
+    {
+      RCLCPP_ERROR_STREAM(logger, "Error while loading " << thing_type << " as mesh " << which_thing << ": " << ex_mbf_core.what());
+    }
+  }
+  else if (std::find(available_simple_things.begin(), available_simple_things.end(), thing_type) != available_simple_things.end())
+  {
+    // thing_type is available as simple thing
+    try 
+    {
+      thing_ptr = std::dynamic_pointer_cast<AbstractThing>(simple_thing_loader.createSharedInstance(thing_type));
+      thing_name = simple_thing_loader.getName(thing_type);
+    }
+    catch (const pluginlib::PluginlibException& ex_mbf_core)
+    {
+      RCLCPP_ERROR_STREAM(logger, "Error while loading " << thing_type << " as simple " << which_thing << ": " << ex_mbf_core.what());
+    }
+  }
+  else
+  {
+    // thing was not found
+    RCLCPP_ERROR_STREAM(logger, "Failed to find the " << thing_type << " thing. "
+                                << "Are you sure it's properly registered and that the containing library is built? "
+                                << "Registered mesh " << which_thing << " are: " << stringVectorToString(available_mesh_things)
+                                << ". Registered simple " << which_thing << " are: " << stringVectorToString(available_simple_things));
+  }
+
+  if (thing_ptr) 
+  {
+    // success
+    RCLCPP_DEBUG_STREAM(logger, "mbf_mesh_core-based " << which_thing << " plugin " << thing_name << " loaded.");
+  }
+  return thing_ptr; // return nullptr in case something went wrong
+}
+
+} // namespace
 
 namespace mbf_mesh_nav
 {
@@ -53,6 +134,9 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr, const r
   , recovery_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshRecovery")
   , controller_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshController")
   , planner_plugin_loader_("mbf_mesh_core", "mbf_mesh_core::MeshPlanner")
+  , simple_recovery_plugin_loader_("mbf_simple_core", "mbf_simple_core::SimpleRecovery")
+  , simple_controller_plugin_loader_("mbf_simple_core", "mbf_simple_core::SimpleController")
+  , simple_planner_plugin_loader_("mbf_simple_core", "mbf_simple_core::SimplePlanner")
   , mesh_ptr_(new mesh_map::MeshMap(*tf_listener_ptr_, node))
 {
   // advertise services and current goal topic
@@ -95,54 +179,42 @@ mbf_abstract_nav::AbstractRecoveryExecution::Ptr MeshNavigationServer::newRecove
 
 mbf_abstract_core::AbstractPlanner::Ptr MeshNavigationServer::loadPlannerPlugin(const std::string& planner_type)
 {
-  mbf_abstract_core::AbstractPlanner::Ptr planner_ptr;
-  try
-  {
-    planner_ptr = std::static_pointer_cast<mbf_abstract_core::AbstractPlanner>(
-        planner_plugin_loader_.createSharedInstance(planner_type));
-    std::string planner_name = planner_plugin_loader_.getName(planner_type);
-    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based planner plugin " << planner_name << " loaded.");
-  }
-  catch (const pluginlib::PluginlibException& ex_mbf_core)
-  {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << planner_type << " planner, are you sure it's properly registered"
-                                           << " and that the containing library is built? " << ex_mbf_core.what());
-  }
-
-  return planner_ptr;
+  return loadPlugin<mbf_abstract_core::AbstractPlanner>(planner_type, planner_plugin_loader_, simple_planner_plugin_loader_, "planner", node_->get_logger());
 }
 
 bool MeshNavigationServer::initializePlannerPlugin(const std::string& name,
                                                    const mbf_abstract_core::AbstractPlanner::Ptr& planner_ptr)
 {
-  mbf_mesh_core::MeshPlanner::Ptr mesh_planner_ptr =
-      std::static_pointer_cast<mbf_mesh_core::MeshPlanner>(planner_ptr);
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "Initialize planner \"" << name << "\".");
 
-  if (!mesh_ptr_)
+  mbf_mesh_core::MeshPlanner::Ptr mesh_planner_ptr =
+      std::dynamic_pointer_cast<mbf_mesh_core::MeshPlanner>(planner_ptr);
+  if (mesh_planner_ptr)
   {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
-    return false;
+    if (!mesh_ptr_)
+    {
+      RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
+      return false;
+    }
+    return mesh_planner_ptr->initialize(name, mesh_ptr_, node_);
   }
-  return mesh_planner_ptr->initialize(name, mesh_ptr_, node_);
+
+  mbf_simple_core::SimplePlanner::Ptr simple_planner_ptr =
+    std::dynamic_pointer_cast<mbf_simple_core::SimplePlanner>(planner_ptr);
+  if (simple_planner_ptr) 
+  {
+    simple_planner_ptr->initialize(name, node_);
+    return true;
+  }
+
+  RCLCPP_ERROR_STREAM(node_->get_logger(), "Failed to initialize plugin " << name << ". Looks like it is neither a mesh planner nor a simple planner.");
+  return false;
 }
 
 mbf_abstract_core::AbstractController::Ptr
 MeshNavigationServer::loadControllerPlugin(const std::string& controller_type)
 {
-  mbf_abstract_core::AbstractController::Ptr controller_ptr;
-  try
-  {
-    controller_ptr = controller_plugin_loader_.createSharedInstance(controller_type);
-    std::string controller_name = controller_plugin_loader_.getName(controller_type);
-    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based controller plugin " << controller_name << " loaded.");
-  }
-  catch (const pluginlib::PluginlibException& ex_mbf_core)
-  {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << controller_type << " controller, are you sure it's properly registered"
-                                           << " and that the containing library is built? " << ex_mbf_core.what());
-  }
-  return controller_ptr;
+  return loadPlugin<mbf_abstract_core::AbstractController>(controller_type, controller_plugin_loader_, simple_controller_plugin_loader_, "controller", node_->get_logger());
 }
 
 bool MeshNavigationServer::initializeControllerPlugin(const std::string& name,
@@ -156,38 +228,37 @@ bool MeshNavigationServer::initializeControllerPlugin(const std::string& name,
     return false;
   }
 
-  if (!mesh_ptr_)
+  mbf_mesh_core::MeshController::Ptr mesh_controller_ptr =
+      std::dynamic_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
+  if (mesh_controller_ptr) 
   {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
-    return false;
+    if (!mesh_ptr_)
+    {
+      RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
+      return false;
+    }
+
+    mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "Controller plugin \"" << name << "\" initialized.");
+    return true;
   }
 
-  mbf_mesh_core::MeshController::Ptr mesh_controller_ptr =
-      std::static_pointer_cast<mbf_mesh_core::MeshController>(controller_ptr);
-  mesh_controller_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Controller plugin \"" << name << "\" initialized.");
-  return true;
+  mbf_simple_core::SimpleController::Ptr simple_controller_ptr =
+    std::dynamic_pointer_cast<mbf_simple_core::SimpleController>(controller_ptr);
+  if (simple_controller_ptr) 
+  {
+    simple_controller_ptr->initialize(name, tf_listener_ptr_, node_);
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "Controller plugin \"" << name << "\" initialized.");
+    return true;
+  }
+
+  RCLCPP_ERROR_STREAM(node_->get_logger(), "Failed to initialize plugin " << name << ". Looks like it is neither a mesh controller nor a simple controller.");
+  return false;
 }
 
 mbf_abstract_core::AbstractRecovery::Ptr MeshNavigationServer::loadRecoveryPlugin(const std::string& recovery_type)
 {
-  mbf_abstract_core::AbstractRecovery::Ptr recovery_ptr;
-
-  try
-  {
-    recovery_ptr = std::static_pointer_cast<mbf_abstract_core::AbstractRecovery>(
-        recovery_plugin_loader_.createSharedInstance(recovery_type));
-    std::string recovery_name = recovery_plugin_loader_.getName(recovery_type);
-    RCLCPP_DEBUG_STREAM(node_->get_logger(), "mbf_mesh_core-based recovery behavior plugin " << recovery_name << " loaded.");
-  }
-  catch (pluginlib::PluginlibException& ex_mbf_core)
-  {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "Failed to load the " << recovery_type
-                                           << " recovery behavior, are you sure it's properly registered"
-                                           << " and that the containing library is built? " << ex_mbf_core.what());
-  }
-
-  return recovery_ptr;
+  return loadPlugin<mbf_abstract_core::AbstractRecovery>(recovery_type, recovery_plugin_loader_, simple_recovery_plugin_loader_, "recovery behavior", node_->get_logger());
 }
 
 bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
@@ -201,16 +272,33 @@ bool MeshNavigationServer::initializeRecoveryPlugin(const std::string& name,
     return false;
   }
 
-  if (!mesh_ptr_)
+  /////////////////
+  mbf_mesh_core::MeshRecovery::Ptr mesh_behavior_ptr =
+      std::dynamic_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
+  if (mesh_behavior_ptr) 
   {
-    RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh map pointer has not been initialized!");
-    return false;
+    if (!mesh_ptr_)
+    {
+      RCLCPP_FATAL_STREAM(node_->get_logger(), "The mesh pointer has not been initialized!");
+      return false;
+    }
+
+    mesh_behavior_ptr->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "Recovery behavior plugin \"" << name << "\" initialized.");
+    return true;
   }
 
-  mbf_mesh_core::MeshRecovery::Ptr behavior = std::static_pointer_cast<mbf_mesh_core::MeshRecovery>(behavior_ptr);
-  behavior->initialize(name, tf_listener_ptr_, mesh_ptr_, node_);
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Recovery behavior plugin \"" << name << "\" initialized.");
-  return true;
+  mbf_simple_core::SimpleRecovery::Ptr simple_behavior_ptr =
+    std::dynamic_pointer_cast<mbf_simple_core::SimpleRecovery>(behavior_ptr);
+  if (simple_behavior_ptr) 
+  {
+    simple_behavior_ptr->initialize(name, tf_listener_ptr_, node_);
+    RCLCPP_DEBUG_STREAM(node_->get_logger(), "Recovery behavior plugin \"" << name << "\" initialized.");
+    return true;
+  }
+
+  RCLCPP_ERROR_STREAM(node_->get_logger(), "Failed to initialize plugin " << name << ". Looks like it is neither a mesh recovery behavior nor a simple recovery behavior.");
+  return false;
 }
 
 void MeshNavigationServer::stop()

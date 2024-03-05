@@ -10,6 +10,7 @@ set(dependencies
   geometry_msgs
   LVR2
   mbf_abstract_nav
+  mbf_simple_core
   mbf_mesh_core
   mbf_msgs
   mesh_map

@@ -51,6 +51,10 @@
 #include <std_srvs/srv/empty.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include <mbf_simple_core/simple_planner.h>
+#include <mbf_simple_core/simple_controller.h>
+#include <mbf_simple_core/simple_recovery.h>
+
 #include <pluginlib/class_loader.hpp>
 
 namespace mbf_mesh_nav
@@ -66,6 +70,8 @@ namespace mbf_mesh_nav
  * nav_core/BaseLocalPlanner, nav_core/BaseMeshPlanner and the
  *        nav_core/RecoveryBehavior base classes as plugin interfaces. These
  * plugin interface are the same for the old move_base
+ *
+ * Supports both mesh_core and simple_core plugins.
  *
  * @ingroup navigation_server move_base_server
  */
@@ -186,12 +192,15 @@ private:
 
   //! plugin class loader for recovery behaviors plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
+  pluginlib::ClassLoader<mbf_simple_core::SimpleRecovery> simple_recovery_plugin_loader_;
 
   //! plugin class loader for controller plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshController> controller_plugin_loader_;
+  pluginlib::ClassLoader<mbf_simple_core::SimpleController> simple_controller_plugin_loader_;
 
   //! plugin class loader for planner plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
+  pluginlib::ClassLoader<mbf_simple_core::SimplePlanner> simple_planner_plugin_loader_;
 
   //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;
