@@ -64,63 +64,63 @@ std::string stringVectorToString(const std::vector<std::string>& vec)
 
 /*!
  * Helper function to reduce code duplication when loading plugins.
- * Things can be either planners, controllers or recovery behaviors.
- * @tparam AbstractThing Abstract type of the thing to load. Needs to be the base class of SimpleThing and MeshThing. E.g. mbf_abstract_core::AbstractPlanner.
- * @tparam SimpleThing Simple type of the thing to load. E.g. mbf_simple_core::SimplePlanner
- * @tparam MeshThing Mesh type of the thing to load. E.g. mbf_simple_core::MeshPlanner
- * @param thing_type typename of the thing that shall be loaded, usually configured by user via ros params.
- * @param which_thing should be "planner", "controller", or "recovery behavior", used only for logging.
+ * CorePluginTypes can be either planners, controllers or recovery behaviors.
+ * @tparam AbstractCorePluginType AbstractCore type of the plugin to load. Needs to be the base class of SimpleCorePluginType and MeshCorePluginType. E.g. mbf_abstract_core::AbstractPlanner.
+ * @tparam SimpleCorePluginType SimpleCore type of the plugin to load. E.g. mbf_simple_core::SimplePlanner
+ * @tparam MeshCorePluginType MeshCore type of the plugin to load. E.g. mbf_simple_core::MeshPlanner
+ * @param plugin_type typename of the plugin that shall be loaded, usually configured by user via ros params.
+ * @param which_plugin_kind should be "planner", "controller", or "recovery behavior", used only for nicer logging messages.
  */
-template<typename AbstractThing, typename MeshThing, typename SimpleThing>
-typename AbstractThing::Ptr loadPlugin(const std::string& thing_type, pluginlib::ClassLoader<MeshThing>& mesh_thing_loader, pluginlib::ClassLoader<SimpleThing>& simple_thing_loader, const std::string& which_thing, rclcpp::Logger logger)
+template<typename AbstractCorePluginType, typename MeshCorePluginType, typename SimpleCorePluginType>
+typename AbstractCorePluginType::Ptr loadPlugin(const std::string& plugin_type, pluginlib::ClassLoader<MeshCorePluginType>& mesh_plugin_loader, pluginlib::ClassLoader<SimpleCorePluginType>& simple_plugin_loader, const std::string& which_plugin_kind, rclcpp::Logger logger)
 {
-  // support both simple core and mesh core things. We cannot see which type a thing is from planner_type, so we need to rely on try catch.
-  const auto available_mesh_things= mesh_thing_loader.getDeclaredClasses();
-  const auto available_simple_things = simple_thing_loader.getDeclaredClasses();
+  // support both simple core and mesh core plugins. We cannot see which type a plugin is from planner_type, so we need to rely on try catch.
+  const auto available_mesh_plugins= mesh_plugin_loader.getDeclaredClasses();
+  const auto available_simple_plugins = simple_plugin_loader.getDeclaredClasses();
 
-  typename AbstractThing::Ptr thing_ptr;
-  std::string thing_name;
-  if (std::find(available_mesh_things.begin(), available_mesh_things.end(), thing_type) != available_mesh_things.end())
+  typename AbstractCorePluginType::Ptr plugin_ptr;
+  std::string plugin_name;
+  if (std::find(available_mesh_plugins.begin(), available_mesh_plugins.end(), plugin_type) != available_mesh_plugins.end())
   {
-    // thing_type is available as mesh thing
+    // plugin_type is available as mesh plugin
     try
     {
-      thing_ptr = std::dynamic_pointer_cast<AbstractThing>(mesh_thing_loader.createSharedInstance(thing_type));
-      thing_name = mesh_thing_loader.getName(thing_type);
+      plugin_ptr = std::dynamic_pointer_cast<AbstractCorePluginType>(mesh_plugin_loader.createSharedInstance(plugin_type));
+      plugin_name = mesh_plugin_loader.getName(plugin_type);
     }
     catch (const pluginlib::PluginlibException& ex_mbf_core)
     {
-      RCLCPP_ERROR_STREAM(logger, "Error while loading " << thing_type << " as mesh " << which_thing << ": " << ex_mbf_core.what());
+      RCLCPP_ERROR_STREAM(logger, "Error while loading " << plugin_type << " as mesh " << which_plugin_kind << ": " << ex_mbf_core.what());
     }
   }
-  else if (std::find(available_simple_things.begin(), available_simple_things.end(), thing_type) != available_simple_things.end())
+  else if (std::find(available_simple_plugins.begin(), available_simple_plugins.end(), plugin_type) != available_simple_plugins.end())
   {
-    // thing_type is available as simple thing
+    // plugin_type is available as simple plugin
     try 
     {
-      thing_ptr = std::dynamic_pointer_cast<AbstractThing>(simple_thing_loader.createSharedInstance(thing_type));
-      thing_name = simple_thing_loader.getName(thing_type);
+      plugin_ptr = std::dynamic_pointer_cast<AbstractCorePluginType>(simple_plugin_loader.createSharedInstance(plugin_type));
+      plugin_name = simple_plugin_loader.getName(plugin_type);
     }
     catch (const pluginlib::PluginlibException& ex_mbf_core)
     {
-      RCLCPP_ERROR_STREAM(logger, "Error while loading " << thing_type << " as simple " << which_thing << ": " << ex_mbf_core.what());
+      RCLCPP_ERROR_STREAM(logger, "Error while loading " << plugin_type << " as simple " << which_plugin_kind << ": " << ex_mbf_core.what());
     }
   }
   else
   {
-    // thing was not found
-    RCLCPP_ERROR_STREAM(logger, "Failed to find the " << thing_type << " " << which_thing << ". "
+    // plugin was not found
+    RCLCPP_ERROR_STREAM(logger, "Failed to find the " << plugin_type << " " << which_plugin_kind << ". "
                                 << "Are you sure it's properly registered and that the containing library is built? "
-                                << "Registered mesh " << which_thing << " are: " << stringVectorToString(available_mesh_things)
-                                << ". Registered simple " << which_thing << " are: " << stringVectorToString(available_simple_things));
+                                << "Registered mesh " << which_plugin_kind << " are: " << stringVectorToString(available_mesh_plugins)
+                                << ". Registered simple " << which_plugin_kind << " are: " << stringVectorToString(available_simple_plugins));
   }
 
-  if (thing_ptr) 
+  if (plugin_ptr) 
   {
     // success
-    RCLCPP_DEBUG_STREAM(logger, "mbf_mesh_core-based " << which_thing << " plugin " << thing_name << " loaded.");
+    RCLCPP_DEBUG_STREAM(logger, "mbf_mesh_core-based " << which_plugin_kind << " plugin " << plugin_name << " loaded.");
   }
-  return thing_ptr; // return nullptr in case something went wrong
+  return plugin_ptr; // return nullptr in case something went wrong
 }
 
 } // namespace
