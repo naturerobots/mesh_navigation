@@ -1236,7 +1236,7 @@ void MeshMap::publishVertexColors()
 
 rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
-  RCLCPP_INFO_STREAM(node->get_logger(), "Set parameters callback...");
+  RCLCPP_DEBUG_STREAM(node->get_logger(), "Set parameters callback...");
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
 
