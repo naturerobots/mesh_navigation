@@ -107,7 +107,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
   path_msg.header = header;
 
   path_pub_->publish(path_msg);
-  mesh_map_->publishVertexCosts(potential_, "Potential");
+  mesh_map_->publishVertexCosts(potential_, "Potential", node_->now());
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
 

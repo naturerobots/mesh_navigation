@@ -124,8 +124,9 @@ public:
 
   /**
    * @brief A method which combines all layer costs with the respective weightings
+   * @param map_stamp timestamp for published cost data
    */
-  void combineVertexCosts();
+  void combineVertexCosts(const rclcpp::Time& map_stamp);
 
   /**
    * @brief Computes contours
@@ -139,17 +140,17 @@ public:
    * @param costs The cost map to publish
    * @param name The name of the cost map
    */
-  void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name);
+  void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp);
 
   /**
    * @briefP Publishes the vertex colors if these exists.
    */
-  void publishVertexColors();
+  void publishVertexColors(const rclcpp::Time& map_stamp);
 
   /**
    * @brief Publishes all layer costs as mesh_msgs/VertexCosts
    */
-  void publishCostLayers();
+  void publishCostLayers(const rclcpp::Time& map_stamp);
 
   /**
    * @brief Computes the projected barycentric coordinates, it implements Heidrich's method
