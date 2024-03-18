@@ -57,12 +57,12 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv, rclcpp::InitOptions(), rclcpp::SignalHandlerOptions::None);
 
-   node = std::make_shared<rclcpp::Node>("mbf_mesh_nav");
+  node = std::make_shared<rclcpp::Node>("mbf_mesh_nav");
   const double cache_time = node->declare_parameter("tf_cache_time", 10.0);
 
-  TFPtr tf_listener_ptr = std::make_shared<TF>(node->get_clock(), tf2::durationFromSec(cache_time));
-  tf2_ros::TransformListener tf_listener(*tf_listener_ptr);
-  mesh_nav_srv_ptr = std::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_listener_ptr, node);
+  TFPtr tf_buffer_ptr = std::make_shared<TF>(node->get_clock(), tf2::durationFromSec(cache_time));
+  tf2_ros::TransformListener tf_listener(*tf_buffer_ptr);
+  mesh_nav_srv_ptr = std::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_buffer_ptr, node);
 
   signal(SIGINT, sigintHandler);
 
