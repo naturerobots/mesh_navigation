@@ -145,11 +145,11 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
       << "For each layer_name, also define layer_name.type with the respective type that shall be loaded via pluginlib.");
   }
 
-  marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("marker", 100);
-  mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("mesh", 1);
-  vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("vertex_costs", 1);
-  vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("vertex_colors", 1);
-  vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("vector_field", 1);
+  marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/marker", 100);
+  mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("~/mesh", rclcpp::QoS(1).transient_local());
+  vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(1).transient_local());
+  vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
+  vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
 }
 
@@ -265,7 +265,9 @@ bool MeshMap::readMap()
     }
   }
 
-  mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals));
+  const rclcpp::Time map_stamp = node->now();
+  mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
+  publishVertexColors(map_stamp);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Try to read edge distances from map file...");
   auto edge_distances_opt = mesh_io_ptr->getAttributeMap<lvr2::DenseEdgeMap<float>>("edge_distances");
@@ -307,9 +309,8 @@ bool MeshMap::readMap()
 
   sleep(1);
 
-  combineVertexCosts();
-  publishCostLayers();
-  publishVertexColors();
+  combineVertexCosts(map_stamp);
+  publishCostLayers(map_stamp);
 
   map_loaded = true;
   return true;
@@ -382,7 +383,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
   RCLCPP_INFO_STREAM(node->get_logger(), "Found " << lethals.size() << " lethal vertices");
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine layer costs...");
 
-  combineVertexCosts();
+  combineVertexCosts(node->now());
   // TODO new lethals old lethals -> renew potential field! around this areas
 }
 
@@ -419,7 +420,7 @@ bool MeshMap::initLayerPlugins()
   return true;
 }
 
-void MeshMap::combineVertexCosts()
+void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Combining costs...");
 
@@ -466,7 +467,7 @@ void MeshMap::combineVertexCosts()
     vertex_costs[vH] = std::numeric_limits<float>::infinity();
   }
 
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str, map_stamp));
 
   hasNaN = false;
 
@@ -1190,24 +1191,24 @@ bool MeshMap::resetLayers()
   return true;  // TODO implement
 }
 
-void MeshMap::publishCostLayers()
+void MeshMap::publishCostLayers(const rclcpp::Time& map_stamp)
 {
   for (const auto& [layer_name, layer_ptr] : loaded_layers)
   {
     vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
                                                            layer_ptr->defaultValue(), layer_name, global_frame,
-                                                           uuid_str));
+                                                           uuid_str, map_stamp));
   }
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str));
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str, map_stamp));
 }
 
-void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name)
+void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp)
 {
   vertex_costs_pub->publish(
-      mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str));
+      mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str, map_stamp));
 }
 
-void MeshMap::publishVertexColors()
+void MeshMap::publishVertexColors(const rclcpp::Time& map_stamp)
 {
   using VertexColorMapOpt = lvr2::DenseVertexMapOptional<std::array<uint8_t, 3>>;
   using VertexColorMap = lvr2::DenseVertexMap<std::array<uint8_t, 3>>;
@@ -1217,7 +1218,7 @@ void MeshMap::publishVertexColors()
     const VertexColorMap colors = vertex_colors_opt.get();
     mesh_msgs::msg::MeshVertexColorsStamped msg;
     msg.header.frame_id = mapFrame();
-    msg.header.stamp = node->now();
+    msg.header.stamp = map_stamp;
     msg.uuid = uuid_str;
     msg.mesh_vertex_colors.vertex_colors.reserve(colors.numValues());
     for (auto vH : colors)
@@ -1260,7 +1261,7 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vecto
       else if (param_name == MESH_MAP_NAMESPACE + ".cost_limit")
       {
         cost_limit = param.as_double();
-        combineVertexCosts();
+        combineVertexCosts(node->now());
         // TODO current implementation should mirror the old behavior; However, it seems like cost_limit and min_contour_size are never used in this class. Only layer_factor is used (in combineVertexCosts). We should probably remove the unused parameters and call combineVertexCosts whenever layer_factor changes.
       }
     }

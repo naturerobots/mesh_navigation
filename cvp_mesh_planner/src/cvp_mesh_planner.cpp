@@ -115,7 +115,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
   path_msg.header = header;
 
   path_pub_->publish(path_msg);
-  mesh_map_->publishVertexCosts(potential_, "Potential");
+  mesh_map_->publishVertexCosts(potential_, "Potential", header.stamp);
   RCLCPP_INFO_STREAM(node_->get_logger(), "Path length: " << cost << "m");
 
   if (config_.publish_vector_field)

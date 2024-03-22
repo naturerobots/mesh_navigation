@@ -141,10 +141,10 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr, const r
 {
   // advertise services and current goal topic
   check_pose_cost_srv_ =
-      node_->create_service<mbf_msgs::srv::CheckPose>("check_pose_cost", std::bind(&MeshNavigationServer::callServiceCheckPoseCost, this, _1, _2, _3));
+      node_->create_service<mbf_msgs::srv::CheckPose>("~/check_pose_cost", std::bind(&MeshNavigationServer::callServiceCheckPoseCost, this, _1, _2, _3));
   check_path_cost_srv_ =
-      node_->create_service<mbf_msgs::srv::CheckPath>("check_path_cost", std::bind(&MeshNavigationServer::callServiceCheckPathCost, this, _1, _2, _3));
-  clear_mesh_srv_ = node_->create_service<std_srvs::srv::Empty>("clear_mesh", std::bind(&MeshNavigationServer::callServiceClearMesh, this, _1, _2, _3));
+      node_->create_service<mbf_msgs::srv::CheckPath>("~/check_path_cost", std::bind(&MeshNavigationServer::callServiceCheckPathCost, this, _1, _2, _3));
+  clear_mesh_srv_ = node_->create_service<std_srvs::srv::Empty>("~/clear_mesh", std::bind(&MeshNavigationServer::callServiceClearMesh, this, _1, _2, _3));
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "Reading map file...");
   mesh_ptr_->readMap();
