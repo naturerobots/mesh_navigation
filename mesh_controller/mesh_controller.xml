@@ -1,4 +1,4 @@
-<library path="lib/libmesh_controller">
+<library path="mesh_controller">
     <class name="mesh_controller/MeshController" type="mesh_controller::MeshController"
            base_class_type="mbf_mesh_core::MeshController">
         <description>
