@@ -1,3 +1,7 @@
+This branch preserves the latest ROS1 (`noetic`) state.
+It is not longer being actively developed.
+For the latest code state (ROS2), check out the [active branch](https://github.com/naturerobots/mesh_navigation).
+
 # Mesh Navigation
 
 The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
