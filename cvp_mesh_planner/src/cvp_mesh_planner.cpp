@@ -665,10 +665,14 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   // reset cancel planning
   cancel_planning_ = false;
 
-  if (!start_opt)
+  if (!start_opt) {
+    message = "Could not find a face close enough to the given start pose";
     return mbf_msgs::action::GetPath::Result::INVALID_START;
-  if (!goal_opt)
+  }
+  if (!goal_opt) {
+    message = "Could not find a face close enough to the given goal pose";
     return mbf_msgs::action::GetPath::Result::INVALID_GOAL;
+  }
 
   const auto& start_face = start_opt.unwrap();
   const auto& goal_face = goal_opt.unwrap();
