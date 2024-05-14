@@ -1056,19 +1056,11 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
       const auto& current_vertices = mesh_ptr->getVertexPositionsOfFace(current_face_handle);
       float distance_to_current_face = 0;
       std::array<float, 3> current_bary_coords;
-      if (mesh_map::projectedBarycentricCoords(query_point, current_vertices, current_bary_coords, distance_to_face)
-          && std::fabs(distance_to_face) < max_dist)
-      {
-        return std::make_tuple(current_face_handle, current_vertices, current_bary_coords);
-      }
+      const bool is_query_point_in_current_face = mesh_map::projectedBarycentricCoords(query_point, current_vertices, current_bary_coords, distance_to_current_face);
 
-      float triangle_dist = 0;
-      triangle_dist += (current_vertices[0] - query_point).length2();
-      triangle_dist += (current_vertices[1] - query_point).length2();
-      triangle_dist += (current_vertices[2] - query_point).length2();
-      if(triangle_dist < lowest_distance_found)
+      if(is_query_point_in_current_face && distance_to_current_face < lowest_distance_found)
       {
-        lowest_distance_found = triangle_dist;
+        lowest_distance_found = distance_to_current_face;
         opt_closest_face_handle = current_face_handle;
         closest_face_vertices = current_vertices;
         bary_coords_on_closest_face = current_bary_coords;
