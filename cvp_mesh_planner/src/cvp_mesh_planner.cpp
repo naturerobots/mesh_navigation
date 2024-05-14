@@ -75,7 +75,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
   mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
   mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
 
-  uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path);
+  const uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path, message);
 
   path.reverse();
 
@@ -226,10 +226,11 @@ void CVPMeshPlanner::computeVectorMap()
 }
 
 uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
-                                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path)
+                                              std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+                                              std::string& message)
 {
-  return waveFrontPropagation(start, goal, mesh_map_->edgeDistances(), mesh_map_->vertexCosts(), path, potential_,
-                              predecessors_);
+  return waveFrontPropagation(start, goal, mesh_map_->edgeDistances(), mesh_map_->vertexCosts(), path, message,
+                              potential_, predecessors_);
 }
 
 inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& distances,
@@ -639,6 +640,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
                                                 const lvr2::DenseEdgeMap<float>& edge_weights,
                                                 const lvr2::DenseVertexMap<float>& costs,
                                                 std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+                                                std::string& message,
                                                 lvr2::DenseVertexMap<float>& distances,
                                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors)
 {
@@ -879,7 +881,8 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 
   if (!path_exists)
   {
-    RCLCPP_WARN(node_->get_logger(), "Predecessor of the goal is not set! No path found!");
+    message = "Predecessor of the goal is not set! No path found!";
+    RCLCPP_WARN_STREAM(node_->get_logger(), message);
     return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
   }
 
@@ -902,13 +905,15 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
       }
       else
       {
-        RCLCPP_WARN_STREAM(node_->get_logger(), "Could not find a valid path, while back-tracking from the goal");
+        message = "Could not find a valid path, while back-tracking from the goal";
+        RCLCPP_WARN_STREAM(node_->get_logger(), message);
         return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
       }
     }
     catch (lvr2::PanicException exception)
     {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not find a valid path, while back-tracking from the goal: HalfEdgeMesh panicked!");
+      message = "Could not find a valid path, while back-tracking from the goal: HalfEdgeMesh panicked!";
+      RCLCPP_ERROR_STREAM(node_->get_logger(), message);
       return mbf_msgs::action::GetPath::Result::NO_PATH_FOUND;
     }
   }
