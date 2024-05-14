@@ -684,11 +684,6 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   distances.clear();
   predecessors.clear();
 
-  if (goal_face == start_face)
-  {
-    return mbf_msgs::action::GetPath::Result::SUCCESS;
-  }
-
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
 
   // clear vector field map
