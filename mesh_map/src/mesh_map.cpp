@@ -1056,16 +1056,16 @@ boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
       const auto& tmp_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
       float dist = 0;
       std::array<float, 3> tmp_bary_coords;
-      if (mesh_map::projectedBarycentricCoords(position, vertices, tmp_bary_coords, dist)
+      if (mesh_map::projectedBarycentricCoords(position, tmp_vertices, tmp_bary_coords, dist)
           && std::fabs(dist) < max_dist)
       {
         return std::make_tuple(fH, tmp_vertices, tmp_bary_coords);
       }
 
       float triangle_dist = 0;
-      triangle_dist += (vertices[0] - position).length2();
-      triangle_dist += (vertices[1] - position).length2();
-      triangle_dist += (vertices[2] - position).length2();
+      triangle_dist += (tmp_vertices[0] - position).length2();
+      triangle_dist += (tmp_vertices[1] - position).length2();
+      triangle_dist += (tmp_vertices[2] - position).length2();
       if(triangle_dist < min_triangle_position_distance)
       {
         min_triangle_position_distance = triangle_dist;
