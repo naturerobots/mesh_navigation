@@ -85,7 +85,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
   cost = 0;
   float dir_length;
-  if (!path.empty())
+  if (!cancel_planning_ && !path.empty())
   {
     mesh_map::Vector vec = path.front().first;
     lvr2::FaceHandle fH = path.front().second;
