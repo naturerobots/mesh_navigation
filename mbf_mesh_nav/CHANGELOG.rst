@@ -6,7 +6,6 @@ Changelog for package mbf_mesh_nav
 ------------------
 * port package to ROS2
 
-
 1.0.1 (2021-10-27)
 ------------------
 
