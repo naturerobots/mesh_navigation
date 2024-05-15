@@ -10,8 +10,10 @@ The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides
 Maintainers:
 * [Matthias Holoch](mailto:matthias.holoch@naturerobots.com)
 * [Sebastian Pütz](mailto:sebastian.puetz@naturerobots.com)
+
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
+Contents:
 * [Publications](#publications)
 * [Installation](#installation)
 * [Software Stack](#software-stack)
