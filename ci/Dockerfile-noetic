@@ -35,7 +35,7 @@ WORKDIR /catkin_ws
 # install package dependencies
 # temporarily clone mesh_tools from git until they are available in the ros repositories
 RUN apt install -q -y --no-install-recommends git
-RUN git clone https://github.com/uos/mesh_tools.git /catkin_ws/src/mesh_tools
+RUN git clone https://github.com/naturerobots/mesh_tools.git --depth 1 --branch noetic /catkin_ws/src/mesh_tools
 
 RUN rosdep init && rosdep update && DEBIAN_FRONTEND=noninteractive rosdep install --from-paths src -i -y --rosdistro $ROS_DISTRO
 
