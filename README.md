@@ -1,12 +1,19 @@
+This is the active ROS2 branch of this repository.
+If your are looking for the old ROS1 version, checkout the [noetic branch](https://github.com/naturerobots/mesh_navigation/tree/noetic).
+
 # Mesh Navigation
 
 The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
 layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
 The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
-Maintainer: [Sebastian Pütz](mailto:spuetz@uos.de)  
+Maintainers:
+* [Matthias Holoch](mailto:matthias.holoch@naturerobots.com)
+* [Sebastian Pütz](mailto:sebastian.puetz@naturerobots.com)
+
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
+Contents:
 * [Publications](#publications)
 * [Installation](#installation)
 * [Software Stack](#software-stack)
