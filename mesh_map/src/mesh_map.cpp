@@ -1042,41 +1042,33 @@ lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const floa
 
 boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
     std::array<float, 3>>> MeshMap::searchContainingFace(
-    Vector& position, const float& max_dist)
+    Vector& query_point, const float& max_dist)
 {
-  if(auto vH_opt = getNearestVertexHandle(position))
+  if(auto vH_opt = getNearestVertexHandle(query_point))
   {
     auto vH = vH_opt.unwrap();
-    float min_triangle_position_distance = std::numeric_limits<float>::max();
-    std::array<Vector, 3> vertices;
-    std::array<float, 3> bary_coords;
-    lvr2::OptionalFaceHandle opt_fH;
-    for(auto fH : mesh_ptr->getFacesOfVertex(vH))
+    float lowest_distance_found = std::numeric_limits<float>::max();
+    std::array<Vector, 3> closest_face_vertices;
+    std::array<float, 3> bary_coords_on_closest_face;
+    lvr2::OptionalFaceHandle opt_closest_face_handle;
+    for(auto current_face_handle : mesh_ptr->getFacesOfVertex(vH))
     {
-      const auto& tmp_vertices = mesh_ptr->getVertexPositionsOfFace(fH);
-      float dist = 0;
-      std::array<float, 3> tmp_bary_coords;
-      if (mesh_map::projectedBarycentricCoords(position, vertices, tmp_bary_coords, dist)
-          && std::fabs(dist) < max_dist)
-      {
-        return std::make_tuple(fH, tmp_vertices, tmp_bary_coords);
-      }
+      const auto& current_vertices = mesh_ptr->getVertexPositionsOfFace(current_face_handle);
+      float distance_to_current_face = 0;
+      std::array<float, 3> current_bary_coords;
+      const bool is_query_point_in_current_face = mesh_map::projectedBarycentricCoords(query_point, current_vertices, current_bary_coords, distance_to_current_face);
 
-      float triangle_dist = 0;
-      triangle_dist += (vertices[0] - position).length2();
-      triangle_dist += (vertices[1] - position).length2();
-      triangle_dist += (vertices[2] - position).length2();
-      if(triangle_dist < min_triangle_position_distance)
+      if(is_query_point_in_current_face && distance_to_current_face < lowest_distance_found)
       {
-        min_triangle_position_distance = triangle_dist;
-        opt_fH = fH;
-        vertices = tmp_vertices;
-        bary_coords = tmp_bary_coords;
+        lowest_distance_found = distance_to_current_face;
+        opt_closest_face_handle = current_face_handle;
+        closest_face_vertices = current_vertices;
+        bary_coords_on_closest_face = current_bary_coords;
       }
     }
-    if(opt_fH)
+    if(opt_closest_face_handle)
     {
-      return std::make_tuple(opt_fH.unwrap(), vertices, bary_coords);
+      return std::make_tuple(opt_closest_face_handle.unwrap(), closest_face_vertices, bary_coords_on_closest_face);
     }
     RCLCPP_ERROR_STREAM(node->get_logger(), "No containing face found!");
     return boost::none;

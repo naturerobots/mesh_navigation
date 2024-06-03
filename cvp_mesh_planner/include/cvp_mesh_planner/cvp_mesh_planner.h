@@ -96,10 +96,12 @@ protected:
    * @param start The seed of the wave, i.e. the robot's goal pose
    * @param goal The goal of the wavefront, where it will stop propagating
    * @param path The backtracked path
+   * @param message String with additional information wrt. the outcome. Will be transmitted to the action caller.
    * @return a ExePath action related outcome code
    */
   uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
-                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path);
+                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+                                std::string& message);
 
   /**
    *
@@ -109,13 +111,14 @@ protected:
    * @param edge_weights The edge weights map to use for vertex distances in a triangle
    * @param costs The combined vertex costs to use during the propagation
    * @param path The backtracked path
+   * @param message String with additional information wrt. the outcome. Will be transmitted to the action caller.
    * @param distances The computed distances
    * @param predecessors The backtracked predecessors
    * @return a ExePath action related outcome code
    */
   uint32_t waveFrontPropagation(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                                 const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::DenseVertexMap<float>& costs,
-                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
+                                std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path, std::string& message,
                                 lvr2::DenseVertexMap<float>& distances,
                                 lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors);
 
