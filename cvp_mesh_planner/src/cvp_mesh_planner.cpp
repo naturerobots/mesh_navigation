@@ -665,10 +665,14 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   // reset cancel planning
   cancel_planning_ = false;
 
-  if (!start_opt)
+  if (!start_opt) {
+    message = "Could not find a face close enough to the given start pose";
     return mbf_msgs::action::GetPath::Result::INVALID_START;
-  if (!goal_opt)
+  }
+  if (!goal_opt) {
+    message = "Could not find a face close enough to the given goal pose";
     return mbf_msgs::action::GetPath::Result::INVALID_GOAL;
+  }
 
   const auto& start_face = start_opt.unwrap();
   const auto& goal_face = goal_opt.unwrap();
@@ -679,11 +683,6 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   path.clear();
   distances.clear();
   predecessors.clear();
-
-  if (goal_face == start_face)
-  {
-    return mbf_msgs::action::GetPath::Result::SUCCESS;
-  }
 
   lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
 
@@ -869,17 +868,18 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   const auto t_vector_field_end = std::chrono::steady_clock::now();
   const auto vector_field_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_vector_field_end - t_wavefront_end);
 
-  bool path_exists = false;
+  // check if wave front propagation reached the goal
+  bool predecessor_for_at_least_one_goal_vertex_exists = false;
   for (auto goal_vertex : goal_vertices)
   {
     if (goal_vertex != predecessors[goal_vertex])
     {
-      path_exists = true;
+      predecessor_for_at_least_one_goal_vertex_exists = true;
       break;
     }
   }
-
-  if (!path_exists)
+  const bool path_found = !predecessor_for_at_least_one_goal_vertex_exists && goal_face != start_face;
+  if (path_found)
   {
     message = "Predecessor of the goal is not set! No path found!";
     RCLCPP_WARN_STREAM(node_->get_logger(), message);
