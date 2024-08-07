@@ -1,4 +1,11 @@
 <library path="mesh_layers">
+    <class name="mesh_layers/BorderLayer"
+            type="mesh_layers::BorderLayer"
+            base_class_type="mesh_map::AbstractLayer">
+        <description>
+            A border layer, setting the border vertices of a mesh to high costs (dangerous).
+        </description>
+    </class>
     <class name="mesh_layers/RoughnessLayer"
             type="mesh_layers::RoughnessLayer"
             base_class_type="mesh_map::AbstractLayer">
