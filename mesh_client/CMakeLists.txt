@@ -6,15 +6,11 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 find_package(ament_cmake_ros REQUIRED)
-set(dependencies
-  rclcpp
-  LVR2
-  CURL
-  Eigen3
-)
-foreach(dep IN LISTS dependencies)
-  find_package(${dep} REQUIRED)
-endforeach()
+find_package(rclcpp REQUIRED)
+find_package(LVR2 REQUIRED)
+find_package(MPI)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(CURL REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
@@ -26,8 +22,18 @@ include_directories(
 add_library(${PROJECT_NAME}
   src/mesh_client.cpp
 )
-ament_target_dependencies(${PROJECT_NAME} ${dependencies})
-target_link_libraries(${PROJECT_NAME} jsoncpp)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+  ${LVR2_INCLUDE_DIRS})
+ament_target_dependencies(${PROJECT_NAME} 
+    rclcpp)
+target_link_libraries(${PROJECT_NAME} 
+    jsoncpp 
+    Eigen3::Eigen
+    ${LVR2_LIBRARIES}
+    ${MPI_CXX_LIBRARIES}
+)
 
 install(DIRECTORY include/
   DESTINATION include
