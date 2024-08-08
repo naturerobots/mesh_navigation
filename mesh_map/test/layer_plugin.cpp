@@ -14,7 +14,7 @@ class TestLayer : public mesh_map::AbstractLayer {
     return std::numeric_limits<float>::infinity();
   }
 
-  virtual bool computeLayer() override{};
+  virtual bool computeLayer() override{ return true; };
 
   virtual lvr2::VertexMap<float> &costs() override { return test_costs_; };
 
