@@ -6,9 +6,9 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 find_package(ament_cmake_ros REQUIRED)
+# ROS deps
 set(dependencies
   geometry_msgs
-  LVR2
   mbf_abstract_nav
   mbf_simple_core
   mbf_mesh_core
@@ -27,6 +27,8 @@ include_directories(
   include
 )
 
+find_package(LVR2 REQUIRED)
+find_package(MPI)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
@@ -40,13 +42,26 @@ add_library(mbf_mesh_server
   src/mesh_planner_execution.cpp
   src/mesh_recovery_execution.cpp
 )
+target_include_directories(mbf_mesh_server PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${LVR2_INCLUDE_DIRS})
 ament_target_dependencies(mbf_mesh_server ${dependencies})
-target_link_libraries(mbf_mesh_server ${JSONCPP_LIBRARIES})
+target_link_libraries(mbf_mesh_server 
+  ${JSONCPP_LIBRARIES}
+  ${LVR2_LIBRARIES}
+  ${MPI_CXX_LIBRARIES}
+)
 
 add_executable(${PROJECT_NAME} src/mbf_mesh_nav.cpp)
 ament_target_dependencies(${PROJECT_NAME} ${dependencies} ${${PROJECT_NAME}_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} mbf_mesh_server)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${LVR2_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}
+  ${LVR2_LIBRARIES}
+  ${MPI_CXX_LIBRARIES}
   ${JSONCPP_LIBRARIES}
   mbf_mesh_server
 )
