@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.5)
 project(mesh_map)
 
 find_package(ament_cmake_ros REQUIRED)
+# ROS Deps
 set(dependencies
   geometry_msgs
-  LVR2
   mesh_client
   mesh_msgs_conversions
   pluginlib
@@ -18,7 +18,10 @@ foreach(dep IN LISTS dependencies)
   find_package(${dep} REQUIRED)
 endforeach()
 
-find_package(Boost REQUIRED COMPONENTS system)
+find_package(LVR2 REQUIRED)
+find_package(MPI)
+# this is nowhere used
+# find_package(Boost REQUIRED COMPONENTS system) 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
@@ -30,7 +33,15 @@ add_library(${PROJECT_NAME}
   src/mesh_map.cpp
   src/util.cpp
 )
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${LVR2_INCLUDE_DIRS})
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
+target_link_libraries(${PROJECT_NAME} 
+    ${LVR2_LIBRARIES}
+    ${MPI_CXX_LIBRARIES}
+)
 
 install(DIRECTORY include/
   DESTINATION include
