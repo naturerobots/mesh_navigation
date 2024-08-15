@@ -3,7 +3,7 @@
             type="mesh_layers::BorderLayer"
             base_class_type="mesh_map::AbstractLayer">
         <description>
-            A border layer, setting the border vertices of a mesh to high costs (dangerous).
+            A border layer, setting the border vertices of a mesh to high costs. Use this layer to prohibit the robot to navigate to the border of the mesh.
         </description>
     </class>
     <class name="mesh_layers/RoughnessLayer"
