@@ -1,5 +1,5 @@
 /*
- *  Copyright 2020, Sebastian Pütz
+ *  Copyright 2020, Alexander Mock
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
+ *    Alexander Mock <amock@uos.de>
  *
  */
 
