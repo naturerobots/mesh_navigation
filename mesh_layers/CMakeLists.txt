@@ -8,6 +8,7 @@ find_package(LVR2)
 pluginlib_export_plugin_description_file(mesh_map mesh_layers.xml)
 
 add_library(${PROJECT_NAME}
+  src/border_layer.cpp
   src/roughness_layer.cpp
   src/height_diff_layer.cpp
   src/inflation_layer.cpp
