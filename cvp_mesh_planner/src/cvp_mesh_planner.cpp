@@ -105,8 +105,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
     geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
-    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH], dir_length);
-    cost += dir_length;
+    pose.pose = goal.pose;
     plan.push_back(pose);
   }
 
