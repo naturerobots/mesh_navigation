@@ -240,7 +240,8 @@ float InflationLayer::fading(const float val)
   // Inflation radius
   if (val > config_.inscribed_radius)
   {
-    float alpha = (sqrt(val) - config_.inscribed_radius) / (config_.inflation_radius - config_.inscribed_radius) * M_PI;
+    // Map values from [config_.inscribed_radius, config_.inflation_radius] to [0, pi]
+    float alpha = ((val - config_.inscribed_radius) / (config_.inflation_radius - config_.inscribed_radius)) * M_PI;
     return config_.inscribed_value * (cos(alpha) + 1) / 2.0;
   }
 
