@@ -105,8 +105,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
 
     geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
-    pose.pose = mesh_map::calculatePoseFromPosition(vec, goal_vec, face_normals[fH], dir_length);
-    cost += dir_length;
+    pose.pose = goal.pose;
     plan.push_back(pose);
   }
 
@@ -782,6 +781,11 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (fixed[a] && fixed[b] && !fixed[c])
         {
           // c is free
+          // Skip vertices above the cost limit
+          if (costs[c] > config_.cost_limit)
+          {
+            continue;
+          }
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, a, b, c))
 #elif defined USE_UPDATE_FMM
@@ -800,6 +804,11 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (fixed[a] && !fixed[b] && fixed[c])
         {
           // b is free
+          // Skip vertices above the cost limit
+          if (costs[b] > config_.cost_limit)
+          {
+            continue;
+          }
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, c, a, b))
 #elif defined USE_UPDATE_FMM
@@ -818,6 +827,11 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (!fixed[a] && fixed[b] && fixed[c])
         {
           // a if free
+          // Skip vertices above the cost limit
+          if (costs[a] > config_.cost_limit)
+          {
+            continue;
+          }
 #ifdef USE_UPDATE_WITH_S
           if (waveFrontUpdateWithS(distances, edge_weights, b, c, a))
 #elif defined USE_UPDATE_FMM
