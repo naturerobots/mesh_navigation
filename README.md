@@ -1,33 +1,47 @@
-This is the active ROS2 branch of this repository.
-If your are looking for the old ROS1 version, checkout the [noetic branch](https://github.com/naturerobots/mesh_navigation/tree/noetic).
+<div align="center">
+<h1>
+Mesh Navigation
+</h1>
+</div>
 
-# Mesh Navigation
+<div align="center">
+  <a href="https://github.com/naturerobots/mesh_navigation_tutorials">Tutorials</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://github.com/naturerobots/mesh_navigation_tutorials/wiki">Documentation</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://www.youtube.com/@nature-robots">Videos</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://github.com/naturerobots/move_base_flex">Move Base Flex</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://github.com/naturerobots/mesh_tools">Mesh Tools</a>
+
+  <br />
+</div>
+
+---
+
 
 The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
 layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
 The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
-Maintainers:
-* [Matthias Holoch](mailto:matthias.holoch@naturerobots.com)
-* [Sebastian Pütz](mailto:sebastian.puetz@naturerobots.com)
+<center><img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600"></center>
 
-Author: [Sebastian Pütz](mailto:spuetz@uos.de)
-
-Contents:
+# Contents
 * [Publications](#publications)
 * [Installation](#installation)
+* [Usage Examples and Demos](#usage-examples-and-demos)
 * [Software Stack](#software-stack)
-* [Usage](#usage)
 * [Mesh Map](#mesh-map)
 * [Planners](#planners)
 * [Controllers](#controllers)
 * [Simulation](#simulation)
-* [Demos](#demos)
+* [Maintain and Contribute](#maintain-and-contribute)
 * [Build Status](#build-status)
 
-<img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600">
 
-## Publications
+
+# Publications
 Please reference the following papers when using the navigation stack in your scientific work.
 
 #### Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots
@@ -54,28 +68,49 @@ Please reference the following papers when using the navigation stack in your sc
 }
 ```
 
-## Installation
+# Installation
 
-Please use the official released ros package or install more recent versions from source.  
+### ROS Version
+This is the active ROS2 branch of this repository, which targets `humble`.
+If your are looking for the old ROS1 version, checkout the [noetic branch](https://github.com/naturerobots/mesh_navigation/tree/noetic).
 
-`sudo apt install ros-melodic-mesh-navigation`
-
-**Installation from source**  
-All dependencies can be installed using rosdep  
-`rosdep install mesh_navigation`
-
-As explicit dependencies we refer to the following ROS packages, which are also developed by us:
-
-* **[lvr2](https://github.com/uos/lvr2)**
-* **[mesh_tools](https://github.com/uos/mesh_tools/)**
-* **[move_base_flex](https://github.com/magazino/move_base_flex/)**
+### Installation from source
+* Prerequisite: A working ROS 2 installation
+* Go into a ROS 2 workspace's source directory `cd $YOUR_ROS_WS/src`.
+* Clone the repo `git clone git@github.com:naturerobots/mesh_navigation.git`
+* Get the tutorial's ROS 2 dependencies
+  * Clone source dependencies: Run `vcs import --input mesh_navigation/source_dependencies.yaml` in your ROS 2 workspace source directory.
+  * Get packaged dependencies: Run `rosdep install --from-paths . --ignore-src -r -y` from within your ROS 2 workspace source directory.
+* Build: Go to workspace root `cd $YOUR_ROS_WS` and run `colcon build --packages-up-to mesh_navigation`.
 
 Use the **[pluto_robot](https://github.com/uos/pluto_robot)** package for example HDF5 map datasets, Gazebo simulations, and example configurations.
 
-## Software Stack
+# Usage Examples and Demos
 
-This **[mesh_navigation](https://github.com/uos/mesh_navigation)** stack provides a navigation server for 
-**[Move Base Flex (MBF)](https://github.com/magazino/move_base_flex)**. It provides a couple of configuration files and launch 
+Recommended entrypoint for new users: Check out the **[mesh_navigation_tutorials](https://github.com/naturerobots/mesh_navigation_tutorials/tree/main)** for a ready-to-use mesh navigation stack. Complete with simulated environment, rviz config, mesh nav config, etc.
+
+See the **[pluto_robot](https://github.com/uos/pluto_robot)** bundle for example configurations of the mesh navigatoin stack and usage (ROS 1).
+
+## Demos
+
+In the following demo videos we used the developed VFP, i.e., the wavefront_propagatn_planner.
+It will be renamed soon to vector_field_planner.
+
+| Dataset and Description                  | Demo Video                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
+| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acron19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
+
+### Stone Quarry in the Forest in Brockum
+
+| Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
+
+# Software Stack
+
+This **[mesh_navigation](https://github.com/naturerobots/mesh_navigation)** stack provides a navigation server for 
+**[Move Base Flex (MBF)](https://github.com/naturerobots/move_base_flex)**. It provides a couple of configuration files and launch 
 files to start the navigation server with the configured layer plugins for the layered mesh map, and the configured
 planners and controller to perform path planning and motion control in 3D (or more specifically on 2D-manifold). 
 
@@ -120,23 +155,8 @@ The package structure is as follows:
 
 - `mesh_client` Is an experimental package to additionally load navigation meshes from a server.
 
-## Usage
 
-See the **[pluto_robot](https://github.com/uos/pluto_robot)** bundle for example configurations of the mesh navigatoin stack and usage.
-
-### Mesh map configuratoin
-
-TODO
-
-### Planner and Controller configurations
-
-TODO
-
-### Path Planning and Motion Control
-
-Use the *MeshGoal* tool from the MeshTools bundle to select a goal pose on the shown mesh in *RViz*. This can be added to the top panel *RViz*. 
-
-## Mesh Map
+# Mesh Map
 
 ### Mesh Layers
 
@@ -154,27 +174,24 @@ below.
 | **RidgeLayer**      | `mesh_layer/RidgeLayer`       | local radius based distance along normal | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
 | **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 
-## Planners
-
-### Usage with Move Base Flex
-
+# Planners
 Currently the following planners are available:
 
-#### Dijkstra Mesh Planner
+### Dijkstra Mesh Planner
 
 ```
   - name: 'dijkstra_mesh_planner'
     type: 'dijkstra_mesh_planner/DijkstraMeshPlanner'
 ```
 
-#### Continuous Vector Field Planner
+### Continuous Vector Field Planner
 
 ```
   - name: 'cvp_mesh_planner'
     type: 'cvp_mesh_planner/CVPMeshPlanner'
 ```
 
-#### MMP Planner
+### MMP Planner
 
 ```
   - name: 'mmp_planner'
@@ -193,25 +210,9 @@ The planners are compared to each other.
 
 If you want to test the mesh navigation stack with Pluto please use the simulation setup and the corresponding launch
 files below for the respective outdoor or rough terrain environment. The mesh tools have to be installed.
-We developed the **[Mesh Tools](https://github.com/uos/mesh_tools)** as a package consisting of message definitions, RViz plugins and tools, as well as a
+We developed the **[Mesh Tools](https://github.com/naturerobots/mesh_tools)** as a package consisting of message definitions, RViz plugins and tools, as well as a
 persistence layer to store such maps. These tools make the benefits of annotated triangle maps available in ROS and
 allow to publish, edit and inspect such maps within the existing ROS software stack.
-
-## Demos
-
-In the following demo videos we used the developed VFP, i.e., the wavefront_propagatn_planner.
-It will be renamed soon to vector_field_planner.
-
-| Dataset and Description                  | Demo Video                                                                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
-| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acron19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
-
-### Stone Quarry in the Forest in Brockum
-
-| Colored Point Cloud                                                                              | Height Diff Layer                                                                                      | RGB Vertex Colors                                                                                       |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
 
 ## Mesh Localization
 
@@ -219,7 +220,16 @@ For the necessary localization of the robot relative to the mesh, we recommend u
 
 <a href="https://vimeo.com/879000775" target="_blank" ><img src="docs/images/roscon2023_talk.png" alt="MeshNav ROSCon 2023 Video" width="300px"/></a>
 
-## Build Status
+# Maintain and Contribute
+Maintainers:
+* [Matthias Holoch](mailto:matthias.holoch@naturerobots.com)
+* [Sebastian Pütz](mailto:sebastian.puetz@naturerobots.com)
+
+Author: [Sebastian Pütz](mailto:spuetz@uos.de)
+
+We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs welcome!
+
+# Build Status
 
 | ROS Distro  | GitHub CI | Develop | Documentation | Source Deb | Binary Deb |
 |-------------|-----------|---------|---------------|------------|------------|
