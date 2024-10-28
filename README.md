@@ -1,9 +1,7 @@
-<div align="center">
-<h1>
-Mesh Navigation
-</h1>
+<div align="center" min-width=519px>
+  <img src="docs/images/mesh_navigation_logo.png" alt="Mesh Navigation" height=150 />  
 </div>
-
+<h4 align="center">Mobile Robot Navigation in 3D Meshes</h4>
 <div align="center">
   <a href="https://github.com/naturerobots/mesh_navigation_tutorials">Tutorials</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
