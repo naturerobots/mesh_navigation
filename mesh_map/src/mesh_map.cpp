@@ -59,8 +59,8 @@
 
 namespace mesh_map
 {
-using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
-                                lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
+
+using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   : tf_buffer(tf_buffer)
@@ -70,21 +70,6 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
   , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
-  srv_url = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_url", "");
-  srv_username = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_username", "");
-  srv_password = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_password", "");
-  mesh_layer = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_layer", "mesh0");
-  min_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_roughness", 0.0);
-  max_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_roughness", 0.0);
-  min_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_height_diff", 0.0);
-  max_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_height_diff", 0.0);
-  bb_min_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_x", 0.0);
-  bb_min_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_y", 0.0);
-  bb_min_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_z", 0.0);
-  bb_max_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_x", 0.0);
-  bb_max_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_y", 0.0);
-  bb_max_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_z", 0.0);
-
   auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
   min_contour_size_desc.name = MESH_MAP_NAMESPACE + ".min_contour_size";
   min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
@@ -95,7 +80,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   min_contour_size_desc.integer_range.push_back(min_contour_size_range);
   min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_contour_size", 3);
 
-  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
+  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
   layer_factor_desc.name = MESH_MAP_NAMESPACE + ".layer_factor";
   layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
@@ -156,45 +141,32 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 bool MeshMap::readMap()
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "server url: " << srv_url);
-  bool server = false;
-
-  if (!srv_url.empty())
+  
+  if (!mesh_file.empty() && !mesh_part.empty())
   {
-    server = true;
-
-    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-        new mesh_client::MeshClient(srv_url, srv_username, srv_password, mesh_layer));
-    auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
-
-    mesh_client_ptr->setBoundingBox(bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z);
-    mesh_client_ptr->addFilter("roughness", min_roughness, max_roughness);
-    mesh_client_ptr->addFilter("height_diff", min_height_diff, max_height_diff);
-  }
-  else if (!mesh_file.empty() && !mesh_part.empty())
-  {
+    // check file ending
     RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
-    HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
-    hdf_5_mesh_io->open(mesh_file);
-    hdf_5_mesh_io->setMeshName(mesh_part);
-    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
+    
+
+    // HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
+    // hdf_5_mesh_io->open(mesh_file);
+    // hdf_5_mesh_io->setMeshName(mesh_part);
+    // mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
+    
+    auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
+    hdf5_mesh_io->open(mesh_file);
+    hdf5_mesh_io->setMeshName(mesh_part);
+    mesh_io_ptr = hdf5_mesh_io;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file or server connection!");
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
     return false;
   }
 
-  if (server)
-  {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh from the server '" << srv_url);
-  }
-  else
-  {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
-  }
+  RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
 
   auto mesh_opt = mesh_io_ptr->getMesh();
-
   if (mesh_opt)
   {
     *mesh_ptr = mesh_opt.get();
@@ -539,12 +511,11 @@ void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contour
     // If border Edge found
     if ((!facepair[0] || !facepair[1]) && !usedEdges[eHStart])
     {
-    std:
-      vector<lvr2::VertexHandle> contour;
+      std::vector<lvr2::VertexHandle> contour;
       // Set vector which links to the following Edge
-      array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
+      std::array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
       lvr2::VertexHandle vH = vertexPair[1];
-      vector<lvr2::EdgeHandle> curEdges;
+      std::vector<lvr2::EdgeHandle> curEdges;
       lvr2::EdgeHandle eHTemp = eHStart;
       bool moving = true;
       bool vertex_flag = false;
