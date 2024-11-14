@@ -57,6 +57,14 @@
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
+#include <filesystem>
+
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+
+namespace fs = std::filesystem;
+
 namespace mesh_map
 {
 
@@ -101,6 +109,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + ".cost_limit", 1.0);
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
+  
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
@@ -139,29 +148,76 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 }
 
 bool MeshMap::readMap()
-{
-  RCLCPP_INFO_STREAM(node->get_logger(), "server url: " << srv_url);
-  
-  if (!mesh_file.empty() && !mesh_part.empty())
+{ 
+  if(!mesh_io_ptr)
   {
-    // check file ending
-    RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
-    
+    if(!mesh_file.empty() && !mesh_part.empty())
+    {
+      // default: mesh_working_file = mesh_file
+      if(mesh_working_file == "")
+      {
+        mesh_working_file = fs::path(mesh_file).replace_extension(".h5");
+      }
 
-    // HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
-    // hdf_5_mesh_io->open(mesh_file);
-    // hdf_5_mesh_io->setMeshName(mesh_part);
-    // mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
-    
-    auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
-    hdf5_mesh_io->open(mesh_file);
-    hdf5_mesh_io->setMeshName(mesh_part);
-    mesh_io_ptr = hdf5_mesh_io;
-  }
-  else
-  {
-    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
-    return false;
+      if(mesh_working_part == "")
+      {
+        mesh_working_part == mesh_part;
+      }
+      
+      if(fs::path(mesh_working_file).extension() != ".h5")
+      {
+        RCLCPP_ERROR_STREAM(node->get_logger(), "Working File has to be of type HDF5!");
+        return false;
+      }
+      
+      // directly work on the input file
+      RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+      auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
+      hdf5_mesh_io->open(mesh_working_file);
+      hdf5_mesh_io->setMeshName(mesh_working_part);
+      mesh_io_ptr = hdf5_mesh_io;
+
+      if(mesh_file != mesh_working_file)
+      {
+        lvr2::MeshBufferPtr mesh_buffer;
+
+        // we have to create the working h5 first
+        if(fs::path(mesh_file).extension() == ".h5")
+        {
+          auto hdf5_mesh_input = std::make_shared<HDF5MeshIO>();
+          hdf5_mesh_input->open(mesh_file);
+          hdf5_mesh_input->setMeshName(mesh_part);
+          mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_part);
+        } else {
+          // use another loader
+          Assimp::Importer io;
+          io.SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION, true);
+          const aiScene* ascene = io.ReadFile(mesh_file, aiProcess_PreTransformVertices | aiProcess_Triangulate | aiProcess_SortByPType);
+          if (!ascene)
+          {
+            RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
+            return false;
+          }
+          mesh_buffer = extractMeshByName(ascene, mesh_part);
+        }
+
+        if(!mesh_buffer)
+        {
+          RCLCPP_ERROR_STREAM(node->get_logger(), "Couldn't load mesh part: " << mesh_part);
+        }
+
+        // write
+        hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
+      }
+
+    }
+    else
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
+      return false;
+    }
+  } else {
+    RCLCPP_INFO_STREAM(node->get_logger(), "Connection to file exists already!");
   }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
@@ -408,7 +464,9 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     float min, max;
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
-    const float factor = 1.0; // TODO how to declare param for each plugin? Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
+    const float factor = 1.0; 
+    // TODO how to declare param for each plugin? 
+    // Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
     // const float factor = private_nh.param<float>(MESH_MAP_NAMESPACE + "/" + layer.first + "/factor", 1.0);
     const float norm_factor = factor / norm;
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
@@ -1198,7 +1256,8 @@ void MeshMap::publishVertexColors(const rclcpp::Time& map_stamp)
   }
 }
 
-rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
+rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
+  std::vector<rclcpp::Parameter> parameters)
 {
   RCLCPP_DEBUG_STREAM(node->get_logger(), "Set parameters callback...");
   rcl_interfaces::msg::SetParametersResult result;

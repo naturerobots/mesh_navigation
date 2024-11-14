@@ -44,6 +44,30 @@
 
 namespace mesh_map
 {
+
+lvr2::MeshBufferPtr extractMeshByName(
+  const aiScene* ascene,
+  std::string name)
+{
+  lvr2::MeshBufferPtr mesh;
+
+  // search for mesh part, if there are multiple meshes
+  for (unsigned int meshIdx = 0; meshIdx < ascene->mNumMeshes; meshIdx++)
+  {
+    // const aiMesh* amesh = ascene->mMeshes[meshIdx];
+
+    // // skip non-triangle meshes
+    // if (amesh->mPrimitiveTypes != aiPrimitiveType_TRIANGLE)
+    // {
+    //   RCLCPP_ERROR_STREAM(rclcpp::get_logger("rviz_mesh_tools_plugins"), "Map Display: Mesh " << meshIdx << " is not a triangle mesh! Skipping...");
+    //   continue;
+    // }
+    
+  }
+
+  return mesh;
+}
+
 void getMinMax(const lvr2::VertexMap<float>& costs, float& min, float& max)
 {
   max = std::numeric_limits<float>::min();

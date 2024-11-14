@@ -19,9 +19,8 @@ foreach(dep IN LISTS dependencies)
 endforeach()
 
 find_package(LVR2 REQUIRED)
+find_package(assimp REQUIRED)
 find_package(MPI)
-# this is nowhere used
-# find_package(Boost REQUIRED COMPONENTS system) 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
 
@@ -36,10 +35,12 @@ add_library(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${LVR2_INCLUDE_DIRS})
+  ${LVR2_INCLUDE_DIRS}
+  ${ASSIMP_INCLUDE_DIRS})
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 target_link_libraries(${PROJECT_NAME} 
     ${LVR2_LIBRARIES}
+    ${ASSIMP_LIBRARIES}
     ${MPI_CXX_LIBRARIES}
 )
 

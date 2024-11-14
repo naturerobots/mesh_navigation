@@ -398,11 +398,14 @@ public:
    */
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
+  //! This is an abstract interface to load mesh information from somewhere
+  //! The most default case is loading from a HDF5 file
+  //! However we could also implement a server connection here
+  //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 
   lvr2::DenseVertexMap<bool> invalid;
-
 private:
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
@@ -424,31 +427,17 @@ private:
   //! global frame / coordinate system id
   std::string global_frame;
 
-  //! server url
-  std::string srv_url;
-
-  //! login username to connect to the server
-  std::string srv_username;
-
-  //! login password to connect to the server
-  std::string srv_password;
-
-  std::string mesh_layer;
-
-  double min_roughness;
-  double max_roughness;
-  double min_height_diff;
-  double max_height_diff;
-  double bb_min_x;
-  double bb_min_y;
-  double bb_min_z;
-  double bb_max_x;
-  double bb_max_y;
-  double bb_max_z;
-
-
+  //! mesh file 
   std::string mesh_file;
+
+  //! mesh part
   std::string mesh_part;
+  
+  //! mesh working file
+  std::string mesh_working_file;
+
+  //! mesh working part
+  std::string mesh_working_part;
 
   //! dynamic params callback handle
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
