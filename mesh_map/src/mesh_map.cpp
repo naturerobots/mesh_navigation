@@ -110,6 +110,8 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
+  mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
+  mesh_working_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
 
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
@@ -161,7 +163,11 @@ bool MeshMap::readMap()
 
       if(mesh_working_part == "")
       {
-        mesh_working_part == mesh_part;
+        std::cout << "BLABLAL: " << mesh_part << std::endl;
+        mesh_working_part = mesh_part;
+        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part es default: '" << mesh_working_part << "'");
+      } else {
+        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is *not* empty: '" << mesh_working_part << "'");
       }
       
       if(fs::path(mesh_working_file).extension() != ".h5")
@@ -171,6 +177,7 @@ bool MeshMap::readMap()
       }
       
       // directly work on the input file
+      
       RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
 
       auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
@@ -197,7 +204,7 @@ bool MeshMap::readMap()
           // use another loader
           Assimp::Importer io;
           io.SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION, true);
-          const aiScene* ascene = io.ReadFile(mesh_file, aiProcess_PreTransformVertices | aiProcess_Triangulate | aiProcess_SortByPType);
+          const aiScene* ascene = io.ReadFile(mesh_file, 0);
           if (!ascene)
           {
             RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
