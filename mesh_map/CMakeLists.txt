@@ -13,6 +13,7 @@ set(dependencies
   tf2_geometry_msgs
   tf2_ros
   visualization_msgs
+  std_srvs
 )
 foreach(dep IN LISTS dependencies)
   find_package(${dep} REQUIRED)

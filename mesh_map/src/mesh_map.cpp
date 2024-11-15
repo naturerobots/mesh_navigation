@@ -147,6 +147,13 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
+
+  save_service = node->create_service<std_srvs::srv::Empty>("~/save_map", [this](
+    const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+    std::shared_ptr<std_srvs::srv::Empty::Response>      response)
+  {
+    saveLayers();
+  });
 }
 
 bool MeshMap::readMap()
@@ -1162,6 +1169,19 @@ mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
     [&layer_name](const std::pair<std::string, mesh_map::AbstractLayer::Ptr>& item) {
       return item.first == layer_name;
     })->second;
+}
+
+void MeshMap::saveLayers()
+{
+  for (auto& layer : loaded_layers)
+  {
+    auto& layer_plugin = layer.second;
+    const auto& layer_name = layer.first;
+
+    RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
+    layer_plugin->writeLayer();
+    RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
+  }
 }
 
 bool MeshMap::barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w)

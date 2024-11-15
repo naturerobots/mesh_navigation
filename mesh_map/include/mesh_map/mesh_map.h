@@ -53,6 +53,8 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <visualization_msgs/msg/marker.hpp>
+#include <std_srvs/srv/empty.hpp>
+
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
@@ -398,6 +400,11 @@ public:
    */
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
+  /**
+   * @brief calls 'saveLayer' on every active layer
+   */
+  void saveLayers();
+
   //! This is an abstract interface to load mesh information from somewhere
   //! The most default case is loading from a HDF5 file
   //! However we could also implement a server connection here
@@ -441,6 +448,8 @@ private:
 
   //! dynamic params callback handle
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
+
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr save_service;
 
   // Reconfigurable parameters (see reconfigureCallback method)
   int min_contour_size;
