@@ -109,9 +109,9 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + ".cost_limit", 1.0);
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
-  
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
+
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
   // params for map layer names to types:
@@ -171,7 +171,8 @@ bool MeshMap::readMap()
       }
       
       // directly work on the input file
-      RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+      RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
+
       auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
       hdf5_mesh_io->open(mesh_working_file);
       hdf5_mesh_io->setMeshName(mesh_working_part);
@@ -179,6 +180,9 @@ bool MeshMap::readMap()
 
       if(mesh_file != mesh_working_file)
       {
+        RCLCPP_INFO_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+      
+        std::cout << "Generate seperate working file..." << std::endl;
         lvr2::MeshBufferPtr mesh_buffer;
 
         // we have to create the working h5 first
@@ -188,6 +192,7 @@ bool MeshMap::readMap()
           hdf5_mesh_input->open(mesh_file);
           hdf5_mesh_input->setMeshName(mesh_part);
           mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_part);
+          // TODO: load all attributes?
         } else {
           // use another loader
           Assimp::Importer io;
@@ -209,7 +214,6 @@ bool MeshMap::readMap()
         // write
         hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
       }
-
     }
     else
     {
