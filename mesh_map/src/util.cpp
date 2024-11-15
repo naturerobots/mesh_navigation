@@ -45,24 +45,105 @@
 namespace mesh_map
 {
 
+const aiNode* extractNodeByName(
+  const aiNode* node,
+  std::string name)
+{
+  if(node == nullptr)
+  {
+    return nullptr;
+  }
+
+  if(node->mNumMeshes > 0)
+  {
+    // found something that is a mesh
+    std::string node_name = node->mName.C_Str();
+    if(node_name == name)
+    {
+      // found!
+      return node;
+    }
+  }
+  
+  for(size_t i=0; i<node->mNumChildren; i++)
+  {
+    const aiNode* child_node = extractNodeByName(node->mChildren[i], name);
+    if(child_node != nullptr)
+    {
+      return child_node;
+    }
+  }
+
+  return nullptr;
+}
+
 lvr2::MeshBufferPtr extractMeshByName(
   const aiScene* ascene,
   std::string name)
 {
   lvr2::MeshBufferPtr mesh;
 
-  // search for mesh part, if there are multiple meshes
-  for (unsigned int meshIdx = 0; meshIdx < ascene->mNumMeshes; meshIdx++)
-  {
-    // const aiMesh* amesh = ascene->mMeshes[meshIdx];
 
-    // // skip non-triangle meshes
-    // if (amesh->mPrimitiveTypes != aiPrimitiveType_TRIANGLE)
-    // {
-    //   RCLCPP_ERROR_STREAM(rclcpp::get_logger("rviz_mesh_tools_plugins"), "Map Display: Mesh " << meshIdx << " is not a triangle mesh! Skipping...");
-    //   continue;
-    // }
+  const aiNode* root_node = ascene->mRootNode;
+  const aiNode* mesh_part_node = extractNodeByName(root_node, name);
+
+  if(mesh_part_node)
+  {
+    if(mesh_part_node->mNumMeshes > 1)
+    {
+      std::cout << "WARNING: the found mesh part consists of multiple meshes! Using the first one." << std::endl;
+    }
+
+    unsigned int mesh_id = mesh_part_node->mMeshes[0];
     
+    const aiMesh* amesh = ascene->mMeshes[mesh_id];
+
+    // fill this
+    mesh = std::make_shared<lvr2::MeshBuffer>();
+    
+    lvr2::Channel<float> vertices(amesh->mNumVertices, 3);
+    for(size_t i=0; i<amesh->mNumVertices; i++)
+    {
+      vertices[i][0] = amesh->mVertices[i].x;
+      vertices[i][1] = amesh->mVertices[i].y;
+      vertices[i][2] = amesh->mVertices[i].z;
+    }
+    (*mesh)["vertices"] = vertices;
+  
+    lvr2::Channel<unsigned int> face_indices(amesh->mNumFaces, 3);
+    for(size_t i=0; i<amesh->mNumFaces; i++)
+    {
+      face_indices[i][0] = amesh->mFaces[i].mIndices[0];
+      face_indices[i][1] = amesh->mFaces[i].mIndices[1];
+      face_indices[i][2] = amesh->mFaces[i].mIndices[2]; 
+    }
+    (*mesh)["face_indices"] = face_indices;
+    
+    if(amesh->HasNormals())
+    {
+      // vertex normals
+      lvr2::Channel<float> vertex_normals(amesh->mNumVertices, 3);
+      for(size_t i=0; i<amesh->mNumVertices; i++)
+      {
+        vertex_normals[i][0] = amesh->mNormals[i].x;
+        vertex_normals[i][1] = amesh->mNormals[i].y;
+        vertex_normals[i][2] = amesh->mNormals[i].z;
+      }
+      (*mesh)["vertex_normals"] = vertex_normals;
+    }
+
+    if(amesh->HasVertexColors(0))
+    {
+      lvr2::Channel<unsigned char> vertex_colors(amesh->mNumVertices, 4);
+      for(size_t i=0; i<amesh->mNumVertices; i++)
+      {
+        vertex_colors[i][0] = amesh->mColors[0][i].r;
+        vertex_colors[i][1] = amesh->mColors[0][i].g;
+        vertex_colors[i][2] = amesh->mColors[0][i].b;
+        vertex_colors[i][3] = amesh->mColors[0][i].a;
+      }
+      (*mesh)["vertex_colors"] = vertex_colors;
+    }
   }
 
   return mesh;
