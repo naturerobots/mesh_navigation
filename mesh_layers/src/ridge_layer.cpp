@@ -50,7 +50,7 @@ namespace mesh_layers
 bool RidgeLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read ridge from map file...");
-  auto ridge_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("ridge");
+  auto ridge_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (ridge_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read ridge from map file.");
@@ -63,7 +63,7 @@ bool RidgeLayer::readLayer()
 
 bool RidgeLayer::writeLayer()
 {
-  if (mesh_io_ptr_->addDenseAttributeMap(ridge_, "ridge"))
+  if (mesh_io_ptr_->addDenseAttributeMap(ridge_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved ridge to map file.");
     return true;

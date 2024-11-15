@@ -162,15 +162,15 @@ bool MeshMap::readMap()
   {
     if(!mesh_file.empty() && !mesh_part.empty())
     {
-      // default: mesh_working_file = mesh_file
+      
       if(mesh_working_file == "")
       {
-        mesh_working_file = fs::path(mesh_file).replace_extension(".h5");
+        // default: mesh_working_file = mesh_file filename in this directory
+        mesh_working_file = fs::path(mesh_file).filename().replace_extension(".h5");
       }
 
       if(mesh_working_part == "")
       {
-        std::cout << "BLABLAL: " << mesh_part << std::endl;
         mesh_working_part = mesh_part;
         RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part es default: '" << mesh_working_part << "'");
       } else {

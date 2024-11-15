@@ -141,6 +141,9 @@ class BorderLayer : public mesh_map::AbstractLayer
     double border_cost = 1.0;
     double factor = 1.0;
   } config_;
+
+  // put this to base class?
+  std::string name;
 };
 
 } /* namespace mesh_layers */

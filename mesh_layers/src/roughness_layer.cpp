@@ -49,7 +49,7 @@ bool RoughnessLayer::readLayer() {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read roughness from map file...");
   auto roughness_opt =
       mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
-          "roughness");
+          layer_name_);
   if (roughness_opt) {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read roughness from map file.");
     roughness_ = roughness_opt.get();
@@ -60,7 +60,7 @@ bool RoughnessLayer::readLayer() {
 }
 
 bool RoughnessLayer::writeLayer() {
-  if (mesh_io_ptr_->addDenseAttributeMap(roughness_, "roughness")) {
+  if (mesh_io_ptr_->addDenseAttributeMap(roughness_, layer_name_)) {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved roughness to map file.");
     return true;
   } else {

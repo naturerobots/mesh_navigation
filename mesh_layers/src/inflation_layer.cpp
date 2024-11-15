@@ -50,7 +50,7 @@ bool InflationLayer::readLayer()
 {
   // riskiness
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read riskiness from map file...");
-  auto riskiness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("riskiness");
+  auto riskiness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
   if (riskiness_opt)
   {
@@ -68,7 +68,7 @@ bool InflationLayer::writeLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Saving " << riskiness_.numValues() << " riskiness values to map file...");
 
-  if (mesh_io_ptr_->addDenseAttributeMap(riskiness_, "riskiness"))
+  if (mesh_io_ptr_->addDenseAttributeMap(riskiness_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved riskiness to map file.");
     return true;

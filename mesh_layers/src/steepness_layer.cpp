@@ -49,7 +49,7 @@ namespace mesh_layers
 bool SteepnessLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read steepness from map file...");
-  auto steepness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("steepness");
+  auto steepness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (steepness_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read steepness from map file.");
@@ -62,7 +62,7 @@ bool SteepnessLayer::readLayer()
 
 bool SteepnessLayer::writeLayer()
 {
-  if (mesh_io_ptr_->addDenseAttributeMap(steepness_, "steepness"))
+  if (mesh_io_ptr_->addDenseAttributeMap(steepness_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved steepness to map file.");
     return true;
