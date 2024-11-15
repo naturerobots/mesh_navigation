@@ -194,20 +194,22 @@ bool SteepnessLayer::initialize()
   { // threshold
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Threshold for the local steepness to be counted as lethal.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.01;
     range.to_value = 3.1415;
     descriptor.floating_point_range.push_back(range);
-    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold, descriptor);
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "The local steepness factor to weight this layer.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.0;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
       &SteepnessLayer::reconfigureCallback, this, std::placeholders::_1));

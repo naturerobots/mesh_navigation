@@ -48,13 +48,12 @@ namespace mesh_layers
 bool BorderLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read border costs from map file...");
-  auto border_costs_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>("border");
+  auto border_costs_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float> >("border");
 
   if (border_costs_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Border costs have been read successfully.");
     border_costs_ = border_costs_opt.get();
-
     return computeLethals();
   }
 
@@ -113,21 +112,39 @@ rcl_interfaces::msg::SetParametersResult BorderLayer::reconfigureCallback(std::v
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
 
-  bool has_threshold_changed = false;
-  for (auto parameter : parameters) {
+  // bool has_threshold_changed = false;
+  bool recompute_costs = false;
+  bool recompute_lethals = false;
+
+  for (auto parameter : parameters)
+  {
     if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
       config_.threshold = parameter.as_double();
-      has_threshold_changed = true;
+      recompute_lethals = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".border_cost") {
       config_.border_cost = parameter.as_double();
+      recompute_costs = true;
+      recompute_lethals = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
       config_.factor = parameter.as_double();
     }
   }
 
-  if (has_threshold_changed) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
+  if(recompute_costs) 
+  {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Recompute layer costs due to cfg change.");
+    computeLayer();
+  }
+
+  if (recompute_lethals) 
+  {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Recompute lethals due to cfg change.");
     computeLethals();
+  }
+
+  if(recompute_costs || recompute_lethals)
+  {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Notify changes.");
     notifyChange();
   }
 
@@ -140,29 +157,32 @@ bool BorderLayer::initialize()
   { // threshold
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Threshold for the local border costs to be counted as lethal.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.05;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold, descriptor);
   }
   { // border cost
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "The cost value used for the border vertices.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.02;
     range.to_value = 10.0;
     descriptor.floating_point_range.push_back(range);
-    config_.border_cost = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".border_cost", config_.border_cost);
+    config_.border_cost = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".border_cost", config_.border_cost, descriptor);
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Using this factor to weight this layer.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.0;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
       &BorderLayer::reconfigureCallback, this, std::placeholders::_1));

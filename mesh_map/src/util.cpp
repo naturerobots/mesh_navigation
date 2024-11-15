@@ -102,13 +102,7 @@ lvr2::MeshBufferPtr extractMeshByName(
 {
   lvr2::MeshBufferPtr mesh;
 
-
   const aiNode* root_node = ascene->mRootNode;
-
-
-  // ascene->mMe
-
-  // const aiNode* mesh_part_node = extractNodeByName(root_node, name);
 
   // bool path_existing = false;
   // transform from mesh to world
@@ -176,8 +170,17 @@ lvr2::MeshBufferPtr extractMeshByName(
   (*mesh)["vertices"] = vertices;
 
   lvr2::Channel<unsigned int> face_indices(amesh->mNumFaces, 3);
+  if(amesh->mNumFaces == 0)
+  {
+    throw std::runtime_error("TRIED TO LOAD 0 TRIANGLES");
+  }
   for(size_t i=0; i<amesh->mNumFaces; i++)
   {
+    if(amesh->mFaces[i].mNumIndices != 3)
+    {
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("mesh_map/util"), "Mesh contains elements that are no triangles: " << amesh->mFaces[i].mNumIndices);
+      throw std::runtime_error("TRIED TO LOAD NON-TRIANGLES");
+    }
     face_indices[i][0] = amesh->mFaces[i].mIndices[0];
     face_indices[i][1] = amesh->mFaces[i].mIndices[1];
     face_indices[i][2] = amesh->mFaces[i].mIndices[2]; 
@@ -210,7 +213,6 @@ lvr2::MeshBufferPtr extractMeshByName(
     }
     (*mesh)["vertex_colors"] = vertex_colors;
   }
-  
 
   return mesh;
 }

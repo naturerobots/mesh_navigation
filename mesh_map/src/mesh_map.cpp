@@ -177,7 +177,6 @@ bool MeshMap::readMap()
       }
       
       // directly work on the input file
-      
       RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
 
       auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
@@ -202,9 +201,16 @@ bool MeshMap::readMap()
           // TODO: load all attributes?
         } else {
           // use another loader
+          
+          // use assimp
           Assimp::Importer io;
           io.SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION, true);
-          const aiScene* ascene = io.ReadFile(mesh_file, 0);
+          const aiScene* ascene = io.ReadFile(mesh_file, 
+              aiProcess_Triangulate | 
+              aiProcess_JoinIdenticalVertices | 
+              aiProcess_GenNormals | 
+              aiProcess_ValidateDataStructure | 
+              aiProcess_FindInvalidData);
           if (!ascene)
           {
             RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
@@ -215,7 +221,7 @@ bool MeshMap::readMap()
 
         if(!mesh_buffer)
         {
-          RCLCPP_ERROR_STREAM(node->get_logger(), "Couldn't load mesh part: " << mesh_part);
+          RCLCPP_ERROR_STREAM(node->get_logger(), "Couldn't load mesh part: '" << mesh_part << "'");
         }
 
         // write
@@ -262,7 +268,6 @@ bool MeshMap::readMap()
   uuid_str = boost::uuids::to_string(uuid);
 
   auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>("face_normals");
-
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
@@ -346,6 +351,7 @@ bool MeshMap::readMap()
     return false;
   }
 
+  // why?
   sleep(1);
 
   combineVertexCosts(map_stamp);
@@ -450,12 +456,18 @@ bool MeshMap::initLayerPlugins()
     layer_plugin->updateLethal(lethals, empty);
     if (!layer_plugin->readLayer())
     {
+      RCLCPP_INFO_STREAM(node->get_logger(), "Computing layer '" << layer_name << "' ...");
       layer_plugin->computeLayer();
+      
+      // RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
+      // layer_plugin->writeLayer();
+      // RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
     }
 
     lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
     lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
   }
+
   return true;
 }
 
@@ -475,7 +487,7 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     float min, max;
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
-    const float factor = 1.0; 
+    const float factor = 1.0;
     // TODO how to declare param for each plugin? 
     // Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
     // const float factor = private_nh.param<float>(MESH_MAP_NAMESPACE + "/" + layer.first + "/factor", 1.0);

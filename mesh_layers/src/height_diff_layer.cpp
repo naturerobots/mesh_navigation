@@ -111,19 +111,20 @@ rcl_interfaces::msg::SetParametersResult HeightDiffLayer::reconfigureCallback(st
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
 
-  bool has_threshold_changed = false;
+  bool recompute_lethals = false;
   for (auto parameter : parameters) {
     if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
       config_.threshold = parameter.as_double();
-      has_threshold_changed = true;
+      recompute_lethals = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius") {
       config_.radius = parameter.as_double();
+      recompute_lethals = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
       config_.factor = parameter.as_double();
     }
   }
 
-  if (has_threshold_changed) {
+  if (recompute_lethals) {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
     notifyChange();
@@ -138,29 +139,32 @@ bool HeightDiffLayer::initialize()
   { // threshold
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Threshold for the local height difference to be counted as lethal.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.05;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold);
+    config_.threshold = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold", config_.threshold, descriptor);
   }
   { // radius
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "The radius used for calculating the local height difference.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.02;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius", config_.radius);
+    config_.radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius", config_.radius, descriptor);
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Using this factor to weight this layer.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.0;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
       &HeightDiffLayer::reconfigureCallback, this, std::placeholders::_1));
