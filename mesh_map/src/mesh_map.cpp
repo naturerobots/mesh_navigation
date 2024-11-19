@@ -148,11 +148,11 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
 
-  save_service = node->create_service<std_srvs::srv::Empty>("~/save_map", [this](
-    const std::shared_ptr<std_srvs::srv::Empty::Request> request,
-    std::shared_ptr<std_srvs::srv::Empty::Response>      response)
+  save_service = node->create_service<std_srvs::srv::Trigger>("~/save_map", [this](
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response>      response)
   {
-    saveLayers();
+    *response = writeLayers();
   });
 }
 
@@ -253,7 +253,7 @@ bool MeshMap::readMap()
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
-
+    // build a tree for fast lookups
     adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
     kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
@@ -1162,17 +1162,33 @@ mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
     })->second;
 }
 
-void MeshMap::saveLayers()
+std_srvs::srv::Trigger::Response MeshMap::writeLayers()
 {
+  std::stringstream ss;
+  bool write_failure = false;
+
   for (auto& layer : loaded_layers)
   {
     auto& layer_plugin = layer.second;
     const auto& layer_name = layer.first;
 
     RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
-    layer_plugin->writeLayer();
-    RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
+    if(layer_plugin->writeLayer())
+    {
+      RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
+    } else {
+      // this is not the first failure. add a comma in between 
+      if(write_failure){ss << ",";}
+      ss << layer_name;
+      write_failure = true;
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Error while writing '" << layer_name << "' to file.");      
+    }
   }
+
+  std_srvs::srv::Trigger::Response res;
+  res.success = !write_failure;
+  res.message = ss.str();
+  return res;
 }
 
 bool MeshMap::barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w)

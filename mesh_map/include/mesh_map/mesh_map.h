@@ -53,7 +53,7 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <visualization_msgs/msg/marker.hpp>
-#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
@@ -401,7 +401,7 @@ public:
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
   /**
-   * @brief calls 'saveLayer' on every active layer. Every layer itself writes its costs 
+   * @brief calls 'writeLayer' on every active layer. Every layer itself writes its costs 
    *        to the working file / part to a dataset named after the layer-name.
    *  
    * Example:
@@ -409,8 +409,11 @@ public:
    *  - Working mesh part: "my_mesh_part"
    * 
    * A BorderLayer of name 'border' would write the costs to "my_map.h5/my_mesh_part/channels/border"  
+   * 
+   * @return Trigger response. If success is false, the message field is 
+   *      beeing filled with all the failed layer names seperated by comma 
    */
-  void saveLayers();
+  std_srvs::srv::Trigger::Response writeLayers();
 
   //! This is an abstract interface to load mesh information from somewhere
   //! The default case is loading from a HDF5 file
@@ -462,7 +465,7 @@ private:
   //! dynamic params callback handle
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
 
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr save_service;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_service;
 
   // Reconfigurable parameters (see reconfigureCallback method)
   int min_contour_size;
