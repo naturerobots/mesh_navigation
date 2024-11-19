@@ -406,7 +406,7 @@ public:
   void saveLayers();
 
   //! This is an abstract interface to load mesh information from somewhere
-  //! The most default case is loading from a HDF5 file
+  //! The default case is loading from a HDF5 file
   //! However we could also implement a server connection here
   //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
