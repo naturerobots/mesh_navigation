@@ -172,7 +172,7 @@ bool MeshMap::readMap()
       if(mesh_working_part == "")
       {
         mesh_working_part = mesh_part;
-        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part es default: '" << mesh_working_part << "'");
+        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part as default: '" << mesh_working_part << "'");
       } else {
         RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is *not* empty: '" << mesh_working_part << "'");
       }
