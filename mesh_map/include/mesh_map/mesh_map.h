@@ -434,16 +434,22 @@ private:
   //! global frame / coordinate system id
   std::string global_frame;
 
-  //! mesh file 
+  //! Filename of the input mesh. Can be any format the assimp library supports to load. 
+  //! https://github.com/assimp/assimp/blob/master/doc/Fileformats.md
   std::string mesh_file;
 
-  //! mesh part
+  //! Part of the mesh that is loaded for navigation
+  //! For HDF5 meshes this is the H5 group name of the desired mesh part
+  //! For standard formats this would be the internal path thorugh the scene graph to the mesh
   std::string mesh_part;
   
-  //! mesh working file
+  //! This is the filename of the file where the work is done. Choosing it differently from the 
+  //! input mesh prevents from accidentially overwrite your input data.
+  //! By default it will be set to the input mesh filename.
+  //! The working file must be of format HDF5
   std::string mesh_working_file;
 
-  //! mesh working part
+  //! The name of the mesh part that is used for navigation stored to the working file
   std::string mesh_working_part;
 
   //! dynamic params callback handle

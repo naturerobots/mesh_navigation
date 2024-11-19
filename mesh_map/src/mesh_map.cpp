@@ -358,9 +358,6 @@ bool MeshMap::readMap()
     return false;
   }
 
-  // why?
-  sleep(1);
-
   combineVertexCosts(map_stamp);
   publishCostLayers(map_stamp);
 
@@ -465,10 +462,6 @@ bool MeshMap::initLayerPlugins()
     {
       RCLCPP_INFO_STREAM(node->get_logger(), "Computing layer '" << layer_name << "' ...");
       layer_plugin->computeLayer();
-      
-      // RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
-      // layer_plugin->writeLayer();
-      // RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
     }
 
     lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
@@ -495,9 +488,7 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
     const float factor = 1.0;
-    // TODO how to declare param for each plugin? 
-    // Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
-    // const float factor = private_nh.param<float>(MESH_MAP_NAMESPACE + "/" + layer.first + "/factor", 1.0);
+    // TODO: carefully think about this
     const float norm_factor = factor / norm;
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
