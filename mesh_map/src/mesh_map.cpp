@@ -162,11 +162,10 @@ bool MeshMap::readMap()
   {
     if(!mesh_file.empty() && !mesh_part.empty())
     {
-      
       if(mesh_working_file == "")
       {
         // default: mesh_working_file = mesh_file filename in this directory
-        mesh_working_file = fs::path(mesh_file).filename().replace_extension(".h5");
+        mesh_working_file = fs::path(mesh_file).replace_extension(".h5");
       }
 
       if(mesh_working_part == "")
