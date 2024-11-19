@@ -401,7 +401,14 @@ public:
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
   /**
-   * @brief calls 'saveLayer' on every active layer
+   * @brief calls 'saveLayer' on every active layer. Every layer itself writes its costs 
+   *        to the working file / part to a dataset named after the layer-name.
+   *  
+   * Example:
+   *  - Working file: "my_map.h5"
+   *  - Working mesh part: "my_mesh_part"
+   * 
+   * A BorderLayer of name 'border' would write the costs to "my_map.h5/my_mesh_part/channels/border"  
    */
   void saveLayers();
 
