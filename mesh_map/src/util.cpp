@@ -104,7 +104,6 @@ lvr2::MeshBufferPtr extractMeshByName(
 
   const aiNode* root_node = ascene->mRootNode;
 
-  // bool path_existing = false;
   // transform from mesh to world
   aiMatrix4x4 Tmw;
 
