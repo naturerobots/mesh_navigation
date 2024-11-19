@@ -174,7 +174,7 @@ bool MeshMap::readMap()
         mesh_working_part = mesh_part;
         RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part as default: '" << mesh_working_part << "'");
       } else {
-        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is *not* empty: '" << mesh_working_part << "'");
+        RCLCPP_INFO_STREAM(node->get_logger(), "Using mesh working part from parameter: '" << mesh_working_part << "'");
       }
       
       if(fs::path(mesh_working_file).extension() != ".h5")
