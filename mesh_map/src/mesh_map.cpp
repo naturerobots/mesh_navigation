@@ -315,7 +315,17 @@ bool MeshMap::readMap()
     }
   }
 
-  const rclcpp::Time map_stamp = node->now();
+  rclcpp::Time map_stamp = node->now();
+  // Workaround: Avoid publishing a map with zero timestamp.
+  // This can occur when using sim time and the node using mesh map starts to quickly,
+  // before whatever should publish /clock (e.g. gazebo) is ready.
+  // A map with timestamp zero will not get displayed in rviz.
+  // Generally, a zero timestamp is currently considered be an error / unintialized stamp.
+  // Issue https://github.com/ros2/rclcpp/issues/2025 might want to change that, though.
+  while (map_stamp.nanoseconds() == 0) { // TODO check whether time is zero
+    sleep(0.5);
+    map_stamp = node->now();
+  }
   mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
   publishVertexColors(map_stamp);
 
