@@ -53,6 +53,8 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <visualization_msgs/msg/marker.hpp>
+#include <std_srvs/srv/trigger.hpp>
+
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
@@ -398,11 +400,29 @@ public:
    */
   mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
 
+  /**
+   * @brief calls 'writeLayer' on every active layer. Every layer itself writes its costs 
+   *        to the working file / part to a dataset named after the layer-name.
+   *  
+   * Example:
+   *  - Working file: "my_map.h5"
+   *  - Working mesh part: "my_mesh_part"
+   * 
+   * A BorderLayer of name 'border' would write the costs to "my_map.h5/my_mesh_part/channels/border"  
+   * 
+   * @return Trigger response. If success is false, the message field is 
+   *      beeing filled with all the failed layer names seperated by comma 
+   */
+  std_srvs::srv::Trigger::Response writeLayers();
+
+  //! This is an abstract interface to load mesh information from somewhere
+  //! The default case is loading from a HDF5 file
+  //! However we could also implement a server connection here
+  //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
 
   lvr2::DenseVertexMap<bool> invalid;
-
 private:
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
@@ -424,34 +444,28 @@ private:
   //! global frame / coordinate system id
   std::string global_frame;
 
-  //! server url
-  std::string srv_url;
-
-  //! login username to connect to the server
-  std::string srv_username;
-
-  //! login password to connect to the server
-  std::string srv_password;
-
-  std::string mesh_layer;
-
-  double min_roughness;
-  double max_roughness;
-  double min_height_diff;
-  double max_height_diff;
-  double bb_min_x;
-  double bb_min_y;
-  double bb_min_z;
-  double bb_max_x;
-  double bb_max_y;
-  double bb_max_z;
-
-
+  //! Filename of the input mesh. Can be any format the assimp library supports to load. 
+  //! https://github.com/assimp/assimp/blob/master/doc/Fileformats.md
   std::string mesh_file;
+
+  //! Part of the mesh that is loaded for navigation
+  //! For HDF5 meshes this is the H5 group name of the desired mesh part
+  //! For standard formats this would be the internal path thorugh the scene graph to the mesh
   std::string mesh_part;
+  
+  //! This is the filename of the file where the work is done. Choosing it differently from the 
+  //! input mesh prevents from accidentially overwrite your input data.
+  //! By default it will be set to the input mesh filename.
+  //! The working file must be of format HDF5
+  std::string mesh_working_file;
+
+  //! The name of the mesh part that is used for navigation stored to the working file
+  std::string mesh_working_part;
 
   //! dynamic params callback handle
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
+
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_service;
 
   // Reconfigurable parameters (see reconfigureCallback method)
   int min_contour_size;

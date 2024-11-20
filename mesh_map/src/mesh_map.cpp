@@ -57,10 +57,18 @@
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
+#include <filesystem>
+
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+
+namespace fs = std::filesystem;
+
 namespace mesh_map
 {
-using HDF5MeshIO = lvr2::Hdf5IO<lvr2::hdf5features::ArrayIO, lvr2::hdf5features::ChannelIO,
-                                lvr2::hdf5features::VariantChannelIO, lvr2::hdf5features::MeshIO>;
+
+using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   : tf_buffer(tf_buffer)
@@ -70,21 +78,6 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
   , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
-  srv_url = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_url", "");
-  srv_username = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_username", "");
-  srv_password = node->declare_parameter(MESH_MAP_NAMESPACE + ".server_password", "");
-  mesh_layer = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_layer", "mesh0");
-  min_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_roughness", 0.0);
-  max_roughness = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_roughness", 0.0);
-  min_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_height_diff", 0.0);
-  max_height_diff = node->declare_parameter(MESH_MAP_NAMESPACE + ".max_height_diff", 0.0);
-  bb_min_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_x", 0.0);
-  bb_min_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_y", 0.0);
-  bb_min_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_min_z", 0.0);
-  bb_max_x = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_x", 0.0);
-  bb_max_y = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_y", 0.0);
-  bb_max_z = node->declare_parameter(MESH_MAP_NAMESPACE + ".bb_max_z", 0.0);
-
   auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
   min_contour_size_desc.name = MESH_MAP_NAMESPACE + ".min_contour_size";
   min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
@@ -95,7 +88,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   min_contour_size_desc.integer_range.push_back(min_contour_size_range);
   min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_contour_size", 3);
 
-  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
+  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
   layer_factor_desc.name = MESH_MAP_NAMESPACE + ".layer_factor";
   layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
   layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
@@ -117,7 +110,10 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
+  mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
+  mesh_working_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
+
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
   // params for map layer names to types:
@@ -151,57 +147,112 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
+
+  save_service = node->create_service<std_srvs::srv::Trigger>("~/save_map", [this](
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response>      response)
+  {
+    *response = writeLayers();
+  });
 }
 
 bool MeshMap::readMap()
-{
-  RCLCPP_INFO_STREAM(node->get_logger(), "server url: " << srv_url);
-  bool server = false;
+{ 
+  if(!mesh_io_ptr)
+  {
+    if(!mesh_file.empty() && !mesh_part.empty())
+    {
+      if(mesh_working_file == "")
+      {
+        // default: mesh_working_file = mesh_file filename in this directory
+        mesh_working_file = fs::path(mesh_file).replace_extension(".h5");
+      }
 
-  if (!srv_url.empty())
-  {
-    server = true;
+      if(mesh_working_part == "")
+      {
+        mesh_working_part = mesh_part;
+        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part as default: '" << mesh_working_part << "'");
+      } else {
+        RCLCPP_INFO_STREAM(node->get_logger(), "Using mesh working part from parameter: '" << mesh_working_part << "'");
+      }
+      
+      if(fs::path(mesh_working_file).extension() != ".h5")
+      {
+        RCLCPP_ERROR_STREAM(node->get_logger(), "Working File has to be of type HDF5!");
+        return false;
+      }
+      
+      // directly work on the input file
+      RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
 
-    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(
-        new mesh_client::MeshClient(srv_url, srv_username, srv_password, mesh_layer));
-    auto mesh_client_ptr = std::static_pointer_cast<mesh_client::MeshClient>(mesh_io_ptr);
+      auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
+      hdf5_mesh_io->open(mesh_working_file);
+      hdf5_mesh_io->setMeshName(mesh_working_part);
+      mesh_io_ptr = hdf5_mesh_io;
 
-    mesh_client_ptr->setBoundingBox(bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z);
-    mesh_client_ptr->addFilter("roughness", min_roughness, max_roughness);
-    mesh_client_ptr->addFilter("height_diff", min_height_diff, max_height_diff);
-  }
-  else if (!mesh_file.empty() && !mesh_part.empty())
-  {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Load \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
-    HDF5MeshIO* hdf_5_mesh_io = new HDF5MeshIO();
-    hdf_5_mesh_io->open(mesh_file);
-    hdf_5_mesh_io->setMeshName(mesh_part);
-    mesh_io_ptr = std::shared_ptr<lvr2::AttributeMeshIOBase>(hdf_5_mesh_io);
-  }
-  else
-  {
-    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file or server connection!");
-    return false;
+      if(mesh_file != mesh_working_file)
+      {
+        RCLCPP_INFO_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+      
+        std::cout << "Generate seperate working file..." << std::endl;
+        lvr2::MeshBufferPtr mesh_buffer;
+
+        // we have to create the working h5 first
+        if(fs::path(mesh_file).extension() == ".h5")
+        {
+          auto hdf5_mesh_input = std::make_shared<HDF5MeshIO>();
+          hdf5_mesh_input->open(mesh_file);
+          hdf5_mesh_input->setMeshName(mesh_part);
+          mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_part);
+          // TODO: load all attributes?
+        } else {
+          // use another loader
+          
+          // use assimp
+          Assimp::Importer io;
+          io.SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION, true);
+          const aiScene* ascene = io.ReadFile(mesh_file, 
+              aiProcess_Triangulate | 
+              aiProcess_JoinIdenticalVertices | 
+              aiProcess_GenNormals | 
+              aiProcess_ValidateDataStructure | 
+              aiProcess_FindInvalidData);
+          if (!ascene)
+          {
+            RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
+            return false;
+          }
+          mesh_buffer = extractMeshByName(ascene, mesh_part);
+        }
+
+        if(!mesh_buffer)
+        {
+          RCLCPP_ERROR_STREAM(node->get_logger(), "Couldn't load mesh part: '" << mesh_part << "'");
+        }
+
+        // write
+        hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
+      }
+    }
+    else
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
+      return false;
+    }
+  } else {
+    RCLCPP_INFO_STREAM(node->get_logger(), "Connection to file exists already!");
   }
 
-  if (server)
-  {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh from the server '" << srv_url);
-  }
-  else
-  {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
-  }
+  RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
 
   auto mesh_opt = mesh_io_ptr->getMesh();
-
   if (mesh_opt)
   {
     *mesh_ptr = mesh_opt.get();
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
-
+    // build a tree for fast lookups
     adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
     kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
@@ -223,7 +274,6 @@ bool MeshMap::readMap()
   uuid_str = boost::uuids::to_string(uuid);
 
   auto face_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseFaceMap<Normal>>("face_normals");
-
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
@@ -306,8 +356,6 @@ bool MeshMap::readMap()
     RCLCPP_FATAL_STREAM(node->get_logger(), "Could not initialize plugins!");
     return false;
   }
-
-  sleep(1);
 
   combineVertexCosts(map_stamp);
   publishCostLayers(map_stamp);
@@ -411,12 +459,14 @@ bool MeshMap::initLayerPlugins()
     layer_plugin->updateLethal(lethals, empty);
     if (!layer_plugin->readLayer())
     {
+      RCLCPP_INFO_STREAM(node->get_logger(), "Computing layer '" << layer_name << "' ...");
       layer_plugin->computeLayer();
     }
 
     lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
     lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
   }
+
   return true;
 }
 
@@ -436,8 +486,8 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     float min, max;
     mesh_map::getMinMax(costs, min, max);
     const float norm = max - min;
-    const float factor = 1.0; // TODO how to declare param for each plugin? Needs to be done after plugins are loaded, which happens when the map gets loaded. Who calls readMap() and when?
-    // const float factor = private_nh.param<float>(MESH_MAP_NAMESPACE + "/" + layer.first + "/factor", 1.0);
+    const float factor = 1.0;
+    // TODO: carefully think about this
     const float norm_factor = factor / norm;
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
@@ -539,12 +589,11 @@ void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contour
     // If border Edge found
     if ((!facepair[0] || !facepair[1]) && !usedEdges[eHStart])
     {
-    std:
-      vector<lvr2::VertexHandle> contour;
+      std::vector<lvr2::VertexHandle> contour;
       // Set vector which links to the following Edge
-      array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
+      std::array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
       lvr2::VertexHandle vH = vertexPair[1];
-      vector<lvr2::EdgeHandle> curEdges;
+      std::vector<lvr2::EdgeHandle> curEdges;
       lvr2::EdgeHandle eHTemp = eHStart;
       bool moving = true;
       bool vertex_flag = false;
@@ -1112,6 +1161,35 @@ mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
     })->second;
 }
 
+std_srvs::srv::Trigger::Response MeshMap::writeLayers()
+{
+  std::stringstream ss;
+  bool write_failure = false;
+
+  for (auto& layer : loaded_layers)
+  {
+    auto& layer_plugin = layer.second;
+    const auto& layer_name = layer.first;
+
+    RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
+    if(layer_plugin->writeLayer())
+    {
+      RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
+    } else {
+      // this is not the first failure. add a comma in between 
+      if(write_failure){ss << ",";}
+      ss << layer_name;
+      write_failure = true;
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Error while writing '" << layer_name << "' to file.");      
+    }
+  }
+
+  std_srvs::srv::Trigger::Response res;
+  res.success = !write_failure;
+  res.message = ss.str();
+  return res;
+}
+
 bool MeshMap::barycentricCoords(const Vector& p, const lvr2::FaceHandle& triangle, float& u, float& v, float& w)
 {
   const auto& face = mesh_ptr->getVertexPositionsOfFace(triangle);
@@ -1227,7 +1305,8 @@ void MeshMap::publishVertexColors(const rclcpp::Time& map_stamp)
   }
 }
 
-rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
+rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
+  std::vector<rclcpp::Parameter> parameters)
 {
   RCLCPP_DEBUG_STREAM(node->get_logger(), "Set parameters callback...");
   rcl_interfaces::msg::SetParametersResult result;

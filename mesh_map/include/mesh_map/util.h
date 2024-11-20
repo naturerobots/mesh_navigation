@@ -48,6 +48,9 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2/LinearMath/Vector3.h>
 
+#include <lvr2/io/MeshBuffer.hpp>
+#include <assimp/scene.h>
+
 namespace mesh_map
 {
 
@@ -57,6 +60,8 @@ typedef lvr2::Normal<float> Normal;
 //! use vectors with datatype folat
 typedef lvr2::BaseVector<float> Vector;
 
+
+lvr2::MeshBufferPtr extractMeshByName(const aiScene* ascene, std::string name);
 
 /**
  * @brief Function to build std_msgs color instances

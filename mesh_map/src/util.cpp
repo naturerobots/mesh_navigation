@@ -42,8 +42,180 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
 namespace mesh_map
 {
+
+// again this function
+std::vector<std::string> split(std::string s, const std::string& delimiter) 
+{
+  std::vector<std::string> tokens;
+  size_t pos = 0;
+  std::string token;
+  while((pos = s.find(delimiter)) != std::string::npos) 
+  {
+    token = s.substr(0, pos);
+    tokens.push_back(token);
+    s.erase(0, pos + delimiter.length());
+  }
+  tokens.push_back(s);
+
+  return tokens;
+}
+
+const aiNode* getChildByName(const aiNode* node, std::string name)
+{
+  for(size_t i=0; i<node->mNumChildren; i++)
+  {
+    const std::string child_name = node->mChildren[i]->mName.C_Str();
+    if(child_name == name)
+    {
+      return node->mChildren[i];
+    }
+  }
+
+  return nullptr;
+}
+
+const aiMesh* getMeshByName(const aiNode* node, aiMesh** meshes, std::string name)
+{
+  for(size_t i=0; i<node->mNumMeshes; i++)
+  {
+    unsigned int mesh_id = node->mMeshes[i];
+    const aiMesh* mesh = meshes[mesh_id];
+    std::string mesh_name = mesh->mName.C_Str();
+    if(mesh_name == name)
+    {
+      return mesh;
+    }
+  }
+
+  return nullptr;
+}
+
+lvr2::MeshBufferPtr extractMeshByName(
+  const aiScene* ascene,
+  std::string name)
+{
+  lvr2::MeshBufferPtr mesh;
+
+  const aiNode* root_node = ascene->mRootNode;
+
+  // transform from mesh to world
+  aiMatrix4x4 Tmw;
+
+  // (T1 * T2) * T3 * p;
+  std::vector<std::string> path_to_mesh = split(name, "/");
+
+  if(path_to_mesh.size() == 0)
+  {
+    return mesh;
+  }
+
+  const aiNode* node_it = root_node;
+  for(size_t i=1; i<path_to_mesh.size()-1; i++)
+  {
+    node_it = getChildByName(node_it, path_to_mesh[i]);
+    
+    if(node_it == nullptr)
+    {
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("mesh_map/util"), "'" << path_to_mesh[i] << "' not found in input mesh file!");
+      break;
+    }
+    Tmw = Tmw * node_it->mTransformation;
+  }
+
+  if(node_it == nullptr)
+  {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("mesh_map/util"), "Could not find path '" << name << "' in input mesh file");
+    // early stop
+    return mesh;
+  }
+
+  if(node_it->mNumMeshes == 0)
+  {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("mesh_map/util"), "'" << name << "' of input mesh file has not meshes!");
+    // early stop
+    return mesh;
+  }
+
+  const aiMesh* amesh = getMeshByName(node_it, ascene->mMeshes, path_to_mesh.back());
+
+  if(amesh == nullptr)
+  {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("mesh_map/util"), "Leaf does not exist in mesh file!");
+    return mesh;
+  }
+
+  aiVector3D smw;
+  aiQuaternion Rmw;
+  aiVector3D tmw;
+  Tmw.Decompose(smw, Rmw, tmw);
+
+  // fill this
+  mesh = std::make_shared<lvr2::MeshBuffer>();
+  
+  lvr2::Channel<float> vertices(amesh->mNumVertices, 3);
+  for(size_t i=0; i<amesh->mNumVertices; i++)
+  {
+    aiVector3D avertex = Tmw * amesh->mVertices[i];
+    vertices[i][0] = avertex.x;
+    vertices[i][1] = avertex.y;
+    vertices[i][2] = avertex.z;
+  }
+  (*mesh)["vertices"] = vertices;
+
+  lvr2::Channel<unsigned int> face_indices(amesh->mNumFaces, 3);
+  if(amesh->mNumFaces == 0)
+  {
+    throw std::runtime_error("TRIED TO LOAD 0 TRIANGLES");
+  }
+  for(size_t i=0; i<amesh->mNumFaces; i++)
+  {
+    if(amesh->mFaces[i].mNumIndices != 3)
+    {
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("mesh_map/util"), "Mesh contains elements that are no triangles: " << amesh->mFaces[i].mNumIndices);
+      throw std::runtime_error("TRIED TO LOAD NON-TRIANGLES");
+    }
+    face_indices[i][0] = amesh->mFaces[i].mIndices[0];
+    face_indices[i][1] = amesh->mFaces[i].mIndices[1];
+    face_indices[i][2] = amesh->mFaces[i].mIndices[2]; 
+  }
+  (*mesh)["face_indices"] = face_indices;
+  
+  if(amesh->HasNormals())
+  {
+    // vertex normals
+    lvr2::Channel<float> vertex_normals(amesh->mNumVertices, 3);
+    for(size_t i=0; i<amesh->mNumVertices; i++)
+    {
+      aiVector3D anormal = Rmw.Rotate(amesh->mNormals[i]);
+      vertex_normals[i][0] = anormal.x;
+      vertex_normals[i][1] = anormal.y;
+      vertex_normals[i][2] = anormal.z;
+    }
+    (*mesh)["vertex_normals"] = vertex_normals;
+  }
+
+  if(amesh->HasVertexColors(0))
+  {
+    lvr2::Channel<unsigned char> vertex_colors(amesh->mNumVertices, 4);
+    for(size_t i=0; i<amesh->mNumVertices; i++)
+    {
+      vertex_colors[i][0] = amesh->mColors[0][i].r;
+      vertex_colors[i][1] = amesh->mColors[0][i].g;
+      vertex_colors[i][2] = amesh->mColors[0][i].b;
+      vertex_colors[i][3] = amesh->mColors[0][i].a;
+    }
+    (*mesh)["vertex_colors"] = vertex_colors;
+  }
+
+  return mesh;
+}
+
 void getMinMax(const lvr2::VertexMap<float>& costs, float& min, float& max)
 {
   max = std::numeric_limits<float>::min();
