@@ -65,7 +65,7 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
                             std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message)
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
   std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> path;
 
   // mesh_map->combineVertexCosts(); // TODO should be outside the planner
@@ -161,8 +161,8 @@ bool CVPMeshPlanner::initialize(const std::string& plugin_name, const std::share
   }
 
   path_pub_ = node->create_publisher<nav_msgs::msg::Path>("~/path", rclcpp::QoS(1).transient_local());
-  const auto& mesh = mesh_map_->mesh();
-  direction_ = lvr2::DenseVertexMap<float>(mesh.nextVertexIndex(), 0);
+  const auto mesh = mesh_map_->mesh();
+  direction_ = lvr2::DenseVertexMap<float>(mesh->nextVertexIndex(), 0);
   // TODO check all map dependencies! (loaded layers etc...)
 
   reconfiguration_callback_handle_ = node_->add_on_set_parameters_callback(std::bind(
@@ -189,11 +189,11 @@ rcl_interfaces::msg::SetParametersResult CVPMeshPlanner::reconfigureCallback(std
 
 void CVPMeshPlanner::computeVectorMap()
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
   const auto& face_normals = mesh_map_->faceNormals();
   const auto& vertex_normals = mesh_map_->vertexNormals();
 
-  for (auto v3 : mesh.vertices())
+  for (auto v3 : mesh->vertices())
   {
     // if(vertex_costs[v3] > config.cost_limit || !predecessors.containsKey(v3))
     // continue;
@@ -212,8 +212,8 @@ void CVPMeshPlanner::computeVectorMap()
 
     const lvr2::FaceHandle& fH = optFh.get();
 
-    const auto& vec3 = mesh.getVertexPosition(v3);
-    const auto& vec1 = mesh.getVertexPosition(v1);
+    const auto& vec3 = mesh->getVertexPosition(v3);
+    const auto& vec1 = mesh->getVertexPosition(v1);
 
     // compute the direction vector and rotate it by theta, which is stored in
     // the direction vertex map
@@ -237,21 +237,21 @@ inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& di
                                                    const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2,
                                                    const lvr2::VertexHandle& v3)
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
 
   const double u1 = distances[v1];
   const double u2 = distances[v2];
   const double u3 = distances[v3];
 
-  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const lvr2::OptionalEdgeHandle e12h = mesh->getEdgeBetween(v1, v2);
   const double c = edge_weights[e12h.unwrap()];
   const double c_sq = c * c;
 
-  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const lvr2::OptionalEdgeHandle e13h = mesh->getEdgeBetween(v1, v3);
   const double b = edge_weights[e13h.unwrap()];
   const double b_sq = b * b;
 
-  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const lvr2::OptionalEdgeHandle e23h = mesh->getEdgeBetween(v2, v3);
   const double a = edge_weights[e23h.unwrap()];
   const double a_sq = a * a;
 
@@ -284,7 +284,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& di
         predecessors_[v3] = v1;
         direction_[v3] = static_cast<float>(theta);
         distances[v3] = static_cast<float>(u3tmp);
-        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        const lvr2::FaceHandle fh = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fh);
 #ifdef DEBUG
         mesh_map->publishDebugVector(v3, v1, fh, theta, mesh_map::color(0.9, 0.9, 0.2),
@@ -300,7 +300,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& di
           predecessors_[v3] = v1;
           direction_[v3] = 0;
           distances[v3] = u3tmp;
-          const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+          const lvr2::FaceHandle fh = mesh->getFaceBetween(v1, v2, v3).unwrap();
           cutting_faces_.insert(v3, fh);
 #ifdef DEBUG
           mesh_map->publishDebugVector(v3, v1, fh, 0, mesh_map::color(0.9, 0.9, 0.2),
@@ -317,7 +317,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& di
       const double t2cos = (a_sq + u3tmp_sq - u2_sq) / (2 * a * u3tmp);
       if (S <= 0 && std::fabs(t2cos) <= 1)
       {
-        const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        const lvr2::FaceHandle fh = mesh->getFaceBetween(v1, v2, v3).unwrap();
         const double theta = -acos(t2cos);
         direction_[v3] = static_cast<float>(theta);
         distances[v3] = static_cast<float>(u3tmp);
@@ -337,7 +337,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateWithS(lvr2::DenseVertexMap<float>& di
           direction_[v3] = 0;
           distances[v3] = u3tmp;
           predecessors_[v3] = v2;
-          const lvr2::FaceHandle fh = mesh.getFaceBetween(v1, v2, v3).unwrap();
+          const lvr2::FaceHandle fh = mesh->getFaceBetween(v1, v2, v3).unwrap();
           cutting_faces_.insert(v3, fh);
 #ifdef DEBUG
           mesh_map->publishDebugVector(v3, v2, fh, 0, mesh_map::color(0.9, 0.9, 0.2),
@@ -357,21 +357,21 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
                                               const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2,
                                               const lvr2::VertexHandle& v3)
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
 
   const double u1 = distances[v1];
   const double u2 = distances[v2];
   const double u3 = distances[v3];
 
-  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const lvr2::OptionalEdgeHandle e12h = mesh->getEdgeBetween(v1, v2);
   const double c = edge_weights[e12h.unwrap()];
   const double c_sq = c * c;
 
-  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const lvr2::OptionalEdgeHandle e13h = mesh->getEdgeBetween(v1, v3);
   const double b = edge_weights[e13h.unwrap()];
   const double b_sq = b * b;
 
-  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const lvr2::OptionalEdgeHandle e23h = mesh->getEdgeBetween(v2, v3);
   const double a = edge_weights[e23h.unwrap()];
   const double a_sq = a * a;
 
@@ -406,7 +406,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
       u3tmp = u1 + b;
       if (u3tmp < u3)
       {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v1;
 #ifdef DEBUG
@@ -425,7 +425,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
       u3tmp = u2 + a;
       if (u3tmp < u3)
       {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v2;
 #ifdef DEBUG
@@ -478,7 +478,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 
     if (theta1 < theta0 && theta2 < theta0)
     {
-      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+      auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
       cutting_faces_.insert(v3, fH);
       distances[v3] = static_cast<float>(u3tmp);
       if (theta1 < theta2)
@@ -506,7 +506,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
       u3tmp = u1 + b;
       if (u3tmp < u3)
       {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v1;
         distances[v3] = static_cast<float>(u3tmp);
@@ -524,7 +524,7 @@ inline bool CVPMeshPlanner::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
       u3tmp = u2 + a;
       if (u3tmp < u3)
       {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v2;
         distances[v3] = static_cast<float>(u3tmp);
@@ -549,7 +549,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
     const lvr2::VertexHandle &v2tmp,
     const lvr2::VertexHandle &v3)
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
 
   bool v1_smaller = distances[v1tmp] < distances[v2tmp];
   const lvr2::VertexHandle v1 = v1_smaller ? v1tmp : v2tmp;
@@ -559,15 +559,15 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
   const double u2 = distances[v2];
   const double u3 = distances[v3];
 
-  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1, v2);
+  const lvr2::OptionalEdgeHandle e12h = mesh->getEdgeBetween(v1, v2);
   const double c = edge_weights[e12h.unwrap()];
   const double c_sq = c * c;
 
-  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1, v3);
+  const lvr2::OptionalEdgeHandle e13h = mesh->getEdgeBetween(v1, v3);
   const double b = edge_weights[e13h.unwrap()];
   const double b_sq = b * b;
 
-  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2, v3);
+  const lvr2::OptionalEdgeHandle e23h = mesh->getEdgeBetween(v2, v3);
   const double a = edge_weights[e23h.unwrap()];
   const double a_sq = a * a;
 
@@ -596,7 +596,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
     const double u3_tmp = u1 + t;
     if(u3_tmp < u3)
     {
-      auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+      auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
       cutting_faces_.insert(v3, fH);
       predecessors_[v3] = v1;
       distances[v3] = static_cast<float>(u3_tmp);
@@ -612,7 +612,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
 
     if (u1t < u2t) {
       if (u1t < u3) {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v1;
         distances[v3] = static_cast<float>(u1t);
@@ -621,7 +621,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
       }
     } else {
       if (u2t < u3) {
-        auto fH = mesh.getFaceBetween(v1, v2, v3).unwrap();
+        auto fH = mesh->getFaceBetween(v1, v2, v3).unwrap();
         cutting_faces_.insert(v3, fH);
         predecessors_[v3] = v2;
         distances[v3] = static_cast<float>(u2t);
@@ -645,7 +645,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
 {
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "Init wave front propagation.");
 
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
   const auto& vertex_costs = mesh_map_->vertexCosts();
   auto& invalid = mesh_map_->invalid;
 
@@ -683,14 +683,14 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   distances.clear();
   predecessors.clear();
 
-  lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
+  lvr2::DenseVertexMap<bool> fixed(mesh->nextVertexIndex(), false);
 
   // clear vector field map
   vector_map_.clear();
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
-  for (auto const& vH : mesh.vertices())
+  for (auto const& vH : mesh->vertices())
   {
     distances.insert(vH, std::numeric_limits<float>::infinity());
     predecessors.insert(vH, vH);
@@ -699,9 +699,9 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   lvr2::Meap<lvr2::VertexHandle, float> pq;
   // Set start distance to zero
   // add start vertex to priority queue
-  for (auto vH : mesh.getVerticesOfFace(start_face))
+  for (auto vH : mesh->getVerticesOfFace(start_face))
   {
-    const mesh_map::Vector diff = start - mesh.getVertexPosition(vH);
+    const mesh_map::Vector diff = start - mesh->getVertexPosition(vH);
     const float dist = diff.length();
     distances[vH] = dist;
     vector_map_.insert(vH, diff);
@@ -710,13 +710,13 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     pq.insert(vH, dist);
   }
 
-  std::array<lvr2::VertexHandle, 3> goal_vertices = mesh.getVerticesOfFace(goal_face);
+  std::array<lvr2::VertexHandle, 3> goal_vertices = mesh->getVerticesOfFace(goal_face);
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "The goal is at (" << goal.x << ", " << goal.y << ", " << goal.z << ") at the face ("
                                      << goal_vertices[0] << ", " << goal_vertices[1] << ", " << goal_vertices[2]
                                      << ")");
-  mesh_map_->publishDebugPoint(mesh.getVertexPosition(goal_vertices[0]), mesh_map::color(0, 0, 1), "goal_face_v1");
-  mesh_map_->publishDebugPoint(mesh.getVertexPosition(goal_vertices[1]), mesh_map::color(0, 0, 1), "goal_face_v2");
-  mesh_map_->publishDebugPoint(mesh.getVertexPosition(goal_vertices[2]), mesh_map::color(0, 0, 1), "goal_face_v3");
+  mesh_map_->publishDebugPoint(mesh->getVertexPosition(goal_vertices[0]), mesh_map::color(0, 0, 1), "goal_face_v1");
+  mesh_map_->publishDebugPoint(mesh->getVertexPosition(goal_vertices[1]), mesh_map::color(0, 0, 1), "goal_face_v2");
+  mesh_map_->publishDebugPoint(mesh->getVertexPosition(goal_vertices[2]), mesh_map::color(0, 0, 1), "goal_face_v3");
 
   float goal_dist = std::numeric_limits<float>::infinity();
 
@@ -756,11 +756,11 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     try
     {
       std::vector<lvr2::FaceHandle> faces;
-      mesh.getFacesOfVertex(current_vh, faces);
+      mesh->getFacesOfVertex(current_vh, faces);
 
       for (auto fh : faces)
       {
-        const auto vertices = mesh.getVerticesOfFace(fh);
+        const auto vertices = mesh->getVerticesOfFace(fh);
         const lvr2::VertexHandle& a = vertices[0];
         const lvr2::VertexHandle& b = vertices[1];
         const lvr2::VertexHandle& c = vertices[2];

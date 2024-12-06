@@ -43,8 +43,8 @@
 #include <tuple>
 #include <unordered_map>
 #include <geometry_msgs/msg/point.hpp>
-#include <lvr2/geometry/BaseVector.hpp>
-#include <lvr2/io/HDF5IO.hpp>
+#include <memory>
+
 #include <mesh_map/abstract_layer.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
@@ -55,12 +55,17 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
+#include <lvr2/geometry/BaseVector.hpp>
+#include <lvr2/io/AttributeMeshIOBase.hpp>
+#include <lvr2/geometry/BaseMesh.hpp>
+
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
+
 namespace mesh_map
 {
-class MeshMap
+class MeshMap : public std::enable_shared_from_this<MeshMap>
 {
 public:
   inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
@@ -270,9 +275,17 @@ public:
   /**
    * @brief Returns the stored mesh
    */
-  const lvr2::HalfEdgeMesh<Vector>& mesh()
+  std::shared_ptr<lvr2::BaseMesh<Vector> > mesh()
   {
-    return *mesh_ptr;
+    return mesh_ptr;
+  }
+
+  /**
+   * @brief Returns the mesh-io object
+   */
+  std::shared_ptr<lvr2::AttributeMeshIOBase> meshIO()
+  {
+    return mesh_io_ptr;
   }
 
   /**
@@ -420,7 +433,7 @@ public:
   //! However we could also implement a server connection here
   //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr;
+  std::shared_ptr<lvr2::BaseMesh<Vector>> mesh_ptr;
 
   lvr2::DenseVertexMap<bool> invalid;
 private:
@@ -527,9 +540,6 @@ private:
   typedef nanoflann::KDTreeSingleIndexAdaptor<
       nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
       NanoFlannMeshAdaptor, 3> KDTree;
-
-  //! k-d tree nano flann mesh adaptor to access mesh data
-  std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
 
   //! k-d tree to query mesh vertices in logarithmic time
   std::unique_ptr<KDTree> kd_tree_ptr;

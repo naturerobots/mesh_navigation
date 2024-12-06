@@ -159,18 +159,14 @@ public:
   virtual bool initialize(
     const std::string& name,
     const notify_func notify_update,
-    std::shared_ptr<mesh_map::MeshMap>& map,
-    std::shared_ptr<lvr2::HalfEdgeMesh<Vector>>& mesh,
-    std::shared_ptr<lvr2::AttributeMeshIOBase>& io,
-    const rclcpp::Node::SharedPtr& node)
+    std::shared_ptr<mesh_map::MeshMap> map,
+    const rclcpp::Node::SharedPtr node)
   {
     layer_name_ = name;
     node_ = node;
     layer_namespace_ = "mesh_map/" + name;
     notify_ = notify_update;
-    mesh_ptr_ = mesh;
     map_ptr_ = map;
-    mesh_io_ptr_ = io;
     return initialize();
   }
 
@@ -181,8 +177,6 @@ public:
 
 protected:
   std::string layer_name_;
-  std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr_;
-  std::shared_ptr<lvr2::HalfEdgeMesh<Vector>> mesh_ptr_;
   std::shared_ptr<mesh_map::MeshMap> map_ptr_;
 
   rclcpp::Node::SharedPtr node_;

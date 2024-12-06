@@ -39,16 +39,19 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <optional>
+
 #include <functional>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
-#include <mesh_client/mesh_client.h>
 
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
-#include <lvr2/io/hdf5/MeshIO.hpp>
+#include <lvr2/io/deprecated/hdf5/MeshIO.hpp>
+#include <lvr2/types/MeshBuffer.hpp>
+
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
@@ -245,16 +248,15 @@ bool MeshMap::readMap()
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
 
-  auto mesh_opt = mesh_io_ptr->getMesh();
-  if (mesh_opt)
+  if(auto mesh_opt = mesh_io_ptr->getMesh())
   {
     *mesh_ptr = mesh_opt.get();
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
     // build a tree for fast lookups
-    adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(*mesh_ptr);
-    kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+    // adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(mesh_ptr);
+    kd_tree_ptr = std::make_unique<KDTree>(3, NanoFlannMeshAdaptor(mesh_ptr), nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
     RCLCPP_INFO_STREAM(node->get_logger(), "The k-d tree has been build successfully!");
   }
@@ -326,7 +328,7 @@ bool MeshMap::readMap()
     sleep(0.5);
     map_stamp = node->now();
   }
-  mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(*mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
+  mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
   publishVertexColors(map_stamp);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Try to read edge distances from map file...");
@@ -450,8 +452,6 @@ bool MeshMap::initLayerPlugins()
   lethals.clear();
   lethal_indices.clear();
 
-  std::shared_ptr<mesh_map::MeshMap> map(this);
-
   for (auto& layer : loaded_layers)
   {
     auto& layer_plugin = layer.second;
@@ -459,7 +459,7 @@ bool MeshMap::initLayerPlugins()
 
     auto callback = [this](const std::string& layer_name) { layerChanged(layer_name); };
 
-    if (!layer_plugin->initialize(layer_name, callback, map, mesh_ptr, mesh_io_ptr, node))
+    if (!layer_plugin->initialize(layer_name, callback, shared_from_this(), node))
     {
       RCLCPP_ERROR_STREAM(node->get_logger(), "Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
       return false;
@@ -825,7 +825,7 @@ void MeshMap::publishVectorField(const std::string& name,
                                  const lvr2::DenseVertexMap<float>& values,
                                  const std::function<float(float)>& cost_function, const bool publish_face_vectors)
 {
-  const auto& mesh = this->mesh();
+  const auto mesh = this->mesh();
   const auto& vertex_costs = vertexCosts();
   const auto& face_normals = faceNormals();
 
@@ -851,7 +851,7 @@ void MeshMap::publishVectorField(const std::string& name,
   unsigned int cnt = 0;
   unsigned int faces = 0;
 
-  lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh.numFaces(), 0);
+  lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh->numFaces(), 0);
   std::set<lvr2::FaceHandle> complete_faces;
 
   for (auto vH : vector_map)
@@ -864,7 +864,7 @@ void MeshMap::publishVectorField(const std::string& name,
       continue;
     }
 
-    auto u = mesh.getVertexPosition(vH);
+    auto u = mesh->getVertexPosition(vH);
     auto v = u + dir_vec * 0.1;
 
     u.z = u.z + 0.01;
@@ -889,7 +889,7 @@ void MeshMap::publishVectorField(const std::string& name,
     // vector_field.markers.push_back(vector);
     try
     {
-      for (auto fH : mesh.getFacesOfVertex(vH))
+      for (auto fH : mesh->getFacesOfVertex(vH))
       {
         if (++vector_field_faces[fH] == 3)
         {
@@ -923,8 +923,8 @@ void MeshMap::publishVectorField(const std::string& name,
 
     for (auto fH : complete_faces)
     {
-      const auto& vertices = mesh.getVertexPositionsOfFace(fH);
-      const auto& vertex_handles = mesh.getVerticesOfFace(fH);
+      const auto& vertices = mesh->getVertexPositionsOfFace(fH);
+      const auto& vertex_handles = mesh->getVerticesOfFace(fH);
       mesh_map::Vector center = (vertices[0] + vertices[1] + vertices[2]) / 3;
       std::array<float, 3> barycentric_coords;
       float dist;

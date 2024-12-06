@@ -48,7 +48,7 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2/LinearMath/Vector3.h>
 
-#include <lvr2/io/MeshBuffer.hpp>
+#include <lvr2/types/MeshBuffer.hpp>
 #include <assimp/scene.h>
 
 namespace mesh_map

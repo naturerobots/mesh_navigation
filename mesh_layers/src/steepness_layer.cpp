@@ -49,7 +49,8 @@ namespace mesh_layers
 bool SteepnessLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read steepness from map file...");
-  auto steepness_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
+  auto mesh_io = map_ptr_->meshIO();
+  auto steepness_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (steepness_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read steepness from map file.");
@@ -62,7 +63,8 @@ bool SteepnessLayer::readLayer()
 
 bool SteepnessLayer::writeLayer()
 {
-  if (mesh_io_ptr_->addDenseAttributeMap(steepness_, layer_name_))
+  auto mesh_io = map_ptr_->meshIO();
+  if (mesh_io->addDenseAttributeMap(steepness_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved steepness to map file.");
     return true;
@@ -98,7 +100,9 @@ bool SteepnessLayer::computeLayer()
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  auto face_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
+  const auto mesh = map_ptr_->mesh();
+  auto mesh_io = map_ptr_->meshIO();
+  auto face_normals_opt = mesh_io->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
 
   if (face_normals_opt)
   {
@@ -108,9 +112,9 @@ bool SteepnessLayer::computeLayer()
   else
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr_);
+    face_normals = lvr2::calcFaceNormals(*mesh);
     RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
-    if (mesh_io_ptr_->addDenseAttributeMap(face_normals, "face_normals"))
+    if (mesh_io->addDenseAttributeMap(face_normals, "face_normals"))
     {
       RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     }
@@ -122,7 +126,7 @@ bool SteepnessLayer::computeLayer()
   }
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-  auto vertex_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
+  auto vertex_normals_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
 
   if (vertex_normals_opt)
   {
@@ -132,8 +136,8 @@ bool SteepnessLayer::computeLayer()
   else
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr_, face_normals);
-    if (mesh_io_ptr_->addDenseAttributeMap(vertex_normals, "vertex_normals"))
+    vertex_normals = lvr2::calcVertexNormals(*mesh, face_normals);
+    if (mesh_io->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
       RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     }
@@ -144,12 +148,12 @@ bool SteepnessLayer::computeLayer()
     }
   }
 
-  steepness_.reserve(mesh_ptr_->nextVertexIndex());
+  steepness_.reserve(mesh->nextVertexIndex());
 
-  for (size_t i = 0; i < mesh_ptr_->nextVertexIndex(); i++)
+  for (size_t i = 0; i < mesh->nextVertexIndex(); i++)
   {
     auto vH = lvr2::VertexHandle(i);
-    if (!mesh_ptr_->containsVertex(vH))
+    if (!mesh->containsVertex(vH))
     {
       continue;
     }
