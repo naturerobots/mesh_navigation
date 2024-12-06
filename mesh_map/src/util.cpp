@@ -49,7 +49,6 @@ namespace fs = std::filesystem;
 namespace mesh_map
 {
 
-// again this function
 std::vector<std::string> split(std::string s, const std::string& delimiter) 
 {
   std::vector<std::string> tokens;
@@ -100,6 +99,9 @@ lvr2::MeshBufferPtr extractMeshByName(
   const aiScene* ascene,
   std::string name)
 {
+  std::cout << "extractMeshByName" << std::endl;
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("mesh_map/util"), "HELLOO");
+
   lvr2::MeshBufferPtr mesh;
 
   const aiNode* root_node = ascene->mRootNode;
@@ -112,12 +114,15 @@ lvr2::MeshBufferPtr extractMeshByName(
 
   if(path_to_mesh.size() == 0)
   {
+    std::cout << "path empty!" << std::endl;
     return mesh;
   }
 
   const aiNode* node_it = root_node;
   for(size_t i=1; i<path_to_mesh.size()-1; i++)
   {
+    // std::cout << "Get Node by Name: '" << path_to_mesh[i] << "'" << std::endl;
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("mesh_map/util"), "Get Node by Name: '" << path_to_mesh[i] << "'");
     node_it = getChildByName(node_it, path_to_mesh[i]);
     
     if(node_it == nullptr)

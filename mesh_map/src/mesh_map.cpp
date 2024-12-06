@@ -163,7 +163,12 @@ bool MeshMap::readMap()
 { 
   if(!mesh_io_ptr)
   {
-    if(!mesh_file.empty() && !mesh_part.empty())
+    if(mesh_file.empty())
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
+      return false;
+    } 
+    else 
     {
       if(mesh_working_file == "")
       {
@@ -225,22 +230,22 @@ bool MeshMap::readMap()
             RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
             return false;
           }
+          RCLCPP_INFO_STREAM(node->get_logger(), "extractMeshByName");
           mesh_buffer = extractMeshByName(ascene, mesh_part);
         }
 
         if(!mesh_buffer)
         {
           RCLCPP_ERROR_STREAM(node->get_logger(), "Couldn't load mesh part: '" << mesh_part << "'");
+          return false;
         }
 
+        RCLCPP_INFO_STREAM(node->get_logger(), "Loaded mesh buffer: \n" << *mesh_buffer);
+
         // write
+        
         hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
       }
-    }
-    else
-    {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open file connection!");
-      return false;
     }
   } else {
     RCLCPP_INFO_STREAM(node->get_logger(), "Connection to file exists already!");
@@ -248,9 +253,17 @@ bool MeshMap::readMap()
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
 
-  if(auto mesh_opt = mesh_io_ptr->getMesh())
+  auto hdf5_mesh_input = std::make_shared<HDF5MeshIO>();
+  hdf5_mesh_input->open(mesh_working_file);
+  hdf5_mesh_input->setMeshName(mesh_working_part);
+  lvr2::MeshBufferPtr mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_working_part);
+
+  RCLCPP_INFO_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
+
+  // auto mesh_opt = mesh_io_ptr->getMesh();
+  if(mesh_buffer)
   {
-    *mesh_ptr = mesh_opt.get();
+    mesh_ptr = std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
