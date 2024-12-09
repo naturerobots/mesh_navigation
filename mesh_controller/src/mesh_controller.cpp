@@ -144,10 +144,9 @@ uint32_t MeshController::computeVelocityCommands(const geometry_msgs::msg::PoseS
   }
 
   const lvr2::FaceHandle& face = current_face_.unwrap();
-  std::array<lvr2::VertexHandle, 3> handles = map_ptr_->mesh_ptr->getVerticesOfFace(face);
+  std::array<lvr2::VertexHandle, 3> handles = mesh->getVerticesOfFace(face);
 
   // update to which position of the plan the robot is closest
-
   const auto& opt_dir = map_ptr_->directionAtPosition(vector_map_, handles, bary_coords);
   if (!opt_dir)
   {

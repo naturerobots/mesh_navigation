@@ -40,6 +40,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <optional>
+#include <memory>
 
 #include <functional>
 #include <geometry_msgs/msg/point_stamped.hpp>
@@ -51,6 +52,13 @@
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <lvr2/io/deprecated/hdf5/MeshIO.hpp>
 #include <lvr2/types/MeshBuffer.hpp>
+
+// Half Edge Mesh (HEM) Base
+#include <lvr2/geometry/BaseMesh.hpp>
+
+// Half Edge Mesh (HEM) Implementations
+#include <lvr2/geometry/HalfEdgeMesh.hpp>
+#include <lvr2/geometry/PMPMesh.hpp>
 
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
@@ -71,6 +79,22 @@ namespace fs = std::filesystem;
 namespace mesh_map
 {
 
+std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, lvr2::MeshBufferPtr mesh_buffer)
+{
+  if(hem_impl == "pmp")
+  {
+    return std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
+  } 
+  else if(hem_impl == "lvr")
+  {
+    return std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
+  }
+
+  std::stringstream error_msg;
+  error_msg << "'" << hem_impl << "' not known." << std::endl;
+  throw std::runtime_error(error_msg.str());
+}
+
 using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
@@ -79,7 +103,6 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , first_config(true)
   , map_loaded(false)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
-  , mesh_ptr(new lvr2::HalfEdgeMesh<Vector>())
 {
   auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
   min_contour_size_desc.name = MESH_MAP_NAMESPACE + ".min_contour_size";
@@ -110,6 +133,8 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   cost_limit_range.to_value = 10.0;
   cost_limit_desc.floating_point_range.push_back(cost_limit_range);
   cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + ".cost_limit", 1.0);
+
+  hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
@@ -179,9 +204,9 @@ bool MeshMap::readMap()
       if(mesh_working_part == "")
       {
         mesh_working_part = mesh_part;
-        RCLCPP_INFO_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part as default: '" << mesh_working_part << "'");
+        RCLCPP_DEBUG_STREAM(node->get_logger(), "Mesh Working Part is empty. Using mesh part as default: '" << mesh_working_part << "'");
       } else {
-        RCLCPP_INFO_STREAM(node->get_logger(), "Using mesh working part from parameter: '" << mesh_working_part << "'");
+        RCLCPP_DEBUG_STREAM(node->get_logger(), "Using mesh working part from parameter: '" << mesh_working_part << "'");
       }
       
       if(fs::path(mesh_working_file).extension() != ".h5")
@@ -191,7 +216,7 @@ bool MeshMap::readMap()
       }
       
       // directly work on the input file
-      RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
+      RCLCPP_DEBUG_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
 
       auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
       hdf5_mesh_io->open(mesh_working_file);
@@ -200,7 +225,7 @@ bool MeshMap::readMap()
 
       if(mesh_file != mesh_working_file)
       {
-        RCLCPP_INFO_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+        RCLCPP_DEBUG_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
       
         std::cout << "Generate seperate working file..." << std::endl;
         lvr2::MeshBufferPtr mesh_buffer;
@@ -230,7 +255,6 @@ bool MeshMap::readMap()
             RCLCPP_ERROR_STREAM(node->get_logger(), "Error while loading map: " << io.GetErrorString());
             return false;
           }
-          RCLCPP_INFO_STREAM(node->get_logger(), "extractMeshByName");
           mesh_buffer = extractMeshByName(ascene, mesh_part);
         }
 
@@ -243,39 +267,39 @@ bool MeshMap::readMap()
         RCLCPP_INFO_STREAM(node->get_logger(), "Loaded mesh buffer: \n" << *mesh_buffer);
 
         // write
-        
         hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
       }
     }
   } else {
-    RCLCPP_INFO_STREAM(node->get_logger(), "Connection to file exists already!");
+    RCLCPP_DEBUG_STREAM(node->get_logger(), "Connection to file exists already!");
   }
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
+  RCLCPP_DEBUG_STREAM(node->get_logger(), "Start reading the mesh part '" << mesh_part << "' from the map file '" << mesh_file << "'...");
 
   auto hdf5_mesh_input = std::make_shared<HDF5MeshIO>();
   hdf5_mesh_input->open(mesh_working_file);
   hdf5_mesh_input->setMeshName(mesh_working_part);
   lvr2::MeshBufferPtr mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_working_part);
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
+  RCLCPP_DEBUG_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
 
-  // auto mesh_opt = mesh_io_ptr->getMesh();
   if(mesh_buffer)
   {
-    mesh_ptr = std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
-    RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
+    RCLCPP_DEBUG_STREAM(node->get_logger(), "Creating mesh of type '" << hem_impl_ << "'");
+    mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
+    RCLCPP_INFO_STREAM(node->get_logger(), "The mesh of type '" << hem_impl_ <<  "' has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
     // build a tree for fast lookups
-    // adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(mesh_ptr);
-    kd_tree_ptr = std::make_unique<KDTree>(3, NanoFlannMeshAdaptor(mesh_ptr), nanoflann::KDTreeSingleIndexAdaptorParams(10));
+    adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(mesh_ptr);
+    kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
     RCLCPP_INFO_STREAM(node->get_logger(), "The k-d tree has been build successfully!");
   }
   else
   {
     RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the mesh '" << mesh_part << "' from the map file '" << mesh_file << "' ");
+    throw std::runtime_error("Could not load mesh");
     return false;
   }
 
@@ -297,7 +321,7 @@ bool MeshMap::readMap()
   else
   {
     RCLCPP_INFO_STREAM(node->get_logger(), "No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr);
+    face_normals = lvr2::calcFaceNormals(*mesh_ptr); // -> lvr2::DenseFaceMap<Normal>
     RCLCPP_INFO_STREAM(node->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
     if (mesh_io_ptr->addDenseAttributeMap(face_normals, "face_normals"))
     {
@@ -309,6 +333,7 @@ bool MeshMap::readMap()
     }
   }
 
+  RCLCPP_INFO_STREAM(node->get_logger(), "Create 'vertex_normals'");
   auto vertex_normals_opt = mesh_io_ptr->getDenseAttributeMap<lvr2::DenseVertexMap<Normal>>("vertex_normals");
 
   if (vertex_normals_opt)
@@ -512,6 +537,12 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     const float factor = 1.0;
     // TODO: carefully think about this
     const float norm_factor = factor / norm;
+
+    if(norm <= 0.00001)
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer.first << "\": ERROR - range between max and min value has to be >0.");
+    }
+
     RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
                                << " factor: " << factor << " norm factor: " << norm_factor);
 
@@ -1108,13 +1139,19 @@ lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const floa
 {
   auto search_result = searchContainingFace(position, max_dist);
   if(search_result)
+  {
     return std::get<0>(*search_result);
+  }
   return lvr2::OptionalFaceHandle();
 }
 
-boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector , 3>,
-    std::array<float, 3>>> MeshMap::searchContainingFace(
-    Vector& query_point, const float& max_dist)
+boost::optional<std::tuple<           // returns:
+    lvr2::FaceHandle,                 // -> face handle 
+    std::array<mesh_map::Vector, 3>,  // -> closest face vertices (why no handles?)
+    std::array<float, 3>              // -> barycentric coords on closest face
+    >> MeshMap::searchContainingFace( // inputs:
+      Vector& query_point,            // -> query point
+      const float& max_dist)          // -> maximum search radius around query point
 {
   if(auto vH_opt = getNearestVertexHandle(query_point))
   {
@@ -1154,6 +1191,12 @@ lvr2::OptionalVertexHandle MeshMap::getNearestVertexHandle(const Vector& pos)
   float querry_point[3] = {pos.x, pos.y, pos.z};
   size_t ret_index;
   float out_dist_sqr;
+
+  if(!kd_tree_ptr)
+  {
+    throw std::runtime_error("Tried to access kd tree which is not yet initialized");
+  }
+
   size_t num_results = kd_tree_ptr->knnSearch(&querry_point[0], 1, &ret_index, &out_dist_sqr);
   return num_results == 0 ? lvr2::OptionalVertexHandle() : lvr2::VertexHandle(ret_index);
 }

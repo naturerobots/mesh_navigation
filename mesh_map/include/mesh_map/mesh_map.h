@@ -428,14 +428,17 @@ public:
    */
   std_srvs::srv::Trigger::Response writeLayers();
 
+  lvr2::DenseVertexMap<bool> invalid;
+
+protected:
   //! This is an abstract interface to load mesh information from somewhere
   //! The default case is loading from a HDF5 file
   //! However we could also implement a server connection here
   //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
   std::shared_ptr<lvr2::BaseMesh<Vector>> mesh_ptr;
+  std::string hem_impl_;
 
-  lvr2::DenseVertexMap<bool> invalid;
 private:
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
@@ -540,6 +543,9 @@ private:
   typedef nanoflann::KDTreeSingleIndexAdaptor<
       nanoflann::L2_Simple_Adaptor<float, NanoFlannMeshAdaptor>,
       NanoFlannMeshAdaptor, 3> KDTree;
+
+  //! k-d tree nano flann mesh adaptor to access mesh data
+  std::unique_ptr<NanoFlannMeshAdaptor> adaptor_ptr;
 
   //! k-d tree to query mesh vertices in logarithmic time
   std::unique_ptr<KDTree> kd_tree_ptr;
