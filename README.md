@@ -5,7 +5,7 @@
 <div align="center">
   <a href="https://github.com/naturerobots/mesh_navigation_tutorials">Tutorials</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://github.com/naturerobots/mesh_navigation_tutorials/wiki">Documentation</a>
+  <a href="https://naturerobots.github.io/mesh_navigation_docs/">Documentation</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://www.youtube.com/@nature-robots">Videos</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
