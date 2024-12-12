@@ -199,6 +199,7 @@ bool MeshMap::readMap()
       {
         // default: mesh_working_file = mesh_file filename in this directory
         mesh_working_file = fs::path(mesh_file).replace_extension(".h5");
+        RCLCPP_INFO_STREAM(node->get_logger(), "No mesh working file specified. Setting it to '" << mesh_working_file << "'");
       }
 
       if(mesh_working_part == "")
@@ -216,7 +217,7 @@ bool MeshMap::readMap()
       }
       
       // directly work on the input file
-      RCLCPP_DEBUG_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
+      RCLCPP_INFO_STREAM(node->get_logger(), "Connect to \"" << mesh_working_part << "\" from file \"" << mesh_working_file << "\"...");
 
       auto hdf5_mesh_io = std::make_shared<HDF5MeshIO>();
       hdf5_mesh_io->open(mesh_working_file);
@@ -225,7 +226,7 @@ bool MeshMap::readMap()
 
       if(mesh_file != mesh_working_file)
       {
-        RCLCPP_DEBUG_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
+        RCLCPP_INFO_STREAM(node->get_logger(), "Initially loading \"" << mesh_part << "\" from file \"" << mesh_file << "\"...");
       
         std::cout << "Generate seperate working file..." << std::endl;
         lvr2::MeshBufferPtr mesh_buffer;
@@ -268,6 +269,8 @@ bool MeshMap::readMap()
 
         // write
         hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
+      } else {
+        RCLCPP_INFO_STREAM(node->get_logger(), "Working mesh == input mesh");
       }
     }
   } else {
