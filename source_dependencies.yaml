@@ -4,7 +4,7 @@ repositories:
   lvr2:
     type: git
     url: https://github.com/uos/lvr2.git
-    version: version-update
+    version: version-upgrade
   mesh_tools:
     type: git
     url: https://github.com/naturerobots/mesh_tools.git
