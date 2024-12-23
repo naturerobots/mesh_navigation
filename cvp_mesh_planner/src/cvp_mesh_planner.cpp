@@ -651,24 +651,15 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   const auto& vertex_costs = mesh_map_->vertexCosts();
   auto& invalid = mesh_map_->invalid;
 
-
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "BLA.");
-
   mesh_map_->publishDebugPoint(original_start, mesh_map::color(0, 1, 0), "start_point");
   mesh_map_->publishDebugPoint(original_goal, mesh_map::color(0, 0, 1), "goal_point");
-
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "published point.");
 
   mesh_map::Vector start = original_start;
   mesh_map::Vector goal = original_goal;
 
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "Find face.");
-
   // Find the containing faces of start and goal
   const lvr2::OptionalFaceHandle start_opt = mesh_map_->getContainingFace(start, 0.4);
   const lvr2::OptionalFaceHandle goal_opt = mesh_map_->getContainingFace(goal, 0.4);
-
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "BLA 2.");
 
   const auto t_initialization_start = std::chrono::steady_clock::now();
 
@@ -741,8 +732,6 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
   const auto t_wavefront_start = std::chrono::steady_clock::now();
   const auto initialization_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_wavefront_start - t_initialization_start);
 
-
-  RCLCPP_DEBUG_STREAM(node_->get_logger(), "GO.");
   while (!pq.isEmpty() && !cancel_planning_)
   {
     lvr2::VertexHandle current_vh = pq.popMin().key();
