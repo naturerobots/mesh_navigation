@@ -50,7 +50,8 @@ namespace mesh_layers
 bool RidgeLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read ridge from map file...");
-  auto ridge_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
+  auto mesh_io = map_ptr_->meshIO();
+  auto ridge_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (ridge_opt)
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read ridge from map file.");
@@ -63,7 +64,8 @@ bool RidgeLayer::readLayer()
 
 bool RidgeLayer::writeLayer()
 {
-  if (mesh_io_ptr_->addDenseAttributeMap(ridge_, layer_name_))
+  auto mesh_io = map_ptr_->meshIO();
+  if (mesh_io->addDenseAttributeMap(ridge_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved ridge to map file.");
     return true;
@@ -99,7 +101,9 @@ bool RidgeLayer::computeLayer()
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  auto face_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
+  const auto mesh = map_ptr_->mesh();
+  auto mesh_io = map_ptr_->meshIO();
+  auto face_normals_opt = mesh_io->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
 
   if (face_normals_opt)
   {
@@ -109,9 +113,9 @@ bool RidgeLayer::computeLayer()
   else
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "No face normals found in the given map file, computing them...");
-    face_normals = lvr2::calcFaceNormals(*mesh_ptr_);
+    face_normals = lvr2::calcFaceNormals(*mesh);
     RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
-    if (mesh_io_ptr_->addDenseAttributeMap(face_normals, "face_normals"))
+    if (mesh_io->addDenseAttributeMap(face_normals, "face_normals"))
     {
       RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
     }
@@ -123,7 +127,7 @@ bool RidgeLayer::computeLayer()
   }
 
   lvr2::DenseVertexMap<mesh_map::Normal> vertex_normals;
-  auto vertex_normals_opt = mesh_io_ptr_->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
+  auto vertex_normals_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<mesh_map::Normal>>("vertex_normals");
 
   if (vertex_normals_opt)
   {
@@ -133,8 +137,8 @@ bool RidgeLayer::computeLayer()
   else
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "No vertex normals found in the given map file, computing them...");
-    vertex_normals = lvr2::calcVertexNormals(*mesh_ptr_, face_normals);
-    if (mesh_io_ptr_->addDenseAttributeMap(vertex_normals, "vertex_normals"))
+    vertex_normals = lvr2::calcVertexNormals(*mesh, face_normals);
+    if (mesh_io->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
       RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
     }
@@ -145,12 +149,12 @@ bool RidgeLayer::computeLayer()
     }
   }
 
-  ridge_.reserve(mesh_ptr_->nextVertexIndex());
+  ridge_.reserve(mesh->nextVertexIndex());
 
-  for (size_t i = 0; i < mesh_ptr_->nextVertexIndex(); i++)
+  for (size_t i = 0; i < mesh->nextVertexIndex(); i++)
   {
     auto vH = lvr2::VertexHandle(i);
-    if (!mesh_ptr_->containsVertex(vH))
+    if (!mesh->containsVertex(vH))
     {
       ridge_.insert(vH, config_.threshold + 0.1);
       continue;
@@ -160,9 +164,9 @@ bool RidgeLayer::computeLayer()
 
     float value = 0.0;
     int num_neighbours = 0;
-    lvr2::BaseVector<float> reference = mesh_ptr_->getVertexPosition(vH) + vertex_normals[vH];
-    visitLocalVertexNeighborhood(*mesh_ptr_.get(), invalid, vH, config_.radius, [&](auto vertex) {
-      lvr2::BaseVector<float> current_point = mesh_ptr_->getVertexPosition(vertex) + vertex_normals[vertex];
+    lvr2::BaseVector<float> reference = mesh->getVertexPosition(vH) + vertex_normals[vH];
+    visitLocalVertexNeighborhood(*mesh, invalid, vH, config_.radius, [&](auto vertex) {
+      lvr2::BaseVector<float> current_point = mesh->getVertexPosition(vertex) + vertex_normals[vertex];
       value += (current_point - reference).length();
       num_neighbours++;
     });

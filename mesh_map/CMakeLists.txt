@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.5)
 project(mesh_map)
 
+# DEFAULT RELEASE
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  endif()
+endif()
+
 find_package(ament_cmake_ros REQUIRED)
 # ROS Deps
 set(dependencies
   geometry_msgs
-  mesh_client
   mesh_msgs_conversions
   pluginlib
   rclcpp
@@ -27,6 +33,7 @@ pkg_check_modules(JSONCPP jsoncpp)
 
 include_directories(
   include
+  ${LVR2_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
@@ -36,13 +43,11 @@ add_library(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${LVR2_INCLUDE_DIRS}
   ${ASSIMP_INCLUDE_DIRS})
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 target_link_libraries(${PROJECT_NAME} 
     ${LVR2_LIBRARIES}
     ${ASSIMP_LIBRARIES}
-    ${MPI_CXX_LIBRARIES}
 )
 
 install(DIRECTORY include/

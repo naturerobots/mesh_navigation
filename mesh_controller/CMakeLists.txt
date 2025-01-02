@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
 project(mesh_controller)
 
+# DEFAULT RELEASE
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  endif()
+endif()
+
 find_package(ament_cmake_ros REQUIRED)
 find_package(example_interfaces REQUIRED)
 find_package(mbf_mesh_core REQUIRED)
@@ -11,7 +18,6 @@ find_package(rclcpp REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(LVR2 REQUIRED)
 find_package(MPI)
-
 
 pluginlib_export_plugin_description_file(mbf_mesh_core mesh_controller.xml)
 

@@ -56,7 +56,8 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
                             double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message)
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
+
   std::list<lvr2::VertexHandle> path;
   RCLCPP_INFO(node_->get_logger(), "start dijkstra mesh planner.");
 
@@ -87,7 +88,7 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
     {
       // get next position
       const lvr2::VertexHandle& vH = path.front();
-      mesh_map::Vector next = mesh.getVertexPosition(vH);
+      mesh_map::Vector next = mesh->getVertexPosition(vH);
 
       pose.pose = mesh_map::calculatePoseFromPosition(vec, next, normal, dir_length);
       cost += dir_length;
@@ -146,7 +147,7 @@ bool DijkstraMeshPlanner::initialize(const std::string& plugin_name, const std::
   }
 
   path_pub_ = node_->create_publisher<nav_msgs::msg::Path>("~/path", rclcpp::QoS(1).transient_local());
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
 
   reconfiguration_callback_handle_ = node_->add_on_set_parameters_callback(std::bind(
       &DijkstraMeshPlanner::reconfigureCallback, this, std::placeholders::_1));
@@ -174,17 +175,17 @@ rcl_interfaces::msg::SetParametersResult DijkstraMeshPlanner::reconfigureCallbac
 
 void DijkstraMeshPlanner::computeVectorMap()
 {
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
 
-  for (auto v3 : mesh.vertices())
+  for (auto v3 : mesh->vertices())
   {
     const lvr2::VertexHandle& v1 = predecessors_[v3];
     // if predecessor is pointing to it self, continue with the next vertex.
     if (v1 == v3)
       continue;
 
-    const auto& vec3 = mesh.getVertexPosition(v3);
-    const auto& vec1 = mesh.getVertexPosition(v1);
+    const auto& vec3 = mesh->getVertexPosition(v3);
+    const auto& vec1 = mesh->getVertexPosition(v1);
 
     // compute the direction vector and store it in the direction vertex map
     const auto dirVec = vec1 - vec3;
@@ -209,7 +210,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   RCLCPP_INFO_STREAM(node_->get_logger(), "Init wave front propagation.");
   const auto t_initialization_start = std::chrono::steady_clock::now();
 
-  const auto& mesh = mesh_map_->mesh();
+  const auto mesh = mesh_map_->mesh();
   const auto& vertex_costs = mesh_map_->vertexCosts();
 
   auto& invalid = mesh_map_->invalid;
@@ -240,7 +241,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     return mbf_msgs::action::GetPath::Result::SUCCESS;
   }
 
-  lvr2::DenseVertexMap<bool> fixed(mesh.nextVertexIndex(), false);
+  lvr2::DenseVertexMap<bool> fixed(mesh->nextVertexIndex(), false);
 
   // clear vector field map
   vector_map_.clear();
@@ -249,7 +250,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
-  for (auto const& vH : mesh.vertices())
+  for (auto const& vH : mesh->vertices())
   {
     distances.insert(vH, std::numeric_limits<float>::infinity());
     predecessors.insert(vH, vH);
@@ -291,7 +292,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     std::vector<lvr2::EdgeHandle> edges;
     try
     {
-      mesh.getEdgesOfVertex(current_vh, edges);
+      mesh->getEdgesOfVertex(current_vh, edges);
     }
     catch (lvr2::PanicException exception)
     {
@@ -307,7 +308,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
     {
       try
       {
-        std::array<lvr2::VertexHandle, 2> vertices = mesh.getVerticesOfEdge(eH);
+        std::array<lvr2::VertexHandle, 2> vertices = mesh->getVerticesOfEdge(eH);
         auto vH = vertices[0] == current_vh ? vertices[1] : vertices[0];
         if (fixed[vH])
           continue;
@@ -361,7 +362,7 @@ uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, c
   const auto t_end = std::chrono::steady_clock::now();
   const auto execution_duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
   RCLCPP_INFO_STREAM(node_->get_logger(), "Execution duration (ms): " << execution_duration_ms.count() 
-                                          << " for " << mesh.numVertices() << " num vertices in the mesh.");
+                                          << " for " << mesh->numVertices() << " num vertices in the mesh.");
 
   computeVectorMap();
 

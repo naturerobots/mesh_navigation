@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
 project(cvp_mesh_planner)
 
+# DEFAULT RELEASE
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  endif()
+endif()
+
 find_package(ament_cmake_ros REQUIRED)
 find_package(mbf_mesh_core REQUIRED)
 find_package(mbf_msgs REQUIRED)

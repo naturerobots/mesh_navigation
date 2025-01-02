@@ -9,7 +9,6 @@
     <author email="spuetz@uos.de">Sebastian Pütz</author>
 
     <depend>geometry_msgs</depend>
-    <depend>mesh_client</depend>
     <depend>mesh_msgs_conversions</depend> <!-- Note: mesh_msgs_conversions from mesh_tools is not packaged for humble, need to get it from source for now (mesh_tools repo) -->
     <depend>pluginlib</depend>
     <depend>rclcpp</depend>
