@@ -4,11 +4,11 @@ repositories:
   lvr2:
     type: git
     url: https://github.com/uos/lvr2.git
-    version: version-upgrade
+    version: main
   mesh_tools:
     type: git
     url: https://github.com/naturerobots/mesh_tools.git
-    version: lvr-update
+    version: humble
   move_base_flex:
     type: git
     url: https://github.com/naturerobots/move_base_flex.git
