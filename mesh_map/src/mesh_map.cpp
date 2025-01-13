@@ -284,10 +284,9 @@ bool MeshMap::readMap()
   hdf5_mesh_input->setMeshName(mesh_working_part);
   lvr2::MeshBufferPtr mesh_buffer = hdf5_mesh_input->MeshIO::load(mesh_working_part);
 
-  RCLCPP_DEBUG_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
-
   if(mesh_buffer)
   {
+    RCLCPP_DEBUG_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
     RCLCPP_DEBUG_STREAM(node->get_logger(), "Creating mesh of type '" << hem_impl_ << "'");
     mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh of type '" << hem_impl_ <<  "' has been loaded successfully with " 

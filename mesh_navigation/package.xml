@@ -10,7 +10,6 @@
 
     <exec_depend>mbf_mesh_core</exec_depend>
     <exec_depend>mbf_mesh_nav</exec_depend>
-    <exec_depend>mesh_client</exec_depend>
     <exec_depend>mesh_controller</exec_depend>
     <exec_depend>mesh_layers</exec_depend>
     <exec_depend>mesh_map</exec_depend>
