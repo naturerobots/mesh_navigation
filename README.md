@@ -139,7 +139,7 @@ The package structure is as follows:
   - RoughnessLayer - `mesh_layers/RoughnessLayer`
   - SteepnessLayer - `mesh_layers/SteepnessLayer`
   - RidgeLayer - `mesh_layer/RidgeLayer`
-  - FreespaceLayer - `mesh_layers/FreespaceLayer`
+  - ClearanceLayer - `mesh_layers/ClearanceLayer`
   - InflationLayer - `mesh_layers/InflationLayer`
 
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm.
@@ -171,7 +171,7 @@ below.
 | **RoughnessLayer**  | `mesh_layers/RoughnessLayer`  | local radius based normal fluctuation    | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer")      |
 | **SteepnessLayer**  | `mesh_layers/SteepnessLayer`  | arccos of the normal's z coordinate      | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer")      |
 | **RidgeLayer**      | `mesh_layer/RidgeLayer`       | local radius based distance along normal | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
-| **FreespaceLayer**  | `mesh_layers/FreespaceLayer`  | comparison of robot height and free space along each vertex normal | ![FreespaceLayer](docs/images/costlayers/freespace.jpg?raw=true "Freespace Layer") |
+| **ClearanceLayer**  | `mesh_layers/ClearanceLayer`  | comparison of robot height and clearance along each vertex normal | ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |
 | **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 
 # Planners

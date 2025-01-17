@@ -35,25 +35,25 @@
  *
  */
 
-#include "mesh_layers/freespace_layer.h"
+#include "mesh_layers/clearance_layer.h"
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <pluginlib/class_list_macros.hpp>
 
-PLUGINLIB_EXPORT_CLASS(mesh_layers::FreespaceLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::ClearanceLayer, mesh_map::AbstractLayer)
 
 namespace mesh_layers
 {
-bool FreespaceLayer::readLayer()
+bool ClearanceLayer::readLayer()
 {
   RCLCPP_INFO(node_->get_logger(), "Try to read '%s' from map file...", layer_name_.c_str());
-  auto freespace_opt = map_ptr_->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
+  auto clearance_opt = map_ptr_->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
-  if (freespace_opt)
+  if (clearance_opt)
   {
     RCLCPP_INFO(node_->get_logger(), "'%s' has been read successfully.", layer_name_.c_str());
-    freespace_ = freespace_opt.get();
+    clearance_ = clearance_opt.get();
 
     return computeLethalsAndCosts();
   }
@@ -61,20 +61,30 @@ bool FreespaceLayer::readLayer()
   return false;
 }
 
-bool FreespaceLayer::computeLethalsAndCosts()
+bool ClearanceLayer::computeLethalsAndCosts()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for '" << layer_name_ << "' (Freespace Layer) with threshold " << config_.required_freespace);
+  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for '" << layer_name_ << "' (Clearance Layer) with robot_height " << config_.robot_height << " and height_inflation " << config_.height_inflation);
   lethal_vertices_.clear();
   costs_.clear();
 
-  // The freespace_ map contains the actual free space above the vertices.
-  // If the robot fits through a gap the cost is 0 and if not its 1
-  for (auto vH : freespace_)
+  // The clearance_ map contains the actual free space above the vertices.
+  // If the robot fits through a gap with the height inflation the cost is 0.
+  // If the robot does not fit the cost is 1.
+  // Between robot_height and robot_height + height_inflation the cost decreases.
+  const double inflated_height = config_.robot_height + config_.height_inflation;
+  for (auto vH : clearance_)
   {
-    if (freespace_[vH] < config_.required_freespace)
+    if (clearance_[vH] < config_.robot_height)
     {
       costs_.insert(vH, 1.0);
       lethal_vertices_.insert(vH);
+    }
+    else if (clearance_[vH] < inflated_height)
+    {
+      // Map the cost to [1, 0] using (cos(x * pi) + 1 / 2)
+      const double diff = (clearance_[vH] - config_.robot_height) / config_.height_inflation;
+      const double cost = (cos(diff * M_PI) + 1.0) / 2.0;
+      costs_.insert(vH, cost);
     }
     else
     {
@@ -85,10 +95,10 @@ bool FreespaceLayer::computeLethalsAndCosts()
   return true;
 }
 
-bool FreespaceLayer::writeLayer()
+bool ClearanceLayer::writeLayer()
 {
   RCLCPP_INFO(node_->get_logger(), "Saving '%s' to map file...", layer_name_.c_str());
-  if (map_ptr_->meshIO()->addDenseAttributeMap(freespace_, layer_name_))
+  if (map_ptr_->meshIO()->addDenseAttributeMap(clearance_, layer_name_))
   {
     RCLCPP_INFO(node_->get_logger(), "Saved '%s' to map file.", layer_name_.c_str());
     return true;
@@ -100,14 +110,14 @@ bool FreespaceLayer::writeLayer()
   }
 }
 
-float FreespaceLayer::threshold()
+float ClearanceLayer::threshold()
 {
-  return config_.required_freespace;
+  return config_.robot_height;
 }
 
-bool FreespaceLayer::computeLayer()
+bool ClearanceLayer::computeLayer()
 {
-  RCLCPP_INFO(node_->get_logger(), "Computing freespace along vertex normals...");
+  RCLCPP_INFO(node_->get_logger(), "Computing clearance along vertex normals...");
 
   // Load vertex normals
   using VertexNormalMap = lvr2::DenseVertexMap<mesh_map::Normal>;
@@ -142,34 +152,37 @@ bool FreespaceLayer::computeLayer()
     VertexNormalMap vertex_normals = lvr2::calcVertexNormals(*map_ptr_->mesh(), face_normals);
   }
 
-  // Finally calculate the freespace layer
-  freespace_ = lvr2::calcNormalClearance(*map_ptr_->mesh(), vertex_normals);
+  // Finally calculate the clearance layer
+  clearance_ = lvr2::calcNormalClearance(*map_ptr_->mesh(), vertex_normals);
 
   return computeLethalsAndCosts();
 }
 
-lvr2::VertexMap<float>& FreespaceLayer::costs()
+lvr2::VertexMap<float>& ClearanceLayer::costs()
 {
   return costs_;
 }
 
-rcl_interfaces::msg::SetParametersResult FreespaceLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
+rcl_interfaces::msg::SetParametersResult ClearanceLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
 
-  bool has_threshold_changed = false;
+  bool needs_cost_recompute = false;
   for (auto parameter : parameters) {
-    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".threshold") {
-      config_.required_freespace = parameter.as_double();
-      has_threshold_changed = true;
+    if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".robot_height") {
+      config_.robot_height = parameter.as_double();
+      needs_cost_recompute = true;
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".height_inflation") {
+      config_.height_inflation = parameter.as_double();
+      needs_cost_recompute = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
       config_.factor = parameter.as_double();
     }
   }
 
-  if (has_threshold_changed) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
+  if (needs_cost_recompute) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute costs and notify change from " << layer_name_ << " due to cfg change.");
     computeLethalsAndCosts();
     notifyChange();
   }
@@ -178,7 +191,7 @@ rcl_interfaces::msg::SetParametersResult FreespaceLayer::reconfigureCallback(std
 }
 
 
-bool FreespaceLayer::initialize()
+bool ClearanceLayer::initialize()
 {
   { // threshold
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -187,7 +200,19 @@ bool FreespaceLayer::initialize()
     range.from_value = 0.05;
     range.to_value = 100.0; // What is a sane limit for robot size?
     descriptor.floating_point_range.push_back(range);
-    config_.required_freespace = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".minimum_required_freespace", config_.required_freespace);
+    config_.robot_height = node_->declare_parameter<double>(
+      mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".robot_height",
+      descriptor
+    );
+  }
+  { // Extra clearance for the robot to avoid tight spaces
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Extra headroom for the robot in which the cost decreases from 1 to 0.";
+    config_.height_inflation = node_->declare_parameter<double>(
+      mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".height_inflation",
+      config_.height_inflation,
+      descriptor
+    );
   }
   { // factor
     rcl_interfaces::msg::ParameterDescriptor descriptor;
@@ -196,10 +221,14 @@ bool FreespaceLayer::initialize()
     range.from_value = 0.0;
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor);
+    config_.factor = node_->declare_parameter(
+      mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor",
+      config_.factor,
+      descriptor
+    );
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
-      &FreespaceLayer::reconfigureCallback, this, std::placeholders::_1));
+      &ClearanceLayer::reconfigureCallback, this, std::placeholders::_1));
   return true;
 }
 

@@ -46,7 +46,7 @@ namespace mesh_layers
 /**
  * @brief Costmap layer which calculates the free space in the direction of the vertex normals
  */
-class FreespaceLayer : public mesh_map::AbstractLayer
+class ClearanceLayer : public mesh_map::AbstractLayer
 {
   /**
    * @brief try read layer from map file
@@ -125,14 +125,14 @@ class FreespaceLayer : public mesh_map::AbstractLayer
 
 private:
   /**
-   * @brief mark vertices without enough freespace as lethal and compute the costs
+   * @brief mark vertices without enough clearance as lethal and compute the costs
    *
    * @return true if successfull; else false
    */
   bool computeLethalsAndCosts();
 
   // distance along vertex normal until the next face
-  lvr2::DenseVertexMap<float> freespace_;
+  lvr2::DenseVertexMap<float> clearance_;
   // Actual costs values
   lvr2::DenseVertexMap<float> costs_;
   // set of all current lethal vertices
@@ -140,7 +140,8 @@ private:
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   struct {
-    double required_freespace = 0.5;
+    double robot_height = 0.5;
+    double height_inflation = 0.3;
     double factor = 1.0;
   } config_;
 };

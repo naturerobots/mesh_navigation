@@ -22,7 +22,7 @@ add_library(${PROJECT_NAME}
   src/inflation_layer.cpp
   src/steepness_layer.cpp
   src/ridge_layer.cpp
-  src/freespace_layer.cpp
+  src/clearance_layer.cpp
 )
 include_directories(
   include
