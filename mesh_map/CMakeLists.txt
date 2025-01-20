@@ -49,12 +49,17 @@ target_link_libraries(${PROJECT_NAME}
     ${LVR2_LIBRARIES}
     ${ASSIMP_LIBRARIES}
 )
+target_compile_definitions(${PROJECT_NAME}
+  PUBLIC
+  ${LVR2_DEFINITIONS}
+)
 
 install(DIRECTORY include/
   DESTINATION include
 )
 
 install(TARGETS ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin

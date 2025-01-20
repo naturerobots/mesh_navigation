@@ -41,4 +41,11 @@
             Calculates an indicator whether or not a vertex is part of a ridge.
         </description>
     </class>
+    <class name="mesh_layers/ClearanceLayer"
+            type="mesh_layers::ClearanceLayer"
+            base_class_type="mesh_map::AbstractLayer">
+        <description>
+            Calculates the free space along the vertex normals and uses it to check if the robot fits through a space. Useful for doors, holes etc.
+        </description>
+    </class>
 </library>
