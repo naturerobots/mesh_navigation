@@ -429,6 +429,11 @@ public:
 
   lvr2::DenseVertexMap<bool> invalid;
 
+  const std::string& getUUID() const
+  {
+    return uuid_str;
+  }
+
 protected:
   //! This is an abstract interface to load mesh information from somewhere
   //! The default case is loading from a HDF5 file
