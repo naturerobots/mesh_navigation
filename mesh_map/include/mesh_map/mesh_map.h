@@ -46,6 +46,7 @@
 #include <memory>
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/layer_manager.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
@@ -83,12 +84,14 @@ public:
    * @brief Loads all configured layer plugins
    * @return true if the layer plugins have been load successfully.
    */
+  [[deprecated]]
   bool loadLayerPlugins();
 
   /**
    * @brief Initialized all loaded layer plugins
    * @return true if the loaded layer plugins have been initialized successfully.
    */
+  [[deprecated]]
   bool initLayerPlugins();
 
   /**
@@ -451,16 +454,8 @@ private:
    */
   void publishEdgeWeightsAsText();
 
-  //! plugin class loader for for the layer plugins
-  pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
-
-  //! mapping from layer name to layer type, as configured via ros params. 
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, std::string>> configured_layers;
-
-  //! mapping from layer name to instance of respective layer
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> loaded_layers;
+  //! Manages loading, configuration and updating the cost map layers
+  LayerManager layer_manager_;
 
   //! each layer maps to a set of impassable indices
   std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;

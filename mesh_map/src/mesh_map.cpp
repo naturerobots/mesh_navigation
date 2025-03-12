@@ -98,11 +98,10 @@ std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, l
 using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
-  : tf_buffer(tf_buffer)
+  : tf_buffer(tf)
   , node(node)
   , first_config(true)
   , map_loaded(false)
-  , layer_loader("mesh_map", "mesh_map::AbstractLayer")
 {
   auto edge_cost_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
   edge_cost_factor_desc.name = MESH_MAP_NAMESPACE + ".edge_cost_factor";
@@ -132,29 +131,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   }
 
   // params for map layer names to types:
-  const auto layer_names = node->declare_parameter(MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>());
-  const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
-  std::unordered_set<std::string> layer_names_in_use;
-  for(const std::string& layer_name : layer_names)
-  {
-    if (layer_names_in_use.find(layer_name) != layer_names_in_use.end())
-    {
-      throw rclcpp::exceptions::InvalidParametersException("The layer name " + layer_name + " is used more than once. Layer names must be unique!");
-    }
-    // This will throws rclcpp::ParameterValue exception if mesh_map.layer_name.type is not set
-    const std::string layer_type = node->declare_parameter(MESH_MAP_NAMESPACE + "." + layer_name + ".type", ros_param_type).get<std::string>();
-
-    // populate map from layer name to layer type, which will be used in loadLayerPlugins()
-    configured_layers.push_back(std::make_pair(layer_name, layer_type));
-    layer_names_in_use.emplace(layer_name);
-  }
-  // output warning if no layer plugins were configured
-  if (configured_layers.size() == 0)
-  {
-    RCLCPP_WARN_STREAM(node->get_logger(), "No MeshMap layer plugins configured!"
-      << " - Use the param \"" << MESH_MAP_NAMESPACE << ".layers\", which must be a list of strings with arbitrary layer names. "
-      << "For each layer_name, also define layer_name.type with the respective type that shall be loaded via pluginlib.");
-  }
+  layer_manager_.read_configured_layers(node);
 
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("~/mesh", rclcpp::QoS(1).transient_local());
@@ -353,7 +330,7 @@ bool MeshMap::readMap()
   // Generally, a zero timestamp is currently considered be an error / unintialized stamp.
   // Issue https://github.com/ros2/rclcpp/issues/2025 might want to change that, though.
   while (map_stamp.nanoseconds() == 0) { // TODO check whether time is zero
-    sleep(0.5);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     map_stamp = node->now();
   }
   mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
@@ -384,14 +361,14 @@ bool MeshMap::readMap()
   }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Load layer plugins...");
-  if (!loadLayerPlugins())
+  if (!layer_manager_.load_layer_plugins(node->get_logger()))
   {
     RCLCPP_FATAL_STREAM(node->get_logger(), "Could not load any layer plugin!");
     return false;
   }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Initialize layer plugins...");
-  if (!initLayerPlugins())
+  if (!layer_manager_.initialize_layer_plugins(node, shared_from_this()))
   {
     RCLCPP_FATAL_STREAM(node->get_logger(), "Could not initialize plugins!");
     return false;
@@ -407,24 +384,7 @@ bool MeshMap::readMap()
 
 bool MeshMap::loadLayerPlugins()
 {
-  for (const auto &[layer_name, layer_type] : configured_layers)
-  {
-    try 
-    {
-      typename AbstractLayer::Ptr layer_ptr = layer_loader.createSharedInstance(layer_type);
-      loaded_layers.push_back(std::make_pair(layer_name, layer_ptr));
-      RCLCPP_INFO(node->get_logger(),
-                  "The layer with the type \"%s\" has been loaded successfully under the name \"%s\".", layer_type.c_str(),
-                  layer_name.c_str());
-    }
-    catch (pluginlib::LibraryLoadException& e)
-    {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not load the layer with the name \"" << layer_name << "\" and the type \"" << layer_type << "\"! Error: " << e.what());
-    }
-  }
-  
-  // did we load any layer?
-  return loaded_layers.empty() ? false : true;
+  return layer_manager_.load_layer_plugins(node->get_logger());
 }
 
 void MeshMap::layerChanged(const std::string& layer_name)
@@ -438,34 +398,36 @@ void MeshMap::layerChanged(const std::string& layer_name)
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine underlining lethal sets...");
 
   // TODO pre-compute combined lethals upto a layer level
-  auto layer_iter = loaded_layers.begin();
-  for (; layer_iter != loaded_layers.end(); layer_iter++)
+  auto layer_iter = layer_manager_.loaded_layers().begin();
+  for (; layer_iter != layer_manager_.loaded_layers().end(); layer_iter++)
   {
+    auto layer_ptr = layer(*layer_iter);
     // TODO add lethal and removae lethal sets
-    lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
+    lethals.insert(layer_ptr->lethals().begin(), layer_ptr->lethals().end());
     // TODO merge with std::set_merge
-    if (layer_iter->first == layer_name)
+    if (*layer_iter == layer_name)
       break;
   }
 
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
-                                                         layer_iter->second->defaultValue(), layer_iter->first,
+  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer(*layer_iter)->costs(), mesh_ptr->numVertices(),
+                                                         layer(*layer_iter)->defaultValue(), *layer_iter,
                                                          global_frame, uuid_str));
 
-  if (layer_iter != loaded_layers.end())
+  if (layer_iter != layer_manager_.loaded_layers().end())
     layer_iter++;
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine  lethal sets...");
 
-  for (; layer_iter != loaded_layers.end(); layer_iter++)
+  for (; layer_iter != layer_manager_.loaded_layers().end(); layer_iter++)
   {
     // TODO add lethal and remove lethal sets as param
-    layer_iter->second->updateLethal(lethals, lethals);
+    auto layer_ptr = layer(*layer_iter);
+    layer_ptr->updateLethal(lethals, lethals);
 
-    lethals.insert(layer_iter->second->lethals().begin(), layer_iter->second->lethals().end());
+    lethals.insert(layer_ptr->lethals().begin(), layer_ptr->lethals().end());
 
-    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_iter->second->costs(), mesh_ptr->numVertices(),
-                                                           layer_iter->second->defaultValue(), layer_iter->first,
+    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
+                                                           layer_ptr->defaultValue(), *layer_iter,
                                                            global_frame, uuid_str));
   }
 
@@ -479,34 +441,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
 
 bool MeshMap::initLayerPlugins()
 {
-  lethals.clear();
-  lethal_indices.clear();
-
-  for (auto& layer : loaded_layers)
-  {
-    auto& layer_plugin = layer.second;
-    const auto& layer_name = layer.first;
-
-    auto callback = [this](const std::string& layer_name) { layerChanged(layer_name); };
-
-    if (!layer_plugin->initialize(layer_name, callback, shared_from_this(), node))
-    {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not initialize the layer plugin with the name \"" << layer_name << "\"!");
-      return false;
-    }
-
-    std::set<lvr2::VertexHandle> empty;
-    layer_plugin->updateLethal(lethals, empty);
-    if (!layer_plugin->readLayer())
-    {
-      RCLCPP_INFO_STREAM(node->get_logger(), "Computing layer '" << layer_name << "' ...");
-      layer_plugin->computeLayer();
-    }
-
-    lethal_indices[layer_name].insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
-    lethals.insert(layer_plugin->lethals().begin(), layer_plugin->lethals().end());
-  }
-
+  layer_manager_.initialize_layer_plugins(node, shared_from_this());
   return true;
 }
 
@@ -520,8 +455,9 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
   bool hasNaN = false;
-  for (auto [layer_name, layer] : loaded_layers)
+  for (const auto& layer_name : layer_manager_.loaded_layers())
   {
+    const auto layer = this->layer(layer_name);
     const auto& costs = layer->costs();
     const float combination_weight = layer->combinationWeight();
 
@@ -775,8 +711,9 @@ void MeshMap::publishCombinedVectorField()
   vertex_vectors.reserve(mesh_ptr->nextVertexIndex());
   face_vectors.reserve(mesh_ptr->nextFaceIndex());
 
-  for (const auto& [_, layer] : loaded_layers)
+  for (const auto& name : layer_manager_.loaded_layers())
   {
+    const auto& layer = this->layer(name);
     lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
     auto opt_vec_map = layer->vectorMap();
     if (!opt_vec_map)
@@ -1074,7 +1011,7 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
     Vector dir = opt_dir.get().normalized();
     std::array<lvr2::VertexHandle, 3> handels = mesh_ptr->getVerticesOfFace(face);
     // iter over all layer vector fields
-    for (auto layer : loaded_layers)
+    for (const auto& layer : layer_manager_.layer_instances())
     {
       dir += layer.second->vectorAt(handels, bary_coords);
     }
@@ -1171,10 +1108,7 @@ bool MeshMap::projectedBarycentricCoords(const Vector& p, const lvr2::FaceHandle
 
 mesh_map::AbstractLayer::Ptr MeshMap::layer(const std::string& layer_name)
 {
-  return std::find_if(loaded_layers.begin(), loaded_layers.end(), 
-    [&layer_name](const std::pair<std::string, mesh_map::AbstractLayer::Ptr>& item) {
-      return item.first == layer_name;
-    })->second;
+  return layer_manager_.get_layer(layer_name);
 }
 
 std_srvs::srv::Trigger::Response MeshMap::writeLayers()
@@ -1182,10 +1116,8 @@ std_srvs::srv::Trigger::Response MeshMap::writeLayers()
   std::stringstream ss;
   bool write_failure = false;
 
-  for (auto& layer : loaded_layers)
+  for (const auto& [layer_name, layer_plugin] : layer_manager_.layer_instances())
   {
-    auto& layer_plugin = layer.second;
-    const auto& layer_name = layer.first;
 
     RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
     if(layer_plugin->writeLayer())
@@ -1279,7 +1211,7 @@ bool MeshMap::resetLayers()
 
 void MeshMap::publishCostLayers(const rclcpp::Time& map_stamp)
 {
-  for (const auto& [layer_name, layer_ptr] : loaded_layers)
+  for (const auto& [layer_name, layer_ptr] : layer_manager_.layer_instances())
   {
     vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
                                                            layer_ptr->defaultValue(), layer_name, global_frame,

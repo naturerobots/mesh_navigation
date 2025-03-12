@@ -40,6 +40,7 @@ add_library(${PROJECT_NAME}
   src/abstract_layer.cpp
   src/mesh_map.cpp
   src/util.cpp
+  src/layer_manager.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
