@@ -156,7 +156,8 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   }
   // TODO: Is this performant?
   std::set<lvr2::VertexHandle> update;
-  std::set_symmetric_difference(
+  // All vertices which are now part of the layer and all old vertices probably changed their costs
+  std::set_union(
     old.begin(), old.end(),
     new_.begin(), new_.end(),
     std::inserter(update, update.end())

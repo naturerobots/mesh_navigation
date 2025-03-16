@@ -108,9 +108,12 @@ public:
     return instances_;
   }
 
-  LayerManager(const std::weak_ptr<mesh_map::MeshMap>& map, const rclcpp::Node::SharedPtr& node);
-  LayerManager() = default;
-  LayerManager(const LayerManager& other) = default;
+  /**
+   *  @brief Init the layer manager. Stores a reference to the map, which is not used
+   *  in the constructor!
+   */
+  LayerManager(MeshMap& map, const rclcpp::Node::SharedPtr& node);
+
 private:
   
   /**
@@ -127,10 +130,13 @@ private:
   );
 
   //! Reference to the map to publish cost maps
-  std::weak_ptr<MeshMap> map_;
+  MeshMap& map_;
 
   //! ROS Node
   rclcpp::Node::SharedPtr node_;
+
+  //! Mutex to prevent parallel updates
+  std::recursive_mutex layer_mtx_;
 
   //! Graph containing an directed edge between a and b if a depends on b
   using DependencyGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;

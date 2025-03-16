@@ -4,10 +4,12 @@
 
 #include <boost/graph/topological_sort.hpp>
 
+#include <mesh_msgs_conversions/conversions.h>
+
 namespace mesh_map
 {
 
-LayerManager::LayerManager(const std::weak_ptr<MeshMap>& map, const rclcpp::Node::SharedPtr& node)
+LayerManager::LayerManager(MeshMap& map, const rclcpp::Node::SharedPtr& node)
 : map_(map)
 , node_(node)
 , loader_("mesh_map", "mesh_map::AbstractLayer")
@@ -125,6 +127,10 @@ bool LayerManager::load_layer_plugins(const rclcpp::Logger& logger)
 
 bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node, const MeshMap::Ptr& map)
 {
+  // Prevent layers from publishing updates while initialization is still ongoing initialization
+  // TODO: Individual layers need to be prevented from changing themselves unexpectedly
+  // Maybe something like layer->beginUpdate() like OGRE
+  std::lock_guard lock(layer_mtx_);
   // Topological sort ensures that all dependencies are initialized before their dependents
   std::vector<Vertex> init_order(boost::num_vertices(graph_));
   boost::topological_sort(graph_, init_order.begin());
@@ -166,6 +172,9 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       RCLCPP_INFO(node->get_logger(), "Computing layer '%s' ...", name.c_str());
       instance->computeLayer();
     }
+
+    // Publish the layer
+    map_.publishVertexCosts(instance->costs(), name, node_->get_clock()->now());
   }
 
   return true;
@@ -189,7 +198,9 @@ void LayerManager::layer_changed(
     // TODO: Log error
     return;
   }
-
+  
+  // Prevent simultaneous execution of updates
+  std::lock_guard lock(layer_mtx_);
   // Publish an update message
   lvr2::SparseVertexMap<float> c;
   const auto& cm = ptr->costs();
@@ -198,7 +209,7 @@ void LayerManager::layer_changed(
     c.insert(v, cm.containsKey(v)? cm[v]: ptr->defaultValue());
   }
   // TODO: We need to get the proper timestamp, but from where?
-  map_.lock()->publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
+  map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
   
   auto [it, end] = boost::in_edges(v_it->second, graph_);
 

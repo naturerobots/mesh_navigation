@@ -116,7 +116,7 @@ public:
                             std::set<lvr2::VertexHandle>& removed_lethal) = 0;
   
   // TODO: Should this replace updateLethal
-  virtual void updateInput(const std::set<lvr2::VertexHandle>& changed)
+  virtual void updateInput(const std::set<lvr2::VertexHandle>& /* changed */)
   {}
 
   /**

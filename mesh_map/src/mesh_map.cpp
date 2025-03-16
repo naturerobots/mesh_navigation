@@ -98,7 +98,8 @@ std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, l
 using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
-  : tf_buffer(tf)
+  : layer_manager_(*this, node)
+  , tf_buffer(tf)
   , node(node)
   , first_config(true)
   , map_loaded(false)
@@ -357,9 +358,6 @@ bool MeshMap::readMap()
     }
   }
   
-  // Init layer manager
-  layer_manager_ = LayerManager(shared_from_this(), node);
-
   layer_manager_.read_configured_layers(node);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Load layer plugins...");
@@ -390,7 +388,7 @@ bool MeshMap::loadLayerPlugins()
 
 void MeshMap::layerChanged(const std::string& layer_name)
 {
-  std::lock_guard<std::mutex> lock(layer_mtx);
+  std::lock_guard lock(layer_mtx);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" changed.");
   // TODO: Implement this
@@ -399,8 +397,6 @@ void MeshMap::layerChanged(const std::string& layer_name)
   {
     const auto ts = node->get_clock()->now();
     this->calculateEdgeCosts(ts);
-    // TODO: It should only be necessary to publish an update
-    this->publishCostLayers(ts);
   }
 }
 
@@ -1177,24 +1173,14 @@ void MeshMap::publishCostLayers(const rclcpp::Time& map_stamp)
       )
     );
   }
-
-  vertex_costs_pub->publish(
-    mesh_msgs_conversions::toVertexCostsStamped(
-      vertex_costs,
-      mesh_ptr->numVertices(),
-      layer(default_layer_)->defaultValue(),
-      "Default Layer",
-      global_frame,
-      uuid_str,
-      map_stamp
-    )
-  );
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp)
 {
   vertex_costs_pub->publish(
       mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str, map_stamp));
+  // TODO: Should this be moved to the LayerManager? Publishing the layers and updates
+  // is part of managing the layers isnt it?
 }
 
 void MeshMap::publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp)
