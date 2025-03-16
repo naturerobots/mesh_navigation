@@ -50,6 +50,7 @@
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_costs_sparse_stamped.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
@@ -133,10 +134,10 @@ public:
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
-   * @brief A method which combines all layer costs with the respective weightings
+   * @brief A method which calculates the per edge costs from the configured default layer
    * @param map_stamp timestamp for published cost data
    */
-  void combineVertexCosts(const rclcpp::Time& map_stamp);
+  void calculateEdgeCosts(const rclcpp::Time& map_stamp);
 
   /**
    * @brief pre-computes edge weights from combined vertex costs.
@@ -158,6 +159,13 @@ public:
    * @param name The name of the cost map
    */
   void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp);
+
+  /**
+   * @brief Publishes the given vertex map as mesh_msgs/VertexCostsSparse, e.g. to update the visualization in RVIZ.
+   * @param costs The cost map to publish
+   * @param name The name of the cost map
+   */
+  void publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp);
 
   /**
    * @briefP Publishes the vertex colors if these exists.
@@ -457,8 +465,8 @@ private:
   //! Manages loading, configuration and updating the cost map layers
   LayerManager layer_manager_;
 
-  //! each layer maps to a set of impassable indices
-  std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
+  //! The layer used to provide the lethal and combined vertex costs
+  std::string default_layer_;
 
   //! all impassable vertices
   std::set<lvr2::VertexHandle> lethals;
@@ -513,6 +521,7 @@ private:
 
   //! publisher for vertex costs
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr vertex_costs_update_pub_;
 
   //! publisher for vertex colors
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;

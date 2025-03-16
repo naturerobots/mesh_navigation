@@ -7,8 +7,10 @@
 namespace mesh_map
 {
 
-LayerManager::LayerManager()
-: loader_("mesh_map", "mesh_map::AbstractLayer")
+LayerManager::LayerManager(const std::weak_ptr<MeshMap>& map, const rclcpp::Node::SharedPtr& node)
+: map_(map)
+, node_(node)
+, loader_("mesh_map", "mesh_map::AbstractLayer")
 {}
 
 void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
@@ -143,7 +145,11 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       continue;
     }
 
-    auto callback = [map](const std::string& layer_name) {map->layerChanged(layer_name);};
+    auto callback = [map, this](const std::string& layer_name, const std::set<lvr2::VertexHandle>& changed)
+    {
+      this->layer_changed(layer_name, changed);
+      map->layerChanged(layer_name);
+    };
 
     if (!instance->initialize(name, callback, map, node))
     {
@@ -163,6 +169,52 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
   }
 
   return true;
+}
+
+void LayerManager::layer_changed(
+  const std::string& name,
+  const std::set<lvr2::VertexHandle>& changed
+)
+{
+  const auto& ptr = get_layer(name);
+  if (nullptr == ptr)
+  {
+    // TODO: Log error
+    return;
+  }
+
+  const auto v_it = vertices_.find(name);
+  if (v_it == vertices_.end())
+  {
+    // TODO: Log error
+    return;
+  }
+
+  // Publish an update message
+  lvr2::SparseVertexMap<float> c;
+  const auto& cm = ptr->costs();
+  for (const lvr2::VertexHandle& v: changed)
+  {
+    c.insert(v, cm.containsKey(v)? cm[v]: ptr->defaultValue());
+  }
+  // TODO: We need to get the proper timestamp, but from where?
+  map_.lock()->publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
+  
+  auto [it, end] = boost::in_edges(v_it->second, graph_);
+
+  // Notify all users
+  for (; it != end; it++)
+  {
+    const auto& name = names_[boost::source(*it, graph_)];
+    const auto& layer = get_layer(name);
+
+    if (nullptr == layer)
+    {
+      continue;
+    }
+
+    layer->updateInput(changed);
+  }
 }
 
 } // namespace mesh_map;

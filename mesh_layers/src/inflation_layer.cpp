@@ -48,6 +48,7 @@ namespace mesh_layers
 {
 bool InflationLayer::readLayer()
 {
+  return false;
   // riskiness
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read riskiness from map file...");
   auto mesh_io = map_ptr_->meshIO();
@@ -94,6 +95,74 @@ void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
   RCLCPP_INFO_STREAM(node_->get_logger(), "Update lethal for inflation layer.");
   waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value,
                     std::numeric_limits<float>::infinity());
+}
+
+void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
+{
+  const std::vector<std::string> inputs = node_->get_parameter(
+    mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inputs"
+  ).as_string_array();
+
+  if (inputs.size() != 1)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Exactly one input layer is required!");
+    return;
+  }
+
+  const auto input = map_ptr_->layer(inputs[0]);
+  if (nullptr == input)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
+    return;
+  }
+
+
+  // TODO: The inflation algorithm overwrites all costs
+  // Copy all changed costs from the input layer
+  // for (const lvr2::VertexHandle& v: changed)
+  // {
+  //   riskiness_.insert(v, input->costs()[v]);
+  // }
+  
+  // TODO: This layer should probably be sparse?
+  std::set<lvr2::VertexHandle> old;
+  for (const lvr2::VertexHandle& v: riskiness_)
+  {
+    if (riskiness_[v] > 0.0)
+    {
+      old.insert(v);
+    }
+  }
+  
+  // Copy lethal vertices of base layer
+  // TODO: Copy all cost values
+  // TODO: Implement update on change
+  lethal_vertices_ = input->lethals();
+  waveCostInflation(
+    lethal_vertices_,
+    config_.inflation_radius,
+    config_.inscribed_radius,
+    config_.inscribed_value,
+    1.0
+  );
+
+  std::set<lvr2::VertexHandle> new_;
+  for (const lvr2::VertexHandle& v: riskiness_)
+  {
+    if (riskiness_[v] > 0.0)
+    {
+      new_.insert(v);
+    }
+  }
+  // TODO: Is this performant?
+  std::set<lvr2::VertexHandle> update;
+  std::set_symmetric_difference(
+    old.begin(), old.end(),
+    new_.begin(), new_.end(),
+    std::inserter(update, update.end())
+  );
+
+  this->notifyChange(update);
 }
 
 inline float InflationLayer::computeUpdateSethianMethod(const float& d1, const float& d2, const float& a,
@@ -518,9 +587,35 @@ void InflationLayer::backToSource(const lvr2::VertexHandle& current_vertex,
 
 bool InflationLayer::computeLayer()
 {
-  waveCostInflation(lethal_vertices_, config_.inflation_radius,
-                      config_.inscribed_radius, config_.inscribed_value,
-                      std::numeric_limits<float>::infinity());
+  const std::vector<std::string> inputs = node_->get_parameter(
+    mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inputs"
+  ).as_string_array();
+
+  if (inputs.size() != 1)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Exactly one input layer is required!");
+    return false;
+  }
+
+  const auto input = map_ptr_->layer(inputs[0]);
+  if (nullptr == input)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
+    return false;
+  }
+  
+  // Copy lethal vertices of base layer
+  // TODO: Copy all cost values
+  // TODO: Implement update on change
+  lethal_vertices_ = input->lethals();
+  waveCostInflation(
+    lethal_vertices_,
+    config_.inflation_radius,
+    config_.inscribed_radius,
+    config_.inscribed_value,
+    1.0
+  );
+
   return true;
 }
 

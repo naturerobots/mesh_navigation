@@ -113,6 +113,12 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   edge_cost_factor_desc.floating_point_range.push_back(edge_cost_factor_range);
   edge_cost_factor = node->declare_parameter(MESH_MAP_NAMESPACE + ".edge_cost_factor", 0.0, edge_cost_factor_desc);
 
+  auto default_layer_desc = rcl_interfaces::msg::ParameterDescriptor();
+  default_layer_desc.name = MESH_MAP_NAMESPACE + ".default_layer";
+  default_layer_desc.description = "Defines the layer to use as a default when accessing costs";
+  default_layer_desc.type = rclcpp::ParameterType::PARAMETER_STRING;
+  default_layer_ = node->declare_parameter<std::string>(default_layer_desc.name, default_layer_desc);
+
   hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
@@ -123,19 +129,10 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
-  { // publish edge weights as text markers
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = "Publish computed edge weights as text markers. Good to debug planners.";
-    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_BOOL;
-    publish_edge_weights_text = node->declare_parameter(MESH_MAP_NAMESPACE + ".publish_edge_weights_text", publish_edge_weights_text, descriptor);
-  }
-
-  // params for map layer names to types:
-  layer_manager_.read_configured_layers(node);
-
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("~/mesh", rclcpp::QoS(1).transient_local());
   vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(1).transient_local());
+  vertex_costs_update_pub_ = node->create_publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>(std::string(vertex_costs_pub->get_topic_name()) + "/updates", rclcpp::QoS(10).transient_local());
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   edge_weights_text_pub = node->create_publisher<visualization_msgs::msg::MarkerArray>("~/edge_weights", rclcpp::QoS(1).transient_local());
@@ -359,6 +356,11 @@ bool MeshMap::readMap()
       RCLCPP_ERROR_STREAM(node->get_logger(), "Could not save edge distances to map file!");
     }
   }
+  
+  // Init layer manager
+  layer_manager_ = LayerManager(shared_from_this(), node);
+
+  layer_manager_.read_configured_layers(node);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Load layer plugins...");
   if (!layer_manager_.load_layer_plugins(node->get_logger()))
@@ -374,7 +376,6 @@ bool MeshMap::readMap()
     return false;
   }
 
-  combineVertexCosts(map_stamp);
   computeEdgeWeights();
   publishCostLayers(map_stamp);
 
@@ -392,105 +393,56 @@ void MeshMap::layerChanged(const std::string& layer_name)
   std::lock_guard<std::mutex> lock(layer_mtx);
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" changed.");
-
-  lethals.clear();
-
-  RCLCPP_INFO_STREAM(node->get_logger(), "Combine underlining lethal sets...");
-
-  // TODO pre-compute combined lethals upto a layer level
-  auto layer_iter = layer_manager_.loaded_layers().begin();
-  for (; layer_iter != layer_manager_.loaded_layers().end(); layer_iter++)
+  // TODO: Implement this
+  
+  if (layer_name == default_layer_)
   {
-    auto layer_ptr = layer(*layer_iter);
-    // TODO add lethal and removae lethal sets
-    lethals.insert(layer_ptr->lethals().begin(), layer_ptr->lethals().end());
-    // TODO merge with std::set_merge
-    if (*layer_iter == layer_name)
-      break;
+    const auto ts = node->get_clock()->now();
+    this->calculateEdgeCosts(ts);
+    // TODO: It should only be necessary to publish an update
+    this->publishCostLayers(ts);
   }
-
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer(*layer_iter)->costs(), mesh_ptr->numVertices(),
-                                                         layer(*layer_iter)->defaultValue(), *layer_iter,
-                                                         global_frame, uuid_str));
-
-  if (layer_iter != layer_manager_.loaded_layers().end())
-    layer_iter++;
-
-  RCLCPP_INFO_STREAM(node->get_logger(), "Combine  lethal sets...");
-
-  for (; layer_iter != layer_manager_.loaded_layers().end(); layer_iter++)
-  {
-    // TODO add lethal and remove lethal sets as param
-    auto layer_ptr = layer(*layer_iter);
-    layer_ptr->updateLethal(lethals, lethals);
-
-    lethals.insert(layer_ptr->lethals().begin(), layer_ptr->lethals().end());
-
-    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
-                                                           layer_ptr->defaultValue(), *layer_iter,
-                                                           global_frame, uuid_str));
-  }
-
-  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << lethals.size() << " lethal vertices");
-  RCLCPP_INFO_STREAM(node->get_logger(), "Combine layer costs...");
-
-  combineVertexCosts(node->now());
-  computeEdgeWeights();
-  // TODO new lethals old lethals -> renew potential field! around this areas
 }
 
 bool MeshMap::initLayerPlugins()
 {
-  layer_manager_.initialize_layer_plugins(node, shared_from_this());
-  return true;
+  return layer_manager_.initialize_layer_plugins(node, shared_from_this());
 }
 
-void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
+void MeshMap::calculateEdgeCosts(const rclcpp::Time& map_stamp)
 {
-  RCLCPP_INFO_STREAM(node->get_logger(), "Combining costs...");
+  // Use a user chosen layer as the default layer for accessing costs
+  // TODO: Costs are copied, so they need to be updated when the underlaying layer changes
+  RCLCPP_INFO_STREAM(node->get_logger(), "Calculating edge costs from layer " << default_layer_);
+  
+  vertex_costs.reserve(mesh()->nextVertexIndex());
 
-  float combined_min = std::numeric_limits<float>::max();
-  float combined_max = std::numeric_limits<float>::lowest();
-
-  vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
-
-  bool hasNaN = false;
-  for (const auto& layer_name : layer_manager_.loaded_layers())
+  const auto ptr = layer(default_layer_);
+  
+  if (nullptr == ptr)
   {
-    const auto layer = this->layer(layer_name);
-    const auto& costs = layer->costs();
-    const float combination_weight = layer->combinationWeight();
-
-    RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\", combination weight: " << combination_weight);
-
-    const float default_value = layer->defaultValue();
-    hasNaN = false;
-    for (auto vH : mesh_ptr->vertices())
-    {
-      const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
-      if (std::isnan(cost))
-        hasNaN = true;
-      vertex_costs[vH] += combination_weight * cost;
-      if (std::isfinite(cost))
-      {
-        combined_max = std::max(combined_max, vertex_costs[vH]);
-        combined_min = std::min(combined_min, vertex_costs[vH]);
-      }
-    }
-    if (hasNaN)
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" contains NaN values!");
+    RCLCPP_ERROR(
+      node->get_logger(),
+      "Default layer '%s' could not be loaded or was not configured!",
+      default_layer_.c_str()
+    );
+    throw rclcpp::exceptions::InvalidParameterValueException(
+      "The default_layer " + default_layer_ + " could not be loaded or was not configured!"
+    );
   }
 
-  const float combined_norm = combined_max - combined_min;
+  const auto default_value = ptr->defaultValue();
+  const auto& cost_map = ptr->costs();
 
-  for (auto vH : lethals)
+  for (const auto& vH: mesh()->vertices())
   {
-    vertex_costs[vH] = std::numeric_limits<float>::infinity();
+    vertex_costs.insert(vH, cost_map.containsKey(vH) ? cost_map[vH] : default_value);
   }
 
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str, map_stamp));
-
-  RCLCPP_INFO(node->get_logger(), "Successfully combined costs!");
+  for (auto vH : ptr->lethals())
+  {
+    vertex_costs[vH] = 1.0;
+  }
 }
 
 void MeshMap::computeEdgeWeights()
@@ -1213,17 +1165,50 @@ void MeshMap::publishCostLayers(const rclcpp::Time& map_stamp)
 {
   for (const auto& [layer_name, layer_ptr] : layer_manager_.layer_instances())
   {
-    vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(layer_ptr->costs(), mesh_ptr->numVertices(),
-                                                           layer_ptr->defaultValue(), layer_name, global_frame,
-                                                           uuid_str, map_stamp));
+    vertex_costs_pub->publish(
+      mesh_msgs_conversions::toVertexCostsStamped(
+        layer_ptr->costs(),
+        mesh_ptr->numVertices(),
+        layer_ptr->defaultValue(),
+        layer_name,
+        global_frame,
+        uuid_str,
+        map_stamp
+      )
+    );
   }
-  vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str, map_stamp));
+
+  vertex_costs_pub->publish(
+    mesh_msgs_conversions::toVertexCostsStamped(
+      vertex_costs,
+      mesh_ptr->numVertices(),
+      layer(default_layer_)->defaultValue(),
+      "Default Layer",
+      global_frame,
+      uuid_str,
+      map_stamp
+    )
+  );
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp)
 {
   vertex_costs_pub->publish(
       mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str, map_stamp));
+}
+
+void MeshMap::publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp)
+{
+  vertex_costs_update_pub_->publish(
+    mesh_msgs_conversions::toVertexCostsSparseStamped(
+      costs,
+      default_value,
+      name,
+      global_frame,
+      uuid_str,
+      map_stamp
+    )
+  );
 }
 
 void MeshMap::publishVertexColors(const rclcpp::Time& map_stamp)
@@ -1287,7 +1272,6 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
 
     if(recompute_combined_vertex_costs)
     {
-      combineVertexCosts(node->now());
       computeEdgeWeights();
     }
   }

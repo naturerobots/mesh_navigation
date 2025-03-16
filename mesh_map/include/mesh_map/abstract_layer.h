@@ -53,7 +53,7 @@ class MeshMap;
 typedef lvr2::BaseVector<float> Vector;
 typedef lvr2::Normal<float> Normal;
 
-typedef std::function<void(const std::string&)> notify_func;
+typedef std::function<void(const std::string&, const std::set<lvr2::VertexHandle>&)> notify_func;
 
 class AbstractLayer
 {
@@ -114,6 +114,10 @@ public:
    */
   virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
                             std::set<lvr2::VertexHandle>& removed_lethal) = 0;
+  
+  // TODO: Should this replace updateLethal
+  virtual void updateInput(const std::set<lvr2::VertexHandle>& changed)
+  {}
 
   /**
    * @brief Optional method if the layer computes vectors. Computes a vector within a triangle using barycentric coordinates.
@@ -158,7 +162,20 @@ public:
 
   void notifyChange()
   {
-    this->notify_(layer_name_);
+    std::set<lvr2::VertexHandle> changed;
+    for (const auto& v: costs())
+    {
+      changed.insert(v);
+    }
+    this->notifyChange(changed);
+  }
+
+  /**
+   *  @param changed The vertices whose costs have changed
+   */
+  void notifyChange(const std::set<lvr2::VertexHandle>& changed)
+  {
+    this->notify_(layer_name_, changed);
   }
 
   inline float combinationWeight() const

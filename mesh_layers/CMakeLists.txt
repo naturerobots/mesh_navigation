@@ -23,6 +23,7 @@ add_library(${PROJECT_NAME}
   src/steepness_layer.cpp
   src/ridge_layer.cpp
   src/clearance_layer.cpp
+  src/combination_layer.cpp
 )
 include_directories(
   include

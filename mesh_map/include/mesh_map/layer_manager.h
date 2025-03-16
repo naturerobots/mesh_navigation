@@ -41,6 +41,8 @@
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/node.hpp>
 
+#include <lvr2/geometry/Handles.hpp>
+
 namespace mesh_map
 {
 
@@ -106,11 +108,32 @@ public:
     return instances_;
   }
 
-  LayerManager();
+  LayerManager(const std::weak_ptr<mesh_map::MeshMap>& map, const rclcpp::Node::SharedPtr& node);
+  LayerManager() = default;
+  LayerManager(const LayerManager& other) = default;
 private:
+  
+  /**
+   *  @brief Handle a layer change by updating the depending layers
+   *
+   *  @param name The name of the changed layer
+   *  @param changed All vertices with changed costs
+   *  @param added_lethal All vertices which are now lethal
+   *  @param remove_lethal All vertices which are no longer lethal
+   */
+  void layer_changed(
+    const std::string& name,
+    const std::set<lvr2::VertexHandle>& changed
+  );
+
+  //! Reference to the map to publish cost maps
+  std::weak_ptr<MeshMap> map_;
+
+  //! ROS Node
+  rclcpp::Node::SharedPtr node_;
 
   //! Graph containing an directed edge between a and b if a depends on b
-  using DependencyGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS>;
+  using DependencyGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
   using Vertex = boost::graph_traits<DependencyGraph>::vertex_descriptor;
   DependencyGraph graph_;
 
