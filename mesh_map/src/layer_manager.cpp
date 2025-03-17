@@ -151,11 +151,7 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       continue;
     }
 
-    auto callback = [map, this](const std::string& layer_name, const std::set<lvr2::VertexHandle>& changed)
-    {
-      this->layer_changed(layer_name, changed);
-      map->layerChanged(layer_name);
-    };
+    auto callback = std::bind(&LayerManager::layer_changed, this, std::placeholders::_1, std::placeholders::_2);
 
     if (!instance->initialize(name, callback, map, node))
     {
@@ -185,6 +181,12 @@ void LayerManager::layer_changed(
   const std::set<lvr2::VertexHandle>& changed
 )
 {
+  // Layers could send empty updates if they are lazy so we just discard them here
+  if (changed.empty())
+  {
+    return;
+  }
+
   const auto& ptr = get_layer(name);
   if (nullptr == ptr)
   {
@@ -226,6 +228,9 @@ void LayerManager::layer_changed(
 
     layer->updateInput(changed);
   }
+  
+  // Notify the map, should be fine after updating the users because the map is only interested in 1 layer
+  map_.layerChanged(name);
 }
 
 } // namespace mesh_map;

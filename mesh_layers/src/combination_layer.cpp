@@ -106,6 +106,8 @@ void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& change
     }
     costs_.insert(v, cost);
   }
+
+  this->notifyChange(changed);
 }
 
 
@@ -270,6 +272,8 @@ void CombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
     }
     costs_.insert(v, cost * norm);
   }
+
+  this->notifyChange(changed);
 }
 
 } // namespace mesh_layers
