@@ -107,7 +107,7 @@ The package structure is as follows:
 
 - `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account. This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`, since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots` which is stated above.
 
-# Mesh Map
+## Mesh Map
 
 ### Mesh Layers
 
@@ -125,7 +125,7 @@ The following table gives an overview of all currently implemented layer plugins
 | **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 | **BorderLayer** | `mesh_layers/BorderLayer` | give vertices close to the border a certain cost | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer")   |
 
-# Planners
+## Planners
 Currently the following planners are available:
 
 ### Dijkstra Mesh Planner
@@ -157,7 +157,7 @@ The planners are compared to each other.
 | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | ![VectorFieldPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Vector Field Planner") | ![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner") | ![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner") |
 
-# Controllers
+## Controllers
 
 ### Mesh Controller
 
@@ -166,11 +166,7 @@ The planners are compared to each other.
     type: 'mesh_controller/MeshController'
 ```
 
-
-
-# Related Work
-
-### Publications
+# Publications
 
 Please reference the following papers when using the navigation stack in your scientific work.
 
@@ -198,13 +194,16 @@ Please reference the following papers when using the navigation stack in your sc
 }
 ```
 
-### Mesh Tools
+
+# Related Work
+
+## Mesh Tools
 
 We developed the **[Mesh Tools](https://github.com/naturerobots/mesh_tools)** as a package consisting of message definitions, RViz plugins and tools, as well as a
 persistence layer to store such maps. These tools make the benefits of annotated triangle maps available in ROS and
 allow to publish, edit and inspect such maps within the existing ROS software stack.
 
-### Mesh Localization
+## Mesh Localization
 
 For the necessary localization of the robot relative to the mesh, we recommend using RMCL: [https://github.com/uos/rmcl](https://github.com/uos/rmcl). We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
 
