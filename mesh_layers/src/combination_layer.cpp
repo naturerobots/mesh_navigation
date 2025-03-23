@@ -1,4 +1,5 @@
 #include <mesh_layers/combination_layer.h>
+#include <mesh_map/timer.h>
 
 namespace mesh_layers
 {
@@ -91,6 +92,7 @@ void MaxCombinationLayer::updateLethal(
 
 void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
 {
+  const auto t0 = mesh_map::LayerTimer::Clock::now();
   // Lock this layer for writing and all inputs for reading
   auto wlock = this->writeLock();
   std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers(inputs_.size());
@@ -104,6 +106,7 @@ void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& change
     layers.push_back(ptr);
     locks.push_back(std::move(lock));
   }
+  const auto t1 = mesh_map::LayerTimer::Clock::now();
 
   // Do the update
   for (const lvr2::VertexHandle& v: changed)
@@ -119,7 +122,10 @@ void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& change
 
   locks.clear();
   wlock.unlock();
+  const auto t2 = mesh_map::LayerTimer::Clock::now();
   this->notifyChange(changed);
+  const auto t3 = mesh_map::LayerTimer::Clock::now();
+  mesh_map::LayerTimer::recordUpdateDuration(layer_name_, t0, t1 - t0, t2 - t1, t3 - t2);
 }
 
 

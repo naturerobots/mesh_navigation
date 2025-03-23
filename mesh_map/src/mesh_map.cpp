@@ -62,6 +62,7 @@
 
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
+#include <mesh_map/timer.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs_conversions/conversions.h>
 #include <mutex>
@@ -127,6 +128,12 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
   mesh_working_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
+
+  const bool enable_layer_timer = node->declare_parameter(MESH_MAP_NAMESPACE + ".enable_layer_timer", false);
+  if (enable_layer_timer)
+  {
+    LayerTimer::enable();
+  }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 

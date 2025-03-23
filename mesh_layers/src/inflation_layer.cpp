@@ -41,6 +41,7 @@
 #include <lvr2/util/Meap.hpp>
 #include <pluginlib/class_list_macros.hpp>
 #include <mesh_map/util.h>
+#include <mesh_map/timer.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::InflationLayer, mesh_map::AbstractLayer);
 
@@ -103,6 +104,7 @@ void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
 
 void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
 {
+  const mesh_map::LayerTimer::TimePoint t0 = mesh_map::LayerTimer::Clock::now();
   const std::vector<std::string> inputs = node_->get_parameter(
     mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inputs"
   ).as_string_array();
@@ -149,8 +151,10 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   // Copy lethal vertices of base layer
   // TODO: Copy all cost values
   // TODO: Implement update on change
+  mesh_map::LayerTimer::TimePoint t1 = mesh_map::LayerTimer::Clock::now();
   {
     auto input_lock = input->readLock();
+    t1 = mesh_map::LayerTimer::Clock::now();
     lethal_vertices_ = input->lethals();
   }
   waveCostInflation(
@@ -179,7 +183,10 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   );
   // Unlock before notifying others
   wlock.unlock();
+  const mesh_map::LayerTimer::TimePoint t2 = mesh_map::LayerTimer::Clock::now();
   this->notifyChange(update);
+  const mesh_map::LayerTimer::TimePoint t3 = mesh_map::LayerTimer::Clock::now();
+  mesh_map::LayerTimer::recordUpdateDuration(layer_name_, t0, t1 - t0, t2 - t1, t3 - t2);
 }
 
 inline float InflationLayer::computeUpdateSethianMethod(const float& d1, const float& d2, const float& a,
