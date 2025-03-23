@@ -88,14 +88,21 @@ void MaxCombinationLayer::updateLethal(
 
 void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
 {
+  // Lock this layer for writing and all inputs for reading
+  auto wlock = this->writeLock();
   std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers(inputs_.size());
+  std::vector<std::shared_lock<std::shared_mutex>> locks(inputs_.size());
   layers.clear();
+  locks.clear();
   for (const auto& ref: inputs_)
   {
     const auto& ptr = ref.lock();
+    auto lock = ptr->readLock();
     layers.push_back(ptr);
+    locks.push_back(std::move(lock));
   }
 
+  // Do the update
   for (const lvr2::VertexHandle& v: changed)
   {
     float cost = 0;
@@ -107,6 +114,8 @@ void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& change
     costs_.insert(v, cost);
   }
 
+  locks.clear();
+  wlock.unlock();
   this->notifyChange(changed);
 }
 

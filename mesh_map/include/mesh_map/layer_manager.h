@@ -136,7 +136,7 @@ private:
   rclcpp::Node::SharedPtr node_;
 
   //! Mutex to prevent parallel updates
-  std::recursive_mutex layer_mtx_;
+  std::shared_mutex layer_mtx_;
 
   //! Graph containing an directed edge between a and b if a depends on b
   using DependencyGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;

@@ -123,7 +123,8 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   // {
   //   riskiness_.insert(v, input->costs()[v]);
   // }
-  
+
+  auto wlock = this->writeLock();
   // TODO: This layer should probably be sparse?
   std::set<lvr2::VertexHandle> old;
   for (const lvr2::VertexHandle& v: riskiness_)
@@ -137,7 +138,10 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   // Copy lethal vertices of base layer
   // TODO: Copy all cost values
   // TODO: Implement update on change
-  lethal_vertices_ = input->lethals();
+  {
+    auto input_lock = input->readLock();
+    lethal_vertices_ = input->lethals();
+  }
   waveCostInflation(
     lethal_vertices_,
     config_.inflation_radius,
@@ -162,7 +166,8 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
     new_.begin(), new_.end(),
     std::inserter(update, update.end())
   );
-
+  // Unlock before notifying others
+  wlock.unlock();
   this->notifyChange(update);
 }
 

@@ -128,9 +128,7 @@ bool LayerManager::load_layer_plugins(const rclcpp::Logger& logger)
 bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node, const MeshMap::Ptr& map)
 {
   // Prevent layers from publishing updates while initialization is still ongoing initialization
-  // TODO: Individual layers need to be prevented from changing themselves unexpectedly
-  // Maybe something like layer->beginUpdate() like OGRE
-  std::lock_guard lock(layer_mtx_);
+  std::unique_lock lock(layer_mtx_);
   // Topological sort ensures that all dependencies are initialized before their dependents
   std::vector<Vertex> init_order(boost::num_vertices(graph_));
   boost::topological_sort(graph_, init_order.begin());
@@ -150,6 +148,8 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       );
       continue;
     }
+
+    auto lock = instance->writeLock();
 
     auto callback = std::bind(&LayerManager::layer_changed, this, std::placeholders::_1, std::placeholders::_2);
 
@@ -181,6 +181,11 @@ void LayerManager::layer_changed(
   const std::set<lvr2::VertexHandle>& changed
 )
 {
+  // Prevent callbacks during initialization
+  // Using a shared lock here allows parallel execution of updates except
+  // for when the initialization method holds the unique_lock
+  // This could also be done with an std::latch in c++20
+  std::shared_lock lock(layer_mtx_);
   // Layers could send empty updates if they are lazy so we just discard them here
   if (changed.empty())
   {
@@ -202,7 +207,8 @@ void LayerManager::layer_changed(
   }
   
   // Prevent simultaneous execution of updates
-  std::lock_guard lock(layer_mtx_);
+  auto rlock = ptr->readLock();
+
   // Publish an update message
   lvr2::SparseVertexMap<float> c;
   const auto& cm = ptr->costs();
@@ -210,12 +216,15 @@ void LayerManager::layer_changed(
   {
     c.insert(v, cm.containsKey(v)? cm[v]: ptr->defaultValue());
   }
+  rlock.unlock();
   // TODO: We need to get the proper timestamp, but from where?
   map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
   
-  auto [it, end] = boost::in_edges(v_it->second, graph_);
+  // Notify the map
+  map_.layerChanged(name);
 
   // Notify all users
+  auto [it, end] = boost::in_edges(v_it->second, graph_);
   for (; it != end; it++)
   {
     const auto& name = names_[boost::source(*it, graph_)];
@@ -228,9 +237,6 @@ void LayerManager::layer_changed(
 
     layer->updateInput(changed);
   }
-  
-  // Notify the map, should be fine after updating the users because the map is only interested in 1 layer
-  map_.layerChanged(name);
 }
 
 } // namespace mesh_map;

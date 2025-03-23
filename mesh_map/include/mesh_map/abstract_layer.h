@@ -177,6 +177,28 @@ public:
   {
     this->notify_(layer_name_, changed);
   }
+  
+  /**
+   *  @brief Aquire a read lock on the layer to prevent changes while reading.
+   *
+   *  Before reading data from a layer a readLock *must* be aquired to prevent
+   *  raceconditions through parallel changes.
+   */
+  [[nodiscard]] std::shared_lock<std::shared_mutex> readLock()
+  {
+    return std::shared_lock(mutex_);
+  }
+
+  /**
+   *  @brief Aquire a write lock on the layer to prevent simultaneaus reads or writes.
+   *
+   *  Before making any changes to the layer a write lock *must* be aquired!
+   *  This is to prevent parallel reads and writes
+   */
+  [[nodiscard]] std::unique_lock<std::shared_mutex> writeLock()
+  {
+    return std::unique_lock(mutex_);
+  }
 
   inline float combinationWeight() const
   {
@@ -214,6 +236,9 @@ private:
     const std::vector<rclcpp::Parameter>& parameters);
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+
+  //! Mutex to protect against concurrent reads and writes
+  std::shared_mutex mutex_;
 };
 
 } /* namespace mesh_map */
