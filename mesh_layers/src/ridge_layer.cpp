@@ -50,7 +50,8 @@ namespace mesh_layers
 bool RidgeLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read ridge from map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  const auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   auto ridge_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (ridge_opt)
   {
@@ -64,7 +65,8 @@ bool RidgeLayer::readLayer()
 
 bool RidgeLayer::writeLayer()
 {
-  auto mesh_io = map_ptr_->meshIO();
+  const auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(ridge_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved ridge to map file.");
@@ -100,9 +102,9 @@ bool RidgeLayer::computeLayer()
   RCLCPP_INFO_STREAM(node_->get_logger(), "Computing ridge...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
-
-  const auto mesh = map_ptr_->mesh();
-  auto mesh_io = map_ptr_->meshIO();
+  const auto map = map_ptr_.lock();
+  const auto mesh = map->mesh();
+  auto mesh_io = map->meshIO();
   auto face_normals_opt = mesh_io->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>("face_normals");
 
   if (face_normals_opt)

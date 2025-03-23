@@ -47,7 +47,8 @@ namespace mesh_layers {
 
 bool RoughnessLayer::readLayer() {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read roughness from map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   auto roughness_opt =
       mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
           layer_name_);
@@ -61,7 +62,8 @@ bool RoughnessLayer::readLayer() {
 }
 
 bool RoughnessLayer::writeLayer() {
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(roughness_, layer_name_)) {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved roughness to map file.");
     return true;
@@ -87,11 +89,12 @@ float RoughnessLayer::threshold() { return config_.threshold; }
 
 bool RoughnessLayer::computeLayer() {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Computing roughness...");
+  auto map = map_ptr_.lock();
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
 
-  const auto mesh = map_ptr_->mesh();
-  auto mesh_io = map_ptr_->meshIO();
+  const auto mesh = map->mesh();
+  auto mesh_io = map->meshIO();
 
   auto face_normals_opt =
       mesh_io->getDenseAttributeMap<lvr2::DenseFaceMap<mesh_map::Normal>>(

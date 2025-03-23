@@ -17,9 +17,11 @@ bool MaxCombinationLayer::initialize()
     return false;
   }
 
+  const auto map = map_ptr_.lock();
+
   for (const std::string& dep: inputs)
   {
-    const auto& layer = map_ptr_->layer(dep);
+    const auto& layer = map->layer(dep);
     if (nullptr == layer)
     {
       RCLCPP_ERROR(node_->get_logger(), "[MaxCombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
@@ -28,8 +30,8 @@ bool MaxCombinationLayer::initialize()
     inputs_.push_back(layer);
   }
 
-  costs_.reserve(map_ptr_->mesh()->numVertices());
-  for (const auto& v: map_ptr_->mesh()->vertices())
+  costs_.reserve(map->mesh()->numVertices());
+  for (const auto& v: map->mesh()->vertices())
   {
     costs_.insert(v, defaultValue());
   }
@@ -51,7 +53,8 @@ bool MaxCombinationLayer::computeLayer()
     layers.push_back(ptr);
   }
 
-  for (const auto& vertex: map_ptr_->mesh()->vertices())
+  auto map = map_ptr_.lock();
+  for (const auto& vertex: map->mesh()->vertices())
   {
     float cost = defaultValue();
     for (const auto& ptr: layers)
@@ -134,9 +137,10 @@ bool CombinationLayer::initialize()
     return false;
   }
 
+  auto map = map_ptr_.lock();
   for (const std::string& dep: inputs)
   {
-    const auto& layer = map_ptr_->layer(dep);
+    const auto& layer = map->layer(dep);
     if (nullptr == layer)
     {
       RCLCPP_ERROR(node_->get_logger(), "[CombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
@@ -145,8 +149,8 @@ bool CombinationLayer::initialize()
     inputs_.push_back(layer);
   }
 
-  costs_.reserve(map_ptr_->mesh()->numVertices());
-  for (const auto& v: map_ptr_->mesh()->vertices())
+  costs_.reserve(map->mesh()->numVertices());
+  for (const auto& v: map->mesh()->vertices())
   {
     costs_.insert(v, defaultValue());
   }

@@ -213,7 +213,8 @@ protected:
   virtual bool initialize() = 0;
 
   std::string layer_name_;
-  std::shared_ptr<mesh_map::MeshMap> map_ptr_;
+  // Use weak ptr here to prevent cyclic shared ptrs map -> layer -> map
+  std::weak_ptr<mesh_map::MeshMap> map_ptr_;
 
   rclcpp::Node::SharedPtr node_;
   std::string layer_namespace_;

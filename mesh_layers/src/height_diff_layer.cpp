@@ -48,7 +48,8 @@ namespace mesh_layers
 bool HeightDiffLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read height differences from map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   auto height_diff_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
   if (height_diff_opt)
@@ -79,7 +80,8 @@ bool HeightDiffLayer::computeLethals()
 bool HeightDiffLayer::writeLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Saving height_differences to map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(height_diff_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved height differences to map file.");
@@ -99,7 +101,8 @@ float HeightDiffLayer::threshold()
 
 bool HeightDiffLayer::computeLayer()
 {
-  auto mesh = map_ptr_->mesh();
+  auto map = map_ptr_.lock();
+  auto mesh = map->mesh();
   height_diff_ = lvr2::calcVertexHeightDifferences(*mesh, config_.radius);
   return computeLethals();
 }

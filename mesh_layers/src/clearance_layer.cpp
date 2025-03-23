@@ -48,7 +48,9 @@ namespace mesh_layers
 bool ClearanceLayer::readLayer()
 {
   RCLCPP_INFO(node_->get_logger(), "Try to read '%s' from map file...", layer_name_.c_str());
-  auto clearance_opt = map_ptr_->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
+  // Since this is called by the map we do not need to check if this is successful
+  const auto map = map_ptr_.lock();
+  auto clearance_opt = map->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
   if (clearance_opt)
   {
@@ -98,7 +100,8 @@ bool ClearanceLayer::computeLethalsAndCosts()
 bool ClearanceLayer::writeLayer()
 {
   RCLCPP_INFO(node_->get_logger(), "Saving '%s' to map file...", layer_name_.c_str());
-  if (map_ptr_->meshIO()->addDenseAttributeMap(clearance_, layer_name_))
+  const auto map = map_ptr_.lock();
+  if (map->meshIO()->addDenseAttributeMap(clearance_, layer_name_))
   {
     RCLCPP_INFO(node_->get_logger(), "Saved '%s' to map file.", layer_name_.c_str());
     return true;
@@ -118,11 +121,12 @@ float ClearanceLayer::threshold()
 bool ClearanceLayer::computeLayer()
 {
   RCLCPP_INFO(node_->get_logger(), "Computing clearance along vertex normals...");
+  const auto map = map_ptr_.lock();
 
   // Load vertex normals
   using VertexNormalMap = lvr2::DenseVertexMap<mesh_map::Normal>;
   VertexNormalMap vertex_normals;
-  auto vertex_normals_opt = map_ptr_->meshIO()->getDenseAttributeMap<VertexNormalMap>("vertex_normals");
+  auto vertex_normals_opt = map->meshIO()->getDenseAttributeMap<VertexNormalMap>("vertex_normals");
 
   if (vertex_normals_opt)
   {
@@ -136,7 +140,7 @@ bool ClearanceLayer::computeLayer()
     // Load or calculate face normals
     using FaceNormalMap = lvr2::DenseFaceMap<mesh_map::Normal>;
     FaceNormalMap face_normals;
-    auto face_normals_opt = map_ptr_->meshIO()->getDenseAttributeMap<FaceNormalMap>("face_normals");
+    auto face_normals_opt = map->meshIO()->getDenseAttributeMap<FaceNormalMap>("face_normals");
     if (face_normals_opt)
     {
       RCLCPP_INFO(node_->get_logger(), "Using face normals from map file");
@@ -145,15 +149,15 @@ bool ClearanceLayer::computeLayer()
     else
     {
       RCLCPP_INFO(node_->get_logger(), "Calculating face normals");
-      face_normals = lvr2::calcFaceNormals(*map_ptr_->mesh());
+      face_normals = lvr2::calcFaceNormals(*map->mesh());
     }
 
     RCLCPP_INFO(node_->get_logger(), "Calculating vertex normals");
-    VertexNormalMap vertex_normals = lvr2::calcVertexNormals(*map_ptr_->mesh(), face_normals);
+    VertexNormalMap vertex_normals = lvr2::calcVertexNormals(*map->mesh(), face_normals);
   }
 
   // Finally calculate the clearance layer
-  clearance_ = lvr2::calcNormalClearance(*map_ptr_->mesh(), vertex_normals);
+  clearance_ = lvr2::calcNormalClearance(*map->mesh(), vertex_normals);
 
   return computeLethalsAndCosts();
 }

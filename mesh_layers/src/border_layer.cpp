@@ -48,7 +48,8 @@ namespace mesh_layers
 bool BorderLayer::readLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read border costs from map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   auto border_costs_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float> >(layer_name_);
 
   if (border_costs_opt)
@@ -80,7 +81,8 @@ bool BorderLayer::computeLethals()
 bool BorderLayer::writeLayer()
 {
   RCLCPP_INFO_STREAM(node_->get_logger(), "Saving border costs to map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  auto map = map_ptr_.lock();
+  auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(border_costs_, layer_name_))
   {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Saved border costs to map file.");
@@ -100,7 +102,9 @@ float BorderLayer::threshold()
 
 bool BorderLayer::computeLayer()
 {
-  border_costs_ = lvr2::calcBorderCosts(*(map_ptr_->mesh()), config_.border_cost);
+  // Called by map so this wont fail
+  auto map = map_ptr_.lock();
+  border_costs_ = lvr2::calcBorderCosts(*(map->mesh()), config_.border_cost);
   return computeLethals();
 }
 
