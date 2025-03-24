@@ -222,6 +222,11 @@ protected:
   //! Factor used to linearly combine layers to a combined layer in MeshMap
   float combination_weight_ = 1.0;
 
+  const rclcpp::Logger& get_logger() const
+  {
+    return logger_;
+  }
+
 private:
   notify_func notify_;
 
@@ -240,6 +245,9 @@ private:
 
   //! Mutex to protect against concurrent reads and writes
   std::shared_mutex mutex_;
+  
+  // Logger will be replaced by the init function
+  rclcpp::Logger logger_ = rclcpp::get_logger("abstract_layer");
 };
 
 } /* namespace mesh_map */

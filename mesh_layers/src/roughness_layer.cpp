@@ -46,14 +46,14 @@ PLUGINLIB_EXPORT_CLASS(mesh_layers::RoughnessLayer, mesh_map::AbstractLayer)
 namespace mesh_layers {
 
 bool RoughnessLayer::readLayer() {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read roughness from map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read roughness from map file...");
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   auto roughness_opt =
       mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(
           layer_name_);
   if (roughness_opt) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read roughness from map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Successfully read roughness from map file.");
     roughness_ = roughness_opt.get();
     return computeLethals();
   }
@@ -65,30 +65,30 @@ bool RoughnessLayer::writeLayer() {
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(roughness_, layer_name_)) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved roughness to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved roughness to map file.");
     return true;
   } else {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save roughness to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save roughness to map file!");
     return false;
   }
 }
 
 bool RoughnessLayer::computeLethals()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Roughness Layer) with threshold " << config_.threshold);
+  RCLCPP_INFO_STREAM(get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Roughness Layer) with threshold " << config_.threshold);
   lethal_vertices_.clear();
   for (auto vH : roughness_) {
     if (roughness_[vH] > config_.threshold)
       lethal_vertices_.insert(vH);
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 float RoughnessLayer::threshold() { return config_.threshold; }
 
 bool RoughnessLayer::computeLayer() {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing roughness...");
+  RCLCPP_INFO_STREAM(get_logger(), "Computing roughness...");
   auto map = map_ptr_.lock();
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
@@ -102,18 +102,18 @@ bool RoughnessLayer::computeLayer() {
 
   if (face_normals_opt) {
     face_normals = face_normals_opt.get();
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues()
+    RCLCPP_INFO_STREAM(get_logger(), "Found " << face_normals.numValues()
                              << " face normals in map file.");
   } else {
-    RCLCPP_INFO_STREAM(node_->get_logger(), 
+    RCLCPP_INFO_STREAM(get_logger(), 
         "No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues()
+    RCLCPP_INFO_STREAM(get_logger(), "Computed " << face_normals.numValues()
                                 << " face normals.");
     if (mesh_io->addDenseAttributeMap(face_normals, "face_normals")) {
-      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(get_logger(), "Saved face normals to map file.");
     } else {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
@@ -125,16 +125,16 @@ bool RoughnessLayer::computeLayer() {
 
   if (vertex_normals_opt) {
     vertex_normals = vertex_normals_opt.get();
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues()
+    RCLCPP_INFO_STREAM(get_logger(), "Found " << vertex_normals.numValues()
                              << " vertex normals in map file!");
   } else {
-    RCLCPP_INFO_STREAM(node_->get_logger(), 
+    RCLCPP_INFO_STREAM(get_logger(), 
         "No vertex normals found in the given map file, computing them...");
     vertex_normals = lvr2::calcVertexNormals(*mesh, face_normals);
     if (mesh_io->addDenseAttributeMap(vertex_normals, "vertex_normals")) {
-      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(get_logger(), "Saved vertex normals to map file.");
     } else {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
@@ -163,7 +163,7 @@ rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std
   }
 
   if (has_threshold_changed) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
     notifyChange();
   }

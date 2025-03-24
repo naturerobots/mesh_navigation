@@ -14,7 +14,7 @@ bool MaxCombinationLayer::initialize()
 
   if (inputs.empty())
   {
-    RCLCPP_ERROR(node_->get_logger(), "[MaxCombinationLayer] No inputs provided in configuration!");
+    RCLCPP_ERROR(get_logger(), "[MaxCombinationLayer] No inputs provided in configuration!");
     return false;
   }
 
@@ -25,7 +25,7 @@ bool MaxCombinationLayer::initialize()
     const auto& layer = map->layer(dep);
     if (nullptr == layer)
     {
-      RCLCPP_ERROR(node_->get_logger(), "[MaxCombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
+      RCLCPP_ERROR(get_logger(), "[MaxCombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
       return false;
     }
     inputs_.push_back(layer);
@@ -139,7 +139,7 @@ bool CombinationLayer::initialize()
 
   if (inputs.empty())
   {
-    RCLCPP_ERROR(node_->get_logger(), "[CombinationLayer] No inputs provided in configuration!");
+    RCLCPP_ERROR(get_logger(), "[CombinationLayer] No inputs provided in configuration!");
     return false;
   }
 
@@ -149,7 +149,7 @@ bool CombinationLayer::initialize()
     const auto& layer = map->layer(dep);
     if (nullptr == layer)
     {
-      RCLCPP_ERROR(node_->get_logger(), "[CombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
+      RCLCPP_ERROR(get_logger(), "[CombinationLayer] Could not get input layer '%s' from map!", dep.c_str());
       return false;
     }
     inputs_.push_back(layer);

@@ -53,12 +53,12 @@ bool InflationLayer::readLayer()
   // Since this is called by the map we do not need to check if this is successful
   const auto map = map_ptr_.lock();
   // riskiness
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read riskiness from map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read riskiness from map file...");
   auto mesh_io = map->meshIO();
   auto riskiness_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (riskiness_opt)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Riskiness has been read successfully.");
+    RCLCPP_INFO_STREAM(get_logger(), "Riskiness has been read successfully.");
     riskiness_ = riskiness_opt.get();
     return true;
   }
@@ -70,19 +70,19 @@ bool InflationLayer::readLayer()
 
 bool InflationLayer::writeLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Saving " << riskiness_.numValues() << " riskiness values to map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Saving " << riskiness_.numValues() << " riskiness values to map file...");
   // Since this is called by the map we do not need to check if this is successful
   const auto map = map_ptr_.lock();
 
   auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(riskiness_, layer_name_))
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved riskiness to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved riskiness to map file.");
     return true;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save riskiness to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save riskiness to map file!");
     return false;
   }
 }
@@ -97,7 +97,7 @@ void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
 {
   lethal_vertices_ = added_lethal;
 
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Update lethal for inflation layer.");
+  RCLCPP_INFO_STREAM(get_logger(), "Update lethal for inflation layer.");
   waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value,
                     std::numeric_limits<float>::infinity());
 }
@@ -111,21 +111,21 @@ void InflationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
 
   if (inputs.size() != 1)
   {
-    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Exactly one input layer is required!");
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Exactly one input layer is required!");
     return;
   }
 
   auto map = map_ptr_.lock();
   if (nullptr == map)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to weak_ptr::lock() map in updateInput()!");
+    RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() map in updateInput()!");
     return;
   }
 
   const auto input = map->layer(inputs[0]);
   if (nullptr == input)
   {
-    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
     return;
   }
 
@@ -356,13 +356,13 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
   {
     if (nullptr == map->mesh())
     {
-      RCLCPP_ERROR(node_->get_logger(), "Cannot init wave inflation: mesh_ptr points to null");
+      RCLCPP_ERROR(get_logger(), "Cannot init wave inflation: mesh_ptr points to null");
       return;
     }
     const auto mesh = map->mesh();
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "inflation radius:" << inflation_radius);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Init wave inflation.");
+    RCLCPP_INFO_STREAM(get_logger(), "inflation radius:" << inflation_radius);
+    RCLCPP_INFO_STREAM(get_logger(), "Init wave inflation.");
 
     lvr2::DenseVertexMap<bool> seen(mesh->nextVertexIndex(), false);
     distances_ = lvr2::DenseVertexMap<float>(mesh->nextVertexIndex(), std::numeric_limits<float>::infinity());
@@ -395,7 +395,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
       pq.insert(vH, 0);
     }
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Start inflation wave front propagation");
+    RCLCPP_INFO_STREAM(get_logger(), "Start inflation wave front propagation");
 
     while (!pq.isEmpty())
     {
@@ -452,7 +452,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
           {
             if (fixed[a] && fixed[b] && fixed[c])
             {
-              // RCLCPP_INFO_STREAM(node_->get_logger(), "All fixed!");
+              // RCLCPP_INFO_STREAM(get_logger(), "All fixed!");
               continue;
             }
             else if (fixed[a] && fixed[b] && !fixed[c])
@@ -488,7 +488,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
             else
             {
               // two free vertices -> skip that face
-              // RCLCPP_INFO_STREAM(node_->get_logger(), "two vertices are free.");
+              // RCLCPP_INFO_STREAM(get_logger(), "two vertices are free.");
               continue;
             }
           }
@@ -504,7 +504,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
       }
     }
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Finished inflation wave front propagation.");
+    RCLCPP_INFO_STREAM(get_logger(), "Finished inflation wave front propagation.");
 
     for (auto vH : mesh->vertices())
     {
@@ -516,7 +516,7 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
   }
   else
   {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to weak_ptr::lock() the map in waveCostInflation()!");
+    RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() the map in waveCostInflation()!");
   }
 }
 
@@ -623,7 +623,7 @@ bool InflationLayer::computeLayer()
 
   if (inputs.size() != 1)
   {
-    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Exactly one input layer is required!");
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Exactly one input layer is required!");
     return false;
   }
   
@@ -631,7 +631,7 @@ bool InflationLayer::computeLayer()
   const auto input = map->layer(inputs[0]);
   if (nullptr == input)
   {
-    RCLCPP_ERROR(node_->get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
     return false;
   }
   
@@ -696,7 +696,7 @@ rcl_interfaces::msg::SetParametersResult InflationLayer::reconfigureCallback(std
     auto map = map_ptr_.lock();
     if (nullptr == map)
     {
-      RCLCPP_ERROR(node_->get_logger(), "Failed to weak_ptr::lock() map in reconfigureCallback()");
+      RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() map in reconfigureCallback()");
       result.successful = false;
       result.reason = "Failed to weak_ptr::lock() map!";
       return result;

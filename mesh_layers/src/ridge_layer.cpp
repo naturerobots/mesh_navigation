@@ -49,13 +49,13 @@ namespace mesh_layers
 {
 bool RidgeLayer::readLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read ridge from map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read ridge from map file...");
   const auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   auto ridge_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (ridge_opt)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully read ridge from map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Successfully read ridge from map file.");
     ridge_ = ridge_opt.get();
     return computeLethals();
   }
@@ -69,26 +69,26 @@ bool RidgeLayer::writeLayer()
   auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(ridge_, layer_name_))
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved ridge to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved ridge to map file.");
     return true;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save ridge to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save ridge to map file!");
     return false;
   }
 }
 
 bool RidgeLayer::computeLethals()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Ridge Layer) with threshold " << config_.threshold);
+  RCLCPP_INFO_STREAM(get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Ridge Layer) with threshold " << config_.threshold);
   lethal_vertices_.clear();
   for (auto vH : ridge_)
   {
     if (ridge_[vH] > config_.threshold)
       lethal_vertices_.insert(vH);
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
@@ -99,7 +99,7 @@ float RidgeLayer::threshold()
 
 bool RidgeLayer::computeLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Computing ridge...");
+  RCLCPP_INFO_STREAM(get_logger(), "Computing ridge...");
 
   lvr2::DenseFaceMap<mesh_map::Normal> face_normals;
   const auto map = map_ptr_.lock();
@@ -110,20 +110,20 @@ bool RidgeLayer::computeLayer()
   if (face_normals_opt)
   {
     face_normals = face_normals_opt.get();
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << face_normals.numValues() << " face normals in map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Found " << face_normals.numValues() << " face normals in map file.");
   }
   else
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "No face normals found in the given map file, computing them...");
+    RCLCPP_INFO_STREAM(get_logger(), "No face normals found in the given map file, computing them...");
     face_normals = lvr2::calcFaceNormals(*mesh);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Computed " << face_normals.numValues() << " face normals.");
+    RCLCPP_INFO_STREAM(get_logger(), "Computed " << face_normals.numValues() << " face normals.");
     if (mesh_io->addDenseAttributeMap(face_normals, "face_normals"))
     {
-      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved face normals to map file.");
+      RCLCPP_INFO_STREAM(get_logger(), "Saved face normals to map file.");
     }
     else
     {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save face normals to map file!");
+      RCLCPP_ERROR_STREAM(get_logger(), "Could not save face normals to map file!");
       return false;
     }
   }
@@ -134,19 +134,19 @@ bool RidgeLayer::computeLayer()
   if (vertex_normals_opt)
   {
     vertex_normals = vertex_normals_opt.get();
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << vertex_normals.numValues() << " vertex normals in map file!");
+    RCLCPP_INFO_STREAM(get_logger(), "Found " << vertex_normals.numValues() << " vertex normals in map file!");
   }
   else
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "No vertex normals found in the given map file, computing them...");
+    RCLCPP_INFO_STREAM(get_logger(), "No vertex normals found in the given map file, computing them...");
     vertex_normals = lvr2::calcVertexNormals(*mesh, face_normals);
     if (mesh_io->addDenseAttributeMap(vertex_normals, "vertex_normals"))
     {
-      RCLCPP_INFO_STREAM(node_->get_logger(), "Saved vertex normals to map file.");
+      RCLCPP_INFO_STREAM(get_logger(), "Saved vertex normals to map file.");
     }
     else
     {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save vertex normals to map file!");
+      RCLCPP_ERROR_STREAM(get_logger(), "Could not save vertex normals to map file!");
       return false;
     }
   }
@@ -211,7 +211,7 @@ rcl_interfaces::msg::SetParametersResult RidgeLayer::reconfigureCallback(std::ve
   if (has_radius_changed) { computeLayer(); }
   if (has_radius_changed || has_threshold_changed) 
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Notify change from " << layer_name_ << " (RidgeLayer) due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "Notify change from " << layer_name_ << " (RidgeLayer) due to cfg change.");
     notifyChange(); 
   }
 

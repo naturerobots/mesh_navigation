@@ -47,14 +47,14 @@ namespace mesh_layers
 {
 bool HeightDiffLayer::readLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read height differences from map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read height differences from map file...");
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   auto height_diff_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
   if (height_diff_opt)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Height differences have been read successfully.");
+    RCLCPP_INFO_STREAM(get_logger(), "Height differences have been read successfully.");
     height_diff_ = height_diff_opt.get();
 
     return computeLethals();
@@ -65,7 +65,7 @@ bool HeightDiffLayer::readLayer()
 
 bool HeightDiffLayer::computeLethals()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Height Differences Layer) with threshold "
+  RCLCPP_INFO_STREAM(get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Height Differences Layer) with threshold "
                                            << config_.threshold);
   lethal_vertices_.clear();
   for (auto vH : height_diff_)
@@ -73,23 +73,23 @@ bool HeightDiffLayer::computeLethals()
     if (height_diff_[vH] > config_.threshold)
       lethal_vertices_.insert(vH);
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 bool HeightDiffLayer::writeLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Saving height_differences to map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Saving height_differences to map file...");
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(height_diff_, layer_name_))
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved height differences to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved height differences to map file.");
     return true;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save height differences to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save height differences to map file!");
     return false;
   }
 }
@@ -129,7 +129,7 @@ rcl_interfaces::msg::SetParametersResult HeightDiffLayer::reconfigureCallback(st
   }
 
   if (recompute_lethals) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "Recompute lethals and notify change from " << layer_name_ << " due to cfg change.");
     computeLethals();
     notifyChange();
   }

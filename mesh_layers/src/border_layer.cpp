@@ -47,14 +47,14 @@ namespace mesh_layers
 {
 bool BorderLayer::readLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read border costs from map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read border costs from map file...");
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   auto border_costs_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float> >(layer_name_);
 
   if (border_costs_opt)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Border costs have been read successfully.");
+    RCLCPP_INFO_STREAM(get_logger(), "Border costs have been read successfully.");
     border_costs_ = border_costs_opt.get();
     return computeLethals();
   }
@@ -64,7 +64,7 @@ bool BorderLayer::readLayer()
 
 bool BorderLayer::computeLethals()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Border Layer) with threshold "
+  RCLCPP_INFO_STREAM(get_logger(), "Compute lethals for \"" << layer_name_ << "\" (Border Layer) with threshold "
                                            << config_.threshold);
   lethal_vertices_.clear();
   for (auto vH : border_costs_)
@@ -74,23 +74,23 @@ bool BorderLayer::computeLethals()
       lethal_vertices_.insert(vH);
     }
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 bool BorderLayer::writeLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Saving border costs to map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Saving border costs to map file...");
   auto map = map_ptr_.lock();
   auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(border_costs_, layer_name_))
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved border costs to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved border costs to map file.");
     return true;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save height differences to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save height differences to map file!");
     return false;
   }
 }
@@ -136,19 +136,19 @@ rcl_interfaces::msg::SetParametersResult BorderLayer::reconfigureCallback(std::v
 
   if(recompute_costs) 
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Recompute layer costs due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "'" << layer_name_ << "': Recompute layer costs due to cfg change.");
     computeLayer();
   }
 
   if (recompute_lethals) 
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Recompute lethals due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "'" << layer_name_ << "': Recompute lethals due to cfg change.");
     computeLethals();
   }
 
   if(recompute_costs || recompute_lethals)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "'" << layer_name_ << "': Notify changes.");
+    RCLCPP_INFO_STREAM(get_logger(), "'" << layer_name_ << "': Notify changes.");
     notifyChange();
   }
 
