@@ -41,6 +41,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <mesh_map/util.h>
 #include <mesh_map/timer.h>
+#include <lvr2/geometry/PMPMesh.hpp>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::DynamicInflationLayer, mesh_map::AbstractLayer);
 
@@ -240,18 +241,19 @@ inline float DynamicInflationLayer::computeUpdateSethianMethod(const float& d1, 
   }
 }
 
-inline bool DynamicInflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distances_,
-                                            lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
-                                            const float& max_distance, const lvr2::DenseEdgeMap<float>& edge_weights,
-                                            const lvr2::FaceHandle& fh, const lvr2::BaseVector<float>& normal,
-                                            const lvr2::VertexHandle& v1h, const lvr2::VertexHandle& v2h,
-                                            const lvr2::VertexHandle& v3h)
+inline bool DynamicInflationLayer::waveFrontUpdate(
+  const lvr2::BaseMesh<mesh_map::Vector>& mesh,
+  lvr2::DenseVertexMap<float>& distances_,
+  lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
+  const float& max_distance,
+  const lvr2::DenseEdgeMap<float>& edge_weights,
+  const lvr2::FaceHandle& fh,
+  const lvr2::BaseVector<float>& normal,
+  const lvr2::VertexHandle& v1h,
+  const lvr2::VertexHandle& v2h,
+  const lvr2::VertexHandle& v3h
+)
 {
-  watch_.begin();
-  const auto map = map_ptr_.lock();
-  const auto mesh = map->mesh();
-  watch_.end_weak();
-
   const double u1 = distances_[v1h];
   const double u2 = distances_[v2h];
   const double u3 = distances_[v3h];
@@ -260,9 +262,9 @@ inline bool DynamicInflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& 
     return false;
 
   watch_.begin();
-  const lvr2::OptionalEdgeHandle e12h = mesh->getEdgeBetween(v1h, v2h);
-  const lvr2::OptionalEdgeHandle e13h = mesh->getEdgeBetween(v1h, v3h);
-  const lvr2::OptionalEdgeHandle e23h = mesh->getEdgeBetween(v2h, v3h);
+  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1h, v2h);
+  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1h, v3h);
+  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2h, v3h);
   watch_.end_mesh();
 
   watch_.begin();
@@ -288,9 +290,9 @@ inline bool DynamicInflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& 
   if (u1 == 0 && u2 == 0)
   {
     watch_.begin();
-    const auto& v1 = mesh->getVertexPosition(v1h);
-    const auto& v2 = mesh->getVertexPosition(v2h);
-    const auto& v3 = mesh->getVertexPosition(v3h);
+    const auto& v1 = mesh.getVertexPosition(v1h);
+    const auto& v2 = mesh.getVertexPosition(v2h);
+    const auto& v3 = mesh.getVertexPosition(v3h);
     watch_.end_mesh();
   
     const auto& dir = ((v3 - v2) + (v3 - v1)).normalized();
@@ -371,6 +373,8 @@ void DynamicInflationLayer::waveCostInflation(
     RCLCPP_ERROR(get_logger(), "Cannot init wave inflation: mesh_ptr points to null");
     return;
   }
+  // The LVR2 PMP wrapper
+  // const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
   const auto mesh = map->mesh();
 
   RCLCPP_INFO_STREAM(get_logger(), "inflation radius:" << inflation_radius);
@@ -410,6 +414,9 @@ void DynamicInflationLayer::waveCostInflation(
   watch_.end_init();
   RCLCPP_INFO_STREAM(get_logger(), "Start inflation wave front propagation");
 
+  // Preallocate the buffer with reasonable size (avg. vertex valence is 6)
+  std::vector<lvr2::VertexHandle> neighbours(10);
+  std::vector<lvr2::FaceHandle> faces(10);
   while (!pq.isEmpty())
   {
     watch_.begin();
@@ -429,7 +436,7 @@ void DynamicInflationLayer::waveCostInflation(
     // check if already fixed
     // if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
-    std::vector<lvr2::VertexHandle> neighbours;
+    neighbours.clear();
     try
     {
       watch_.begin();
@@ -449,7 +456,7 @@ void DynamicInflationLayer::waveCostInflation(
 
     for (auto nh : neighbours)
     {
-      std::vector<lvr2::FaceHandle> faces;
+      faces.clear();
       try
       {
         watch_.begin();
@@ -481,7 +488,7 @@ void DynamicInflationLayer::waveCostInflation(
           else if (fixed[a] && fixed[b] && !fixed[c])
           {
             // c is free
-            if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
+            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
                                 c))
             {
               watch_.begin();
@@ -493,7 +500,7 @@ void DynamicInflationLayer::waveCostInflation(
           else if (fixed[a] && !fixed[b] && fixed[c])
           {
             // b is free
-            if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
+            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
                                 b))
             {
               watch_.begin();
@@ -505,7 +512,7 @@ void DynamicInflationLayer::waveCostInflation(
           else if (!fixed[a] && fixed[b] && fixed[c])
           {
             // a if free
-            if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
+            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
                                 a))
             {
               watch_.begin();
