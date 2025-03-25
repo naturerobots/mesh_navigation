@@ -20,6 +20,7 @@ add_library(${PROJECT_NAME}
   src/roughness_layer.cpp
   src/height_diff_layer.cpp
   src/inflation_layer.cpp
+  src/dynamic_inflation_layer.cpp
   src/steepness_layer.cpp
   src/ridge_layer.cpp
   src/clearance_layer.cpp

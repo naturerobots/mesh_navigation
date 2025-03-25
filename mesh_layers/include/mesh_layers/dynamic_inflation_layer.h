@@ -35,8 +35,8 @@
  *
  */
 
-#ifndef MESH_MAP__INFLATION_LAYER_H
-#define MESH_MAP__INFLATION_LAYER_H
+#ifndef MESH_MAP__DYNAMIC_INFLATION_LAYER
+#define MESH_MAP__DYNAMIC_INFLATION_LAYER
 
 #include <mesh_map/abstract_layer.h>
 #include <rclcpp/rclcpp.hpp>
@@ -45,10 +45,83 @@ namespace mesh_layers
 {
 const float EPSILON = 1e-9;
 
+struct StopWatch
+{
+  using Duration = std::chrono::nanoseconds;
+  using TS = std::chrono::steady_clock::time_point;
+
+  std::optional<TS> ts_;
+  TS begin_;
+  std::ofstream logfile_;
+
+#define MAKE_NAMED_END_FN(name) Duration name##_ = Duration(0); \
+  inline void end_##name() { \
+    TS now = std::chrono::steady_clock::now(); \
+    name##_ += now - begin_; \
+    begin_ = now; \
+  }
+
+  MAKE_NAMED_END_FN(alloc);
+  MAKE_NAMED_END_FN(init);
+  MAKE_NAMED_END_FN(fading);
+  MAKE_NAMED_END_FN(meap);
+  MAKE_NAMED_END_FN(seth);
+  MAKE_NAMED_END_FN(weak);
+  MAKE_NAMED_END_FN(mesh);
+  MAKE_NAMED_END_FN(pub);
+  MAKE_NAMED_END_FN(vec);
+
+  inline void begin()
+  {
+    begin_ = std::chrono::steady_clock::now();
+    if (!ts_)
+    {
+      ts_ = begin_;
+    }
+  }
+
+  inline void open(const std::string& name)
+  {
+    const std::string filename = name + "_waveCostInflationTimes.csv";
+    logfile_.open(filename, std::ios::trunc);
+    logfile_ << "Timestamp, Unknown, Allocation, Initialization, Fading, Meap, Sethian, WeakPtr, MeshCalls, Publish, VecField" << std::endl;
+  }
+
+  inline void commit()
+  {
+    const auto end = std::chrono::steady_clock::now();
+    // Total minus everything else we measured
+    const Duration unknown = (end - ts_.value()) - alloc_ - init_ - fading_ - meap_ - seth_ - weak_ - mesh_ - pub_ - vec_;
+    logfile_ << ts_.value().time_since_epoch().count() << ',';
+    logfile_ << unknown.count() << ',';
+    logfile_ << alloc_.count() << ',';
+    logfile_ << init_.count() << ',';
+    logfile_ << fading_.count() << ',';
+    logfile_ << meap_.count() << ',';
+    logfile_ << seth_.count() << ',';
+    logfile_ << weak_.count() << ',';
+    logfile_ << mesh_.count() << ',';
+    logfile_ << pub_.count() << ',';
+    logfile_ << vec_.count() << std::endl;
+
+    alloc_ = Duration(0);
+    init_ = Duration(0);
+    fading_ = Duration(0);
+    meap_ = Duration(0);
+    seth_ = Duration(0);
+    weak_ = Duration(0);
+    mesh_ = Duration(0);
+    pub_ = Duration(0);
+    vec_ = Duration(0);
+    
+    ts_.reset();
+  }
+};
+
 /**
  * @brief Costmap layer which inflates around existing lethal vertices
  */
-class InflationLayer : public mesh_map::AbstractLayer
+class DynamicInflationLayer : public mesh_map::AbstractLayer
 {
   /**
    * @brief try read layer from map file
@@ -112,7 +185,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return resulting cost value
    */
-  float fading(const float squared_distance);
+  float fading(const float val);
 
   /**
    * @brief inflate around lethal vertices by using an wave front propagation and assign riskiness values to vertices
@@ -155,17 +228,6 @@ class InflationLayer : public mesh_map::AbstractLayer
   {
     return vector_map_;
   }
-
-  /**
-   * @brief adds vector pointing back to source of inflation source
-   *
-   * @param current_vertex vertex to calculate vector for
-   * @param predecessors current predecessor map
-   * @param[out] vector_map resulting vectorfield
-   */
-  void backToSource(const lvr2::VertexHandle& current_vertex,
-                    const lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
-                    lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map);
 
   /**
    * @brief calculate the values of this layer
@@ -229,16 +291,16 @@ class InflationLayer : public mesh_map::AbstractLayer
   struct {
     double inscribed_radius = 0.25;
     double inflation_radius = 0.4;
-    double lethal_value = 1.0;
-    double inscribed_value = 0.99;
-    double cost_scaling_factor = 1.0;
+    double factor = 1.0;
+    double lethal_value = 2.0;
+    double inscribed_value = 1.0;
     int min_contour_size = 3;
     bool repulsive_field = true;
   } config_;
-
-  std::ofstream logfile_;
+  
+  StopWatch watch_;
 };
 
 } /* namespace mesh_layers */
 
-#endif  // MESH_MAP__INFLATION_LAYER_H
+#endif  // MESH_MAP__DYNAMIC_INFLATION_LAYER
