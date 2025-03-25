@@ -173,7 +173,7 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
    * @return true if successful; else false
    */
   inline bool waveFrontUpdate(
-    const lvr2::BaseMesh<mesh_map::Vector>& mesh,
+    const pmp::SurfaceMesh& mesh,
     lvr2::DenseVertexMap<float>& distances,
     lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
     const float& max_distance,

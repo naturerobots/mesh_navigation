@@ -242,7 +242,7 @@ inline float DynamicInflationLayer::computeUpdateSethianMethod(const float& d1, 
 }
 
 inline bool DynamicInflationLayer::waveFrontUpdate(
-  const lvr2::BaseMesh<mesh_map::Vector>& mesh,
+  const pmp::SurfaceMesh& mesh,
   lvr2::DenseVertexMap<float>& distances_,
   lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
   const float& max_distance,
@@ -262,19 +262,20 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
     return false;
 
   watch_.begin();
-  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1h, v2h);
-  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1h, v3h);
-  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2h, v3h);
+  // We should always find the edge because the 3 input vertices have to be part of the same triangle
+  const lvr2::EdgeHandle e12h = mesh.find_edge(v1h, v2h);
+  const lvr2::EdgeHandle e13h = mesh.find_edge(v1h, v3h);
+  const lvr2::EdgeHandle e23h = mesh.find_edge(v2h, v3h);
   watch_.end_mesh();
 
   watch_.begin();
-  const float c = edge_weights[e12h.unwrap()];
+  const float c = edge_weights[e12h];
   const float c_sq = c * c;
 
-  const float b = edge_weights[e13h.unwrap()];
+  const float b = edge_weights[e13h];
   const float b_sq = b * b;
 
-  const float a = edge_weights[e23h.unwrap()];
+  const float a = edge_weights[e23h];
   const float a_sq = a * a;
 
   float dot = (a_sq + b_sq - c_sq) / (2 * a * b);
@@ -290,12 +291,13 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
   if (u1 == 0 && u2 == 0)
   {
     watch_.begin();
-    const auto& v1 = mesh.getVertexPosition(v1h);
-    const auto& v2 = mesh.getVertexPosition(v2h);
-    const auto& v3 = mesh.getVertexPosition(v3h);
+    const auto& v1 = mesh.position(v1h);
+    const auto& v2 = mesh.position(v2h);
+    const auto& v3 = mesh.position(v3h);
     watch_.end_mesh();
   
-    const auto& dir = ((v3 - v2) + (v3 - v1)).normalized();
+    const auto& tmp = ((v3 - v2) + (v3 - v1)).normalized();
+    const auto& dir = mesh_map::Vector(tmp.x(), tmp.y(), tmp.z());
     cutting_faces_.insert(v1h, fh);
     cutting_faces_.insert(v2h, fh);
     cutting_faces_.insert(v3h, fh);
@@ -374,30 +376,30 @@ void DynamicInflationLayer::waveCostInflation(
     return;
   }
   // The LVR2 PMP wrapper
-  // const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
-  const auto mesh = map->mesh();
+  const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
+  const auto& mesh = pmp_mesh->getSurfaceMesh();
 
   RCLCPP_INFO_STREAM(get_logger(), "inflation radius:" << inflation_radius);
+  RCLCPP_INFO_STREAM(get_logger(), "Lethals: " << lethals.size());
   RCLCPP_INFO_STREAM(get_logger(), "Init wave inflation.");
 
   watch_.begin();
-
-  lvr2::DenseVertexMap<bool> seen(mesh->nextVertexIndex(), false);
-  distances_ = lvr2::DenseVertexMap<float>(mesh->nextVertexIndex(), std::numeric_limits<float>::infinity());
+  lvr2::DenseVertexMap<bool> seen(mesh.vertices_size(), false);
+  distances_ = lvr2::DenseVertexMap<float>(mesh.vertices_size(), std::numeric_limits<float>::infinity());
   lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-  predecessors.reserve(mesh->nextVertexIndex());
-  vector_map_ = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh->nextVertexIndex(), lvr2::BaseVector<float>());
+  predecessors.reserve(mesh.vertices_size());
+  vector_map_ = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh.vertices_size(), lvr2::BaseVector<float>());
   direction_ = lvr2::DenseVertexMap<float>();
 
   const auto& edge_distances = map->edgeDistances();
   const auto& face_normals = map->faceNormals();
 
-  lvr2::DenseVertexMap<bool> fixed(mesh->nextVertexIndex(), false);
+  lvr2::DenseVertexMap<bool> fixed(mesh.vertices_size(), false);
   watch_.end_alloc();
 
   // initialize distances with infinity
   // initialize predecessor of each vertex with itself
-  for (auto const& vH : mesh->vertices())
+  for (auto const& vH : mesh.vertices())
   {
     predecessors.insert(vH, vH);
   }
@@ -414,9 +416,6 @@ void DynamicInflationLayer::waveCostInflation(
   watch_.end_init();
   RCLCPP_INFO_STREAM(get_logger(), "Start inflation wave front propagation");
 
-  // Preallocate the buffer with reasonable size (avg. vertex valence is 6)
-  std::vector<lvr2::VertexHandle> neighbours(10);
-  std::vector<lvr2::FaceHandle> faces(10);
   while (!pq.isEmpty())
   {
     watch_.begin();
@@ -424,7 +423,7 @@ void DynamicInflationLayer::waveCostInflation(
     auto _t1 = std::chrono::steady_clock::now();
     watch_.end_meap();
     
-    if (current_vh.idx() >= mesh->nextVertexIndex())
+    if (current_vh.idx() >= mesh.vertices_size())
     {
       continue;
     }
@@ -436,105 +435,72 @@ void DynamicInflationLayer::waveCostInflation(
     // check if already fixed
     // if(fixed[current_vh]) continue;
     fixed[current_vh] = true;
-    neighbours.clear();
-    try
+    for (const auto nh : mesh.vertices(current_vh))
     {
-      watch_.begin();
-      mesh->getNeighboursOfVertex(current_vh, neighbours);
-      watch_.end_mesh();
-    }
-    catch (lvr2::PanicException exception)
-    {
-      map->invalid.insert(current_vh, true);
-      continue;
-    }
-    catch (lvr2::VertexLoopException exception)
-    {
-      map->invalid.insert(current_vh, true);
-      continue;
-    }
-
-    for (auto nh : neighbours)
-    {
-      faces.clear();
-      try
+      // TODO: Maybe this can be reduced?
+      // Do we need to iterate all faces of all neighbours?
+      // Is it enough to look at the faces adjacent to the edge between
+      // current and neighbor?
+      for (const auto fh : mesh.faces(nh))
       {
         watch_.begin();
-        mesh->getFacesOfVertex(nh, faces);
+        // Using the pmp::VertexAroundFaceCirculator is slower here because it builds
+        // an internal unordered set to detect loops. We know that the mesh must be a
+        // valid triangle mesh, therefore we can to this ourselves
+        pmp::Halfedge half_edge_handle = mesh.halfedge(fh);
+        const lvr2::VertexHandle& a = mesh.to_vertex(half_edge_handle);
+        half_edge_handle = mesh.next_halfedge(half_edge_handle);
+        const lvr2::VertexHandle& b = mesh.to_vertex(half_edge_handle);
+        half_edge_handle = mesh.next_halfedge(half_edge_handle);
+        const lvr2::VertexHandle& c = mesh.to_vertex(half_edge_handle);
         watch_.end_mesh();
-      }
-      catch (lvr2::PanicException exception)
-      {
-        map->invalid.insert(nh, true);
-        continue;
-      }
 
-      for (auto fh : faces)
-      {
-        watch_.begin();
-        const auto vertices = mesh->getVerticesOfFace(fh);
-        watch_.end_mesh();
-        const lvr2::VertexHandle& a = vertices[0];
-        const lvr2::VertexHandle& b = vertices[1];
-        const lvr2::VertexHandle& c = vertices[2];
-
-        try
+        if (fixed[a] && fixed[b] && fixed[c])
         {
-          if (fixed[a] && fixed[b] && fixed[c])
-          {
-            // RCLCPP_INFO_STREAM(get_logger(), "All fixed!");
-            continue;
-          }
-          else if (fixed[a] && fixed[b] && !fixed[c])
-          {
-            // c is free
-            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
-                                c))
-            {
-              watch_.begin();
-              pq.insert(c, distances_[c]);
-              watch_.end_meap();
-            }
-            // if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
-          }
-          else if (fixed[a] && !fixed[b] && fixed[c])
-          {
-            // b is free
-            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
-                                b))
-            {
-              watch_.begin();
-              pq.insert(b, distances_[b]);
-              watch_.end_meap();
-            }
-            // if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
-          }
-          else if (!fixed[a] && fixed[b] && fixed[c])
-          {
-            // a if free
-            if (waveFrontUpdate(*mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
-                                a))
-            {
-              watch_.begin();
-              pq.insert(a, distances_[a]);
-              watch_.end_meap();
-            }
-            // if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
-          }
-          else
-          {
-            // two free vertices -> skip that face
-            // RCLCPP_INFO_STREAM(get_logger(), "two vertices are free.");
-            continue;
-          }
+          // RCLCPP_INFO_STREAM(get_logger(), "All fixed!");
+          continue;
         }
-        catch (lvr2::PanicException exception)
+        else if (fixed[a] && fixed[b] && !fixed[c])
         {
-          map->invalid.insert(nh, true);
+          // c is free
+          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
+                              c))
+          {
+            watch_.begin();
+            pq.insert(c, distances_[c]);
+            watch_.end_meap();
+          }
+          // if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
         }
-        catch (lvr2::VertexLoopException exception)
+        else if (fixed[a] && !fixed[b] && fixed[c])
         {
-          map->invalid.insert(nh, true);
+          // b is free
+          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
+                              b))
+          {
+            watch_.begin();
+            pq.insert(b, distances_[b]);
+            watch_.end_meap();
+          }
+          // if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
+        }
+        else if (!fixed[a] && fixed[b] && fixed[c])
+        {
+          // a if free
+          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
+                              a))
+          {
+            watch_.begin();
+            pq.insert(a, distances_[a]);
+            watch_.end_meap();
+          }
+          // if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
+        }
+        else
+        {
+          // two free vertices -> skip that face
+          // RCLCPP_INFO_STREAM(get_logger(), "two vertices are free.");
+          continue;
         }
       }
     }
@@ -543,16 +509,16 @@ void DynamicInflationLayer::waveCostInflation(
   RCLCPP_INFO_STREAM(get_logger(), "Finished inflation wave front propagation.");
 
   watch_.begin();
-  for (auto vH : mesh->vertices())
+  for (auto vH : mesh.vertices())
   {
     riskiness_.insert(vH, fading(distances_[vH]));
   }
   watch_.end_fading();
 
   // TODO: Why is this published?? Seems to be expensive
-  map->publishVectorField("inflation", vector_map_, distances_,
-                              std::bind(&DynamicInflationLayer::fading, this, std::placeholders::_1));
-  watch_.end_pub();
+  // map->publishVectorField("inflation", vector_map_, distances_,
+                              // std::bind(&DynamicInflationLayer::fading, this, std::placeholders::_1));
+  // watch_.end_pub();
   watch_.commit();
 
 }
