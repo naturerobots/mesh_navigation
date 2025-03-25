@@ -355,6 +355,13 @@ void DynamicInflationLayer::waveCostInflation(
   }
   // The LVR2 PMP wrapper
   const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
+  if (nullptr == pmp_mesh)
+  {
+    // TODO: Talk to Alex, we could create the HalfEdgeMesh backend we want here.
+    // Also measure again, using the BaseMesh interface might be fast enough.
+    RCLCPP_ERROR(get_logger(), "Failed to dynamic_cast mesh to lvr2::PMPMesh! Currently only the lvr2::PMPMesh backend is supported!");
+    return;
+  }
   const auto& mesh = pmp_mesh->getSurfaceMesh();
 
   RCLCPP_DEBUG(get_logger(), "Inflation radius: %f", inflation_radius);
