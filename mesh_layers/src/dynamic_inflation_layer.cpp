@@ -437,13 +437,15 @@ void DynamicInflationLayer::waveCostInflation(
     fixed[current_vh] = true;
     for (const auto nh : mesh.vertices(current_vh))
     {
-      // TODO: Maybe this can be reduced?
-      // Do we need to iterate all faces of all neighbours?
-      // Is it enough to look at the faces adjacent to the edge between
-      // current and neighbor?
-      for (const auto fh : mesh.faces(nh))
+      // Current VH is now fixed, check if we can update the neighbours via one of the common faces
+      const pmp::Halfedge halfedge = mesh.find_halfedge(current_vh, nh);
+      for (const auto fh : {mesh.face(halfedge), mesh.face(halfedge.opposite())})
       {
         watch_.begin();
+        if (!fh.is_valid())
+        {
+          continue;
+        }
         // Using the pmp::VertexAroundFaceCirculator is slower here because it builds
         // an internal unordered set to detect loops. We know that the mesh must be a
         // valid triangle mesh, therefore we can to this ourselves
