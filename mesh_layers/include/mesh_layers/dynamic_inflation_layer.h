@@ -161,7 +161,6 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
    * @brief updates the wavefront
    *
    * @param distances current distances from the start vertices
-   * @param predecessors current predecessors of vertices visited during the wave front propagation
    * @param max_distance max distance of propagation
    * @param edge_weights weights of the edges
    * @param fh current face
@@ -175,7 +174,6 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
   inline bool waveFrontUpdate(
     const pmp::SurfaceMesh& mesh,
     lvr2::DenseVertexMap<float>& distances,
-    lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
     const float& max_distance,
     const lvr2::DenseEdgeMap<float>& edge_weights,
     const lvr2::FaceHandle& fh,
@@ -283,8 +281,6 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   lvr2::DenseVertexMap<float> riskiness_;
-
-  lvr2::DenseVertexMap<float> direction_;
 
   lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
 

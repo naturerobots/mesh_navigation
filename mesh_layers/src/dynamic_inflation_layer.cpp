@@ -138,15 +138,8 @@ void DynamicInflationLayer::updateInput(const std::set<lvr2::VertexHandle>& chan
   // }
 
   auto wlock = this->writeLock();
-  // TODO: This layer should probably be sparse?
-  std::set<lvr2::VertexHandle> old;
-  for (const lvr2::VertexHandle& v: riskiness_)
-  {
-    if (riskiness_[v] > 0.0)
-    {
-      old.insert(v);
-    }
-  }
+  // Copy the old costs for later reference
+  const lvr2::DenseVertexMap<float> old_costs = riskiness_;
   
   // Copy lethal vertices of base layer
   // TODO: Copy all cost values
@@ -165,22 +158,17 @@ void DynamicInflationLayer::updateInput(const std::set<lvr2::VertexHandle>& chan
     1.0
   );
 
-  std::set<lvr2::VertexHandle> new_;
+  // Figure out which vertices changed their costs
+  // TODO: Should this use an epsilon because floats?
+  std::set<lvr2::VertexHandle> update;
   for (const lvr2::VertexHandle& v: riskiness_)
   {
-    if (riskiness_[v] > 0.0)
+    if (riskiness_[v] != old_costs[v])
     {
-      new_.insert(v);
+      update.insert(v);
     }
   }
-  // TODO: Is this performant?
-  std::set<lvr2::VertexHandle> update;
-  // All vertices which are now part of the layer and all old vertices probably changed their costs
-  std::set_union(
-    old.begin(), old.end(),
-    new_.begin(), new_.end(),
-    std::inserter(update, update.end())
-  );
+
   // Unlock before notifying others
   wlock.unlock();
   const mesh_map::LayerTimer::TimePoint t2 = mesh_map::LayerTimer::Clock::now();
@@ -244,7 +232,6 @@ inline float DynamicInflationLayer::computeUpdateSethianMethod(const float& d1, 
 inline bool DynamicInflationLayer::waveFrontUpdate(
   const pmp::SurfaceMesh& mesh,
   lvr2::DenseVertexMap<float>& distances_,
-  lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
   const float& max_distance,
   const lvr2::DenseEdgeMap<float>& edge_weights,
   const lvr2::FaceHandle& fh,
@@ -320,21 +307,12 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
     }
     watch_.end_vec();
 
-    if (d31 < d32)
-    {
-      predecessors.insert(v3h, v1h);
-    }
-    else  // right face check
-    {
-      predecessors.insert(v3h, v2h);
-    }
-
     return u1 <= max_distance && u2 <= max_distance;
   }
   return false;
 }
 
-float DynamicInflationLayer::fading(const float val)
+inline float DynamicInflationLayer::fading(const float val)
 {
   if (val > config_.inflation_radius)
     return 0;
@@ -379,17 +357,12 @@ void DynamicInflationLayer::waveCostInflation(
   const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
   const auto& mesh = pmp_mesh->getSurfaceMesh();
 
-  RCLCPP_INFO_STREAM(get_logger(), "inflation radius:" << inflation_radius);
-  RCLCPP_INFO_STREAM(get_logger(), "Lethals: " << lethals.size());
-  RCLCPP_INFO_STREAM(get_logger(), "Init wave inflation.");
+  RCLCPP_DEBUG(get_logger(), "Inflation radius: %f", inflation_radius);
+  RCLCPP_DEBUG(get_logger(), "Lethals: %lu", lethals.size());
 
   watch_.begin();
-  lvr2::DenseVertexMap<bool> seen(mesh.vertices_size(), false);
   distances_ = lvr2::DenseVertexMap<float>(mesh.vertices_size(), std::numeric_limits<float>::infinity());
-  lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-  predecessors.reserve(mesh.vertices_size());
   vector_map_ = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh.vertices_size(), lvr2::BaseVector<float>());
-  direction_ = lvr2::DenseVertexMap<float>();
 
   const auto& edge_distances = map->edgeDistances();
   const auto& face_normals = map->faceNormals();
@@ -398,12 +371,6 @@ void DynamicInflationLayer::waveCostInflation(
   watch_.end_alloc();
 
   // initialize distances with infinity
-  // initialize predecessor of each vertex with itself
-  for (auto const& vH : mesh.vertices())
-  {
-    predecessors.insert(vH, vH);
-  }
-
   lvr2::Meap<lvr2::VertexHandle, float> pq;
   // Set start distance to zero
   // add start vertex to priority queue
@@ -414,7 +381,8 @@ void DynamicInflationLayer::waveCostInflation(
     pq.insert(vH, 0);
   }
   watch_.end_init();
-  RCLCPP_INFO_STREAM(get_logger(), "Start inflation wave front propagation");
+  RCLCPP_DEBUG(get_logger(), "Initialized wave inflation");
+  RCLCPP_DEBUG(get_logger(), "Starting inflation wave front propagation");
 
   while (!pq.isEmpty())
   {
@@ -465,7 +433,7 @@ void DynamicInflationLayer::waveCostInflation(
         else if (fixed[a] && fixed[b] && !fixed[c])
         {
           // c is free
-          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
+          if (waveFrontUpdate(mesh, distances_, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
                               c))
           {
             watch_.begin();
@@ -477,7 +445,7 @@ void DynamicInflationLayer::waveCostInflation(
         else if (fixed[a] && !fixed[b] && fixed[c])
         {
           // b is free
-          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
+          if (waveFrontUpdate(mesh, distances_, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
                               b))
           {
             watch_.begin();
@@ -489,7 +457,7 @@ void DynamicInflationLayer::waveCostInflation(
         else if (!fixed[a] && fixed[b] && fixed[c])
         {
           // a if free
-          if (waveFrontUpdate(mesh, distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
+          if (waveFrontUpdate(mesh, distances_, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
                               a))
           {
             watch_.begin();
@@ -508,7 +476,7 @@ void DynamicInflationLayer::waveCostInflation(
     }
   }
 
-  RCLCPP_INFO_STREAM(get_logger(), "Finished inflation wave front propagation.");
+  RCLCPP_DEBUG(get_logger(), "Finished inflation wave front propagation");
 
   watch_.begin();
   for (auto vH : mesh.vertices())
@@ -664,7 +632,7 @@ rcl_interfaces::msg::SetParametersResult DynamicInflationLayer::reconfigureCallb
   }
 
   if (has_inflation_radius_changed){
-    waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, std::numeric_limits<float>::infinity());
+    waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, 1.0);
   }
 
   if (has_vector_field_parameter_changed)
