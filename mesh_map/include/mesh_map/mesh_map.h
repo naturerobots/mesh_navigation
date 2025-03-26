@@ -147,6 +147,13 @@ public:
   void computeEdgeWeights();
 
   /**
+   * @brief A method which updates the per edge costs from the changed vertices.
+   * @param map_stamp timestamp for published cost data
+   * @param changed The Vertices which costs have changed.
+   */
+  void updateEdgeCosts(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changes);
+
+  /**
    * @brief Computes contours
    * @param contours the vector to bo filled with contours
    * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
@@ -204,7 +211,7 @@ public:
    * @brief Callback function which is called from inside a layer plugin if cost values change
    * @param layer_name the name of the layer.
    */
-  void layerChanged(const std::string& layer_name);
+  void layerChanged(const std::string& layer_name, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Returns the global frame / coordinate system id string

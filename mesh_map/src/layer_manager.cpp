@@ -221,7 +221,7 @@ void LayerManager::layer_changed(
   map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
   
   // Notify the map
-  map_.layerChanged(name);
+  map_.layerChanged(name, changed);
 
   // Notify all users
   auto [it, end] = boost::in_edges(v_it->second, graph_);

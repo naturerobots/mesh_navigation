@@ -38,7 +38,6 @@
 #ifndef MESH_MAP__TIMER_H
 #define MESH_MAP__TIMER_H
 
-#include <cstdint>
 #include <chrono>
 #include <string>
 #include <fstream>
@@ -47,10 +46,8 @@
 namespace mesh_map
 {
 
-using SlotHandle = uint32_t;
-
 /**
-* @brief Provides a facility to log layer update timings to a directory.
+* @brief Provides a facility to log layer update timings to a file.
 */
 class LayerTimer
 {
