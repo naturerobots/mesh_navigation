@@ -154,13 +154,17 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
    */
   virtual float threshold() override;
 
-  inline float computeUpdateSethianMethod(const float& d1, const float& d2, const float& a, const float& b,
-                                          const float& dot, const float& F);
+  inline float computeUpdateSethianMethod(
+    const float& d1, const float& d2,
+    const float& a, const float& b,
+    const float& dot, const float& F
+  ) const;
 
   /**
    * @brief updates the wavefront
    *
    * @param distances current distances from the start vertices
+   * @param vector_map buffer to store the new vectors in
    * @param max_distance max distance of propagation
    * @param edge_weights weights of the edges
    * @param fh current face
@@ -174,6 +178,7 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
   inline bool waveFrontUpdate(
     const pmp::SurfaceMesh& mesh,
     lvr2::DenseVertexMap<float>& distances,
+    lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
     const float& max_distance,
     const lvr2::DenseEdgeMap<float>& edge_weights,
     const lvr2::FaceHandle& fh,
@@ -181,7 +186,7 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
     const lvr2::VertexHandle& v1,
     const lvr2::VertexHandle& v2,
     const lvr2::VertexHandle& v3
-  );
+  ) const;
 
   /**
    * @brief fade cost value based on lethal and inscribed area
@@ -195,14 +200,15 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
   /**
    * @brief inflate around lethal vertices by using an wave front propagation and assign riskiness values to vertices
    *
-   * @param lethals set of current lethal vertices
-   * @param inflation_radius radius of inflation
-   * @param inscribed_radius rarius of inscribed area
-   * @param inscribed_value value assigned to inscribed vertices
-   * @param lethal_value value of lethal vertices
+   * @param lethals set of current lethal to inflate
+   * @param cost_out a buffer to store the per vertex costs resulting from the inflation
+   * @param vector_out a buffer to store the per vertex vectors resulting from the inflation
    */
-  void waveCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
-                         const float inscribed_radius, const float inscribed_value, const float lethal_value);
+  void waveCostInflation(
+    const std::set<lvr2::VertexHandle>& lethals,
+    lvr2::DenseVertexMap<float>& cost_out,
+    lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_out
+  );
 
   /**
    * @brief returns repulsive vector at a given position inside a face
@@ -282,13 +288,13 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
 
   lvr2::DenseVertexMap<float> riskiness_;
 
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
-
   lvr2::DenseVertexMap<lvr2::BaseVector<float>> vector_map_;
 
-  lvr2::DenseVertexMap<float> distances_;
-
   std::set<lvr2::VertexHandle> lethal_vertices_;
+
+  /// Buffer for the distances during waveCostInflation and not part of the public
+  /// interface of this class.
+  lvr2::DenseVertexMap<float> distances_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   struct {
@@ -301,7 +307,7 @@ class DynamicInflationLayer : public mesh_map::AbstractLayer
     bool repulsive_field = true;
   } config_;
   
-  StopWatch watch_;
+  mutable StopWatch watch_;
 };
 
 } /* namespace mesh_layers */
