@@ -115,7 +115,12 @@ public:
   virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
                             std::set<lvr2::VertexHandle>& removed_lethal) = 0;
   
-  // TODO: Should this replace updateLethal
+  // TODO: Should this replace updateLethal, should this be named onInputChanged?
+  /**
+   *  @brief Called by the mesh map if one of the input layers has changed.
+   *
+   *  @param changed The vertices whose cost has changed in one of the input layers.
+   */
   virtual void updateInput(const std::set<lvr2::VertexHandle>& /* changed */)
   {}
 
@@ -160,6 +165,7 @@ public:
     std::shared_ptr<mesh_map::MeshMap> map,
     const rclcpp::Node::SharedPtr node);
 
+  // TODO: Should these be protected functions?
   void notifyChange()
   {
     std::set<lvr2::VertexHandle> changed;
@@ -190,6 +196,15 @@ public:
   }
 
   /**
+   *  @brief The weight to use when combining this layer with others.
+   */
+  inline float combinationWeight() const
+  {
+    return combination_weight_;
+  }
+
+protected:
+  /**
    *  @brief Aquire a write lock on the layer to prevent simultaneaus reads or writes.
    *
    *  Before making any changes to the layer a write lock *must* be aquired!
@@ -200,17 +215,18 @@ public:
     return std::unique_lock(mutex_);
   }
 
-  inline float combinationWeight() const
-  {
-    return combination_weight_;
-  }
-
-protected:
-
   /**
    * @brief Initializes a custom layer plugin and is invoked at the end of the abstract layer's initialization.
    */
   virtual bool initialize() = 0;
+
+  /**
+   *  @brief Get the layer specific logger (mesh_map.layer_name)
+   */
+  const rclcpp::Logger& get_logger() const
+  {
+    return logger_;
+  }
 
   std::string layer_name_;
   // Use weak ptr here to prevent cyclic shared ptrs map -> layer -> map
@@ -221,11 +237,6 @@ protected:
 
   //! Factor used to linearly combine layers to a combined layer in MeshMap
   float combination_weight_ = 1.0;
-
-  const rclcpp::Logger& get_logger() const
-  {
-    return logger_;
-  }
 
 private:
   notify_func notify_;

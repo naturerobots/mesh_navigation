@@ -149,8 +149,6 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       continue;
     }
 
-    auto lock = instance->writeLock();
-
     auto callback = std::bind(&LayerManager::layer_changed, this, std::placeholders::_1, std::placeholders::_2);
 
     if (!instance->initialize(name, callback, map, node))
