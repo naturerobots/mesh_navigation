@@ -55,19 +55,17 @@ If your are looking for the old ROS 1 version, checkout the [noetic branch](http
 
 # Usage Examples and Demos
 
-Recommended entrypoint for new users: Check out the **[mesh_navigation_tutorials](https://github.com/naturerobots/mesh_navigation_tutorials/tree/main)** for a ready-to-use mesh navigation stack. Complete with simulated environment, rviz config, mesh nav config, etc.
+Recommended entrypoint for new users: Check out the **[mesh_navigation_tutorials](https://github.com/naturerobots/mesh_navigation_tutorials/tree/main)** for a ready-to-use mesh navigation stack. Complete with simulated environment, RViz config, mesh nav config, etc.
 
-See the **[pluto_robot](https://github.com/uos/pluto_robot)** bundle for example configurations of the mesh navigatoin stack and usage (ROS 1).
 
 ## Demos
 
-In the following demo videos we used the developed VFP, i.e., the wavefront_propagatn_planner.
-It will be renamed soon to vector_field_planner.
+In the following demo videos we used the developed *continuous vector field planner* (CVP).
 
 | Dataset and Description                  | Demo Video                                                                                                               |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
-| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acron19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
+| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acorn19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
 
 ### Stone Quarry in the Forest in Brockum
 
@@ -105,7 +103,7 @@ The package structure is as follows:
 
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm. It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed vertex to the goal pose can be computed. This leads to a sub-optimal potential field, which highly depends on the mesh structure.
 
-- `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account. This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`, since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots` which is stated above.
+- `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account. This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`, since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots`.
 
 ## Mesh Map
 
@@ -181,6 +179,7 @@ Please reference the following papers when using the navigation stack in your sc
     note = {Software available at \url{https://github.com/uos/mesh_navigation}}
 }
 ```
+
 #### Move Base Flex: A Highly Flexible Navigation Framework for Mobile Robots
 ```bib
 @inproceedings{puetz18mbf,
