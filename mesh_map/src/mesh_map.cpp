@@ -259,6 +259,20 @@ bool MeshMap::readMap()
     RCLCPP_DEBUG_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
     RCLCPP_DEBUG_STREAM(node->get_logger(), "Creating mesh of type '" << hem_impl_ << "'");
     mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
+
+    // Detect if a non manifold mesh was loaded. These seem to break everything
+    if (mesh_ptr->numFaces() != mesh_buffer->numFaces()
+      || mesh_ptr->numVertices() != mesh_buffer->numVertices()
+    )
+    {
+      RCLCPP_ERROR(
+        node->get_logger(),
+        "Detected Non-Manifold input Mesh! We cannot continue as these break the system. Please use external tooling to ensure your mesh contains no Non-Manifold Edges or Vertices."
+      );
+      return false;
+    }
+
+
     RCLCPP_INFO_STREAM(node->get_logger(), "The mesh of type '" << hem_impl_ <<  "' has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
@@ -1168,6 +1182,7 @@ std_srvs::srv::Trigger::Response MeshMap::writeLayers()
 
   for (const auto& [layer_name, layer_plugin] : layer_manager_.layer_instances())
   {
+    auto lock = layer_plugin->readLock();
 
     RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
     if(layer_plugin->writeLayer())
