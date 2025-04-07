@@ -411,7 +411,7 @@ void MeshMap::layerChanged(const std::string& layer_name, const std::set<lvr2::V
 {
   std::lock_guard lock(layer_mtx);
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" changed.");
+  RCLCPP_DEBUG_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" changed.");
   
   if (layer_name != default_layer_)
   {
