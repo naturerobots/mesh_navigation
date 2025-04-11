@@ -11,6 +11,7 @@ endif()
 find_package(ament_cmake_ros REQUIRED)
 find_package(mesh_map REQUIRED)
 find_package(LVR2 REQUIRED)
+find_package(OpenMP)
 add_definitions(${LVR2_DEFINITIONS})
 
 pluginlib_export_plugin_description_file(mesh_map mesh_layers.xml)
@@ -40,6 +41,7 @@ ament_target_dependencies(${PROJECT_NAME} mesh_map LVR2)
 target_compile_definitions(${PROJECT_NAME} PRIVATE "MESH_LAYERS_BUILDING_LIBRARY")
 target_link_libraries(${PROJECT_NAME}
   ${LVR2_LIBRARIES}
+  OpenMP::OpenMP_CXX
 )
 
 install(DIRECTORY include/

@@ -73,10 +73,9 @@ bool MaxCombinationLayer::computeLayer()
     lethals_.merge(ptr->lethals());
   }
 
-  // TODO: This is the old behavior, is this good?
   for (const auto& v: lethals_)
   {
-    costs_[v] = std::numeric_limits<float>::infinity();
+    costs_[v] = 1.0;
   }
 
   return true;
@@ -255,10 +254,9 @@ bool CombinationLayer::computeLayer()
     lethals_.merge(ptr->lethals());
   }
 
-  // TODO: This is the old behavior, is this good?
   for (const auto& v: lethals_)
   {
-    costs_[v] = std::numeric_limits<float>::infinity();
+    costs_[v] = 1.0;
   }
 
   return true;
