@@ -8,7 +8,7 @@ repositories:
   mesh_tools:
     type: git
     url: https://github.com/naturerobots/mesh_tools.git
-    version: humble
+    version: main
   move_base_flex:
     type: git
     url: https://github.com/naturerobots/move_base_flex.git
