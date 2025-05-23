@@ -1,4 +1,4 @@
-name: Humble CI
+name: Jazzy CI
 
 on:
   push:
@@ -10,8 +10,8 @@ on:
       - '*'
 
 jobs:
-  humble_build_and_test:
+  jazzy_build_and_test:
     uses: naturerobots/github_automation_public/.github/workflows/ros_ci.yaml@main
     secrets: inherit
     with:
-      ros_distro: humble
+      ros_distro: jazzy

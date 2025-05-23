@@ -1,3 +1,6 @@
+[![Jazzy CI](https://github.com/naturerobots/mesh_navigation/actions/workflows/jazzy.yaml/badge.svg)](https://github.com/naturerobots/mesh_navigation/actions/workflows/jazzy.yaml)
+[![Humble CI](https://github.com/naturerobots/mesh_navigation/actions/workflows/humble.yaml/badge.svg)](https://github.com/naturerobots/mesh_navigation/actions/workflows/humble.yaml)
+
 <div align="center" min-width=519px>
   <img src="docs/images/mesh_navigation_logo.png" alt="Mesh Navigation" height=150 />  
 </div>
@@ -217,9 +220,3 @@ Maintainers:
 Author: [Sebastian Pütz](mailto:spuetz@uos.de)
 
 We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs are welcome!
-
-# Build Status
-
-| ROS Distro  | GitHub CI | Develop | Documentation | Source Deb | Binary Deb |
-|-------------|-----------|---------|---------------|------------|------------|
-| **Humble**  | [![Humble CI](https://github.com/naturerobots/mesh_navigation/actions/workflows/humble.yaml/badge.svg)](https://github.com/naturerobots/mesh_navigation/actions/workflows/humble.yaml) | N/A | N/A | N/A | N/A |
