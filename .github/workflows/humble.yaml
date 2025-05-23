@@ -11,5 +11,5 @@ on:
 
 jobs:
   build_and_test:
-    uses: naturerobots/github_automation_public/.github/workflows/humble_ci.yaml@main
+    uses: naturerobots/github_automation_public/.github/workflows/ros_ci.yaml@main
     secrets: inherit
