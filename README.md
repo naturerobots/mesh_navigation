@@ -16,6 +16,9 @@
   <br />
 </div>
 
+Notice: The `humble` branch is inactive for now.
+As long as we can support both `humble` and `jazzy` with the same codebase, we do that using the `main` branch.
+
 ---
 
 The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
