@@ -266,13 +266,14 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
   watch_.end_mesh();
 
   watch_.begin();
-  const float c = edge_weights[e12h];
+  // Somehow sometimes some edge does not exists??? Maybe the Mesh Topology is broken in this case
+  const float c = edge_weights.containsKey(e12h) ? edge_weights[e12h] : INFINITY;
   const float c_sq = c * c;
 
-  const float b = edge_weights[e13h];
+  const float b = edge_weights.containsKey(e13h) ? edge_weights[e13h] : INFINITY;
   const float b_sq = b * b;
 
-  const float a = edge_weights[e23h];
+  const float a = edge_weights.containsKey(e23h) ? edge_weights[e23h] : INFINITY;
   const float a_sq = a * a;
 
   float dot = (a_sq + b_sq - c_sq) / (2 * a * b);
@@ -361,8 +362,6 @@ void DynamicInflationLayer::waveCostInflation(
   const auto pmp_mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
   if (nullptr == pmp_mesh)
   {
-    // TODO: Talk to Alex, we could create the HalfEdgeMesh backend we want here.
-    // Also measure again, using the BaseMesh interface might be fast enough.
     RCLCPP_ERROR(get_logger(), "Failed to dynamic_cast mesh to lvr2::PMPMesh! Currently only the lvr2::PMPMesh backend is supported!");
     return;
   }
