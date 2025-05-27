@@ -207,10 +207,10 @@ lvr2::MeshBufferPtr extractMeshByName(
     lvr2::Channel<unsigned char> vertex_colors(amesh->mNumVertices, 4);
     for(size_t i=0; i<amesh->mNumVertices; i++)
     {
-      vertex_colors[i][0] = amesh->mColors[0][i].r;
-      vertex_colors[i][1] = amesh->mColors[0][i].g;
-      vertex_colors[i][2] = amesh->mColors[0][i].b;
-      vertex_colors[i][3] = amesh->mColors[0][i].a;
+      vertex_colors[i][0] = amesh->mColors[0][i].r * 255.0f;
+      vertex_colors[i][1] = amesh->mColors[0][i].g * 255.0f;
+      vertex_colors[i][2] = amesh->mColors[0][i].b * 255.0f;
+      vertex_colors[i][3] = amesh->mColors[0][i].a * 255.0f;
     }
     (*mesh)["vertex_colors"] = vertex_colors;
   }

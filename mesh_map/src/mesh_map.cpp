@@ -239,6 +239,23 @@ bool MeshMap::readMap()
 
         // write
         hdf5_mesh_io->save(mesh_working_part, mesh_buffer);
+        // Write vertex colors to HDF5
+        if (mesh_buffer->hasVertexColors())
+        {
+          size_t width = 0;
+          auto colors = mesh_buffer->getVertexColors(width);
+          lvr2::DenseVertexMap<std::array<uint8_t, 3>> map;
+
+          for (size_t i = 0; i < mesh_buffer->numVertices(); i++)
+          {
+            std::array<uint8_t, 3> color;
+            color[0] = colors[i * width + 0];
+            color[1] = colors[i * width + 1];
+            color[2] = colors[i * width + 2];
+            map.insert(lvr2::VertexHandle(i), color);
+          }
+          hdf5_mesh_io->addDenseAttributeMap(map, "vertex_colors");
+        }
       } else {
         RCLCPP_INFO_STREAM(node->get_logger(), "Working mesh == input mesh");
       }
