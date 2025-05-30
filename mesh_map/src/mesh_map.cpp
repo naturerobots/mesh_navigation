@@ -217,7 +217,10 @@ bool MeshMap::readMap()
           io.SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION, true);
           const aiScene* ascene = io.ReadFile(mesh_file, 
               aiProcess_Triangulate | 
-              aiProcess_JoinIdenticalVertices | 
+              // This is problematic because it can lead to non-manifold geometries.
+              // Tools like MeshLab split vertices more or less in place to create manifold geometries.
+              // which is then rolled back by this option.
+              aiProcess_JoinIdenticalVertices |
               aiProcess_GenNormals | 
               aiProcess_ValidateDataStructure | 
               aiProcess_FindInvalidData);
@@ -277,16 +280,31 @@ bool MeshMap::readMap()
     RCLCPP_DEBUG_STREAM(node->get_logger(), "Creating mesh of type '" << hem_impl_ << "'");
     mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
 
-    // Detect if a non manifold mesh was loaded. These seem to break everything
+    // Detect if a non manifold mesh was loaded. These break everything
     if (mesh_ptr->numFaces() != mesh_buffer->numFaces()
       || mesh_ptr->numVertices() != mesh_buffer->numVertices()
     )
     {
-      RCLCPP_ERROR(
+      RCLCPP_WARN(
         node->get_logger(),
-        "Detected Non-Manifold input Mesh! We cannot continue as these break the system. Please use external tooling to ensure your mesh contains no Non-Manifold Edges or Vertices."
+        "Detected Non-Manifold input Mesh! Fixing it now by discarding problematic faces."
       );
-      return false;
+
+      // Reexport the mesh to ensure continuous vertex indices
+      lvr2::SimpleFinalizer<Vector> fin;
+
+      // Keep color data for RViz :)
+      lvr2::DenseVertexMap<lvr2::RGB8Color> colors;
+      if (mesh_buffer->hasVertexColors())
+      {
+        colors = extractColorAttributeMap(*mesh_buffer);
+        fin.setColorData(colors);
+      }
+
+      mesh_buffer = fin.apply(*mesh_ptr);
+      mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
+      // Overwrite the mesh_buffer in the HDF5
+      hdf5_mesh_input->save(mesh_working_part, mesh_buffer);
     }
 
 
