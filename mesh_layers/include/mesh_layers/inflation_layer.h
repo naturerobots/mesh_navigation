@@ -91,8 +91,8 @@ class InflationLayer : public mesh_map::AbstractLayer
    * @param inscribed_value value assigned to vertices in inscribed area
    * @param lethal_value value assigned to lethal vertices
    */
-  void lethalCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
-                           const float inscribed_radius, const float inscribed_value, const float lethal_value);
+  // void lethalCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
+  //                          const float inscribed_radius, const float inscribed_value, const float lethal_value);
 
   inline float computeUpdateSethianMethod(const float& d1, const float& d2, const float& a, const float& b,
                                           const float& dot, const float& F);
@@ -241,8 +241,9 @@ class InflationLayer : public mesh_map::AbstractLayer
     double inscribed_radius = 0.25;
     double inflation_radius = 0.4;
     double factor = 1.0;
-    double lethal_value = 2.0;
-    double inscribed_value = 1.0;
+    double lethal_value = 1.0;
+    double inscribed_value = 0.99;
+    double cost_scaling_factor = 1.0;
     int min_contour_size = 3;
     bool repulsive_field = true;
   } config_;
