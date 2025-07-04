@@ -112,7 +112,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return resulting cost value
    */
-  float fading(const float val);
+  float fading(const float squared_distance);
 
   /**
    * @brief inflate around lethal vertices by using an wave front propagation and assign riskiness values to vertices

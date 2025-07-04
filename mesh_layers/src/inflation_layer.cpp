@@ -238,10 +238,7 @@ float InflationLayer::fading(const float squared_distance)
   // <= Inflation radius
   if (distance > config_.inscribed_radius) 
   {
-    // Map values from [config_.inscribed_radius, config_.inflation_radius] to [0, pi]
-    // float alpha = ((dist - config_.inscribed_radius) / (config_.inflation_radius - config_.inscribed_radius)) * M_PI;
-    // return config_.inscribed_value * (cos(alpha) + 1) / 2.0;
-
+    // http://wiki.ros.org/costmap_2d - cost decay function
     const float factor = exp(-1.0f * config_.cost_scaling_factor * (distance - config_.inscribed_radius));
     const float cost = config_.inscribed_value * factor;
     return cost;
