@@ -94,13 +94,6 @@ void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
   RCLCPP_INFO_STREAM(node_->get_logger(), "Update lethal for inflation layer.");
   waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value,
                     std::numeric_limits<float>::infinity());
-
-  /*lethalCostInflation(lethal_vertices_, config_.inflation_radius,
-                      config_.inscribed_radius, config_.inscribed_value,
-                      config_.lethal_value == -1
-                          ? std::numeric_limits<float>::infinity()
-                          : config_.lethal_value);
-*/
 }
 
 inline float InflationLayer::computeUpdateSethianMethod(const float& d1, const float& d2, const float& a,
@@ -233,22 +226,29 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
   return false;
 }
 
-float InflationLayer::fading(const float val)
+float InflationLayer::fading(const float squared_distance)
 {
-  if (val > config_.inflation_radius)
-    return 0;
+  const float distance = sqrt(squared_distance);
 
-  // Inflation radius
-  if (val > config_.inscribed_radius)
+  if (distance > config_.inflation_radius)
   {
-    // Map values from [config_.inscribed_radius, config_.inflation_radius] to [0, pi]
-    float alpha = ((val - config_.inscribed_radius) / (config_.inflation_radius - config_.inscribed_radius)) * M_PI;
-    return config_.inscribed_value * (cos(alpha) + 1) / 2.0;
+    return 0;
+  } 
+  
+  // <= Inflation radius
+  if (distance > config_.inscribed_radius) 
+  {
+    // http://wiki.ros.org/costmap_2d - cost decay function
+    const float factor = exp(-1.0f * config_.cost_scaling_factor * (distance - config_.inscribed_radius));
+    const float cost = config_.inscribed_value * factor;
+    return cost;
   }
 
-  // Inscribed radius
-  if (val > 0)
+  // <= Inscribed radius
+  if (distance > 0)
+  {
     return config_.inscribed_value;
+  }
 
   // Lethality
   return config_.lethal_value;
@@ -310,7 +310,6 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
 
       if (map_ptr_->invalid[current_vh])
         continue;
-
       // check if already fixed
       // if(fixed[current_vh]) continue;
       fixed[current_vh] = true;
@@ -517,117 +516,14 @@ void InflationLayer::backToSource(const lvr2::VertexHandle& current_vertex,
   }
 }
 
-void InflationLayer::lethalCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
-                                         const float inscribed_radius, const float inscribed_value,
-                                         const float lethal_value)
-{
-  RCLCPP_INFO_STREAM(node_->get_logger(), "lethal cost inflation.");
-
-  struct Cmp
-  {
-    const lvr2::DenseVertexMap<float>& distances;
-    Cmp(const lvr2::DenseVertexMap<float>& distances) : distances(distances)
-    {
-    }
-
-    bool operator()(lvr2::VertexHandle& left, lvr2::VertexHandle& right)
-    {
-      return distances[left] > distances[right];
-    }
-  };
-
-  const auto mesh = map_ptr_->mesh();
-
-  lvr2::DenseVertexMap<bool> seen(mesh->nextVertexIndex(), false);
-  lvr2::DenseVertexMap<float> distances(mesh->nextVertexIndex(), std::numeric_limits<float>::max());
-  lvr2::DenseVertexMap<lvr2::VertexHandle> prev;
-  prev.reserve(mesh->nextVertexIndex());
-
-  for (auto vH : mesh->vertices())
-  {
-    prev.insert(vH, vH);
-  }
-
-  Cmp cmp(distances);
-  std::priority_queue<lvr2::VertexHandle, std::vector<lvr2::VertexHandle>, Cmp> pq(cmp);
-
-  for (auto vH : lethals)
-  {
-    distances[vH] = 0;
-    pq.push(vH);
-  }
-
-  float inflation_radius_squared = inflation_radius * inflation_radius;
-  float inscribed_radius_squared = inscribed_radius * inscribed_radius;
-
-  while (!pq.empty())
-  {
-    lvr2::VertexHandle vH = pq.top();
-    pq.pop();
-
-    if (seen[vH])
-      continue;
-    seen[vH] = true;
-
-    std::vector<lvr2::VertexHandle> neighbours;
-    mesh->getNeighboursOfVertex(vH, neighbours);
-    for (auto n : neighbours)
-    {
-      if (distances[n] == 0 || seen[n])
-        continue;
-      float n_dist = mesh->getVertexPosition(n).squaredDistanceFrom(mesh->getVertexPosition(prev[vH]));
-      if (n_dist < distances[n] && n_dist < inflation_radius_squared)
-      {
-        prev[n] = prev[vH];
-        distances[n] = n_dist;
-        pq.push(n);
-      }
-    }
-  }
-
-  for (auto vH : mesh->vertices())
-  {
-    if (distances[vH] > inflation_radius_squared)
-    {
-      riskiness_.insert(vH, 0);
-    }
-
-    // Inflation radius
-    else if (distances[vH] > inscribed_radius_squared)
-    {
-      float alpha = (sqrt(distances[vH]) - inscribed_radius) / (inflation_radius - inscribed_radius) * M_PI;
-      riskiness_.insert(vH, inscribed_value * (cos(alpha) + 1) / 2.0);
-    }
-
-    // Inscribed radius
-    else if (distances[vH] > 0)
-    {
-      riskiness_.insert(vH, inscribed_value);
-    }
-
-    // Lethality
-    else
-    {
-      riskiness_.insert(vH, lethal_value);
-    }
-  }
-
-  RCLCPP_INFO_STREAM(node_->get_logger(), "lethal cost inflation finished.");
-}
-
 bool InflationLayer::computeLayer()
 {
-  /*waveCostInflation(lethal_vertices_, config_.inflation_radius,
+  waveCostInflation(lethal_vertices_, config_.inflation_radius,
                       config_.inscribed_radius, config_.inscribed_value,
                       std::numeric_limits<float>::infinity());
-  */
-  // lethalCostInflation(lethal_vertices_, config_.inflation_radius,
-  //                    config_.inscribed_radius, config_.inscribed_value,
-  //                    std::numeric_limits<float>::infinity());
-  // config_.lethal_value);
-
   return true;
 }
+
 lvr2::VertexMap<float>& InflationLayer::costs()
 {
   return riskiness_;
@@ -638,40 +534,38 @@ rcl_interfaces::msg::SetParametersResult InflationLayer::reconfigureCallback(std
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
 
-  bool has_inflation_radius_changed = false;
-  bool has_vector_field_parameter_changed = false;
+  bool recompute_inflation_costs = false;
+
   for (auto parameter : parameters) {
     if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inflation_radius") {
       config_.inflation_radius = parameter.as_double();
-      has_inflation_radius_changed = true;
-      has_vector_field_parameter_changed = true;
+      recompute_inflation_costs = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_radius") {
       config_.inscribed_radius = parameter.as_double();
-      has_vector_field_parameter_changed = true;
+      recompute_inflation_costs = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".lethal_value") {
       config_.lethal_value = parameter.as_double();
-      has_vector_field_parameter_changed = true;
+      recompute_inflation_costs = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_value") {
       config_.inscribed_value = parameter.as_double();
-      has_vector_field_parameter_changed = true;
+      recompute_inflation_costs = true;
+    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".cost_scaling_factor") {
+      config_.cost_scaling_factor = parameter.as_double();
+      recompute_inflation_costs = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".min_contour_size") {
       config_.min_contour_size = parameter.as_int();
+      recompute_inflation_costs = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".repulsive_field") {
       config_.repulsive_field = parameter.as_bool();
+      recompute_inflation_costs = true;
     }
   }
 
-  if (has_inflation_radius_changed){
-    waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, std::numeric_limits<float>::infinity());
-  }
-
-  if (has_vector_field_parameter_changed)
+  if (recompute_inflation_costs)
   {
+    waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, std::numeric_limits<float>::infinity());
     map_ptr_->publishVectorField("inflation", vector_map_, distances_,
                                 std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
-  }
-
-  if (has_vector_field_parameter_changed || has_inflation_radius_changed) {
     RCLCPP_INFO_STREAM(node_->get_logger(), "Inflation layer (name: " << layer_name_ << ") changed due to cfg update.");
     notifyChange();
   }
@@ -687,7 +581,7 @@ bool InflationLayer::initialize()
     descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.01;
-    range.to_value = 1.0;
+    range.to_value = 5.0;
     descriptor.floating_point_range.push_back(range);
     config_.inscribed_radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_radius", config_.inscribed_radius, descriptor);
   }
@@ -697,7 +591,7 @@ bool InflationLayer::initialize()
     descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.01;
-    range.to_value = 3.0;
+    range.to_value = 10.0;
     descriptor.floating_point_range.push_back(range);
     config_.inflation_radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inflation_radius", config_.inflation_radius, descriptor);
   }
@@ -707,7 +601,7 @@ bool InflationLayer::initialize()
     descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     rcl_interfaces::msg::FloatingPointRange range;
     range.from_value = 0.0;
-    range.to_value = 1.-0;
+    range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
     config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
   }
@@ -730,6 +624,16 @@ bool InflationLayer::initialize()
     range.to_value = 100000.0;
     descriptor.floating_point_range.push_back(range);
     config_.inscribed_value = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inscribed_value", config_.inscribed_value, descriptor);
+  }
+  { // cost_scaling_factor
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Defines the cost scaling factor for the exponential fading outside the inscribed radius.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::FloatingPointRange range;
+    range.from_value = 0.0;
+    range.to_value = 5.0;
+    descriptor.floating_point_range.push_back(range);
+    config_.cost_scaling_factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".cost_scaling_factor", config_.cost_scaling_factor, descriptor);
   }
   { // min_contour_size
     rcl_interfaces::msg::ParameterDescriptor descriptor;
