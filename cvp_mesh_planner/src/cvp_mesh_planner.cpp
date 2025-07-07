@@ -230,7 +230,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& start, con
                                               std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>>& path,
                                               std::string& message)
 {
-  return waveFrontPropagation(start, goal, mesh_map_->edgeDistances(), mesh_map_->vertexCosts(), path, message,
+  return waveFrontPropagation(start, goal, mesh_map_->edgeWeights(), mesh_map_->vertexCosts(), path, message,
                               potential_, predecessors_);
 }
 
