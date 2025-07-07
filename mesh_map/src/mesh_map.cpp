@@ -124,16 +124,6 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   layer_factor_desc.floating_point_range.push_back(layer_factor_range);
   layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + ".layer_factor", 1.0, layer_factor_desc);
 
-  auto cost_limit_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  cost_limit_desc.name = MESH_MAP_NAMESPACE + ".cost_limit";
-  cost_limit_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
-  cost_limit_desc.description = "Defines the vertex cost limit with which it can be accessed.";
-  auto cost_limit_range = rcl_interfaces::msg::FloatingPointRange{};
-  cost_limit_range.from_value = 0.0;
-  cost_limit_range.to_value = 10.0;
-  cost_limit_desc.floating_point_range.push_back(cost_limit_range);
-  cost_limit = node->declare_parameter(MESH_MAP_NAMESPACE + ".cost_limit", 1.0);
-
   hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
 
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
@@ -524,49 +514,40 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Combining costs...");
 
+  // instead: just store last layer
   float combined_min = std::numeric_limits<float>::max();
-  float combined_max = std::numeric_limits<float>::min();
+  float combined_max = std::numeric_limits<float>::lowest();
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
+  auto [last_layer_name, last_layer] = loaded_layers.back();
+
+  const float default_value = last_layer->defaultValue();
+  const auto& costs = last_layer->costs();
   bool hasNaN = false;
-  for (auto layer : loaded_layers)
+
+  const float factor = 1.0;
+
+  for (auto vH : mesh_ptr->vertices())
   {
-    const auto& costs = layer.second->costs();
-    float min, max;
-    mesh_map::getMinMax(costs, min, max);
-    const float norm = max - min;
-    const float factor = 1.0;
-    // TODO: carefully think about this
-    const float norm_factor = factor / norm;
-
-    if(norm <= 0.00001)
+    const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
+    if (std::isnan(cost))
     {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer.first << "\": ERROR - range between max and min value has to be >0.");
+      hasNaN = true;
     }
-
-    RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" max value: " << max << " min value: " << min << " norm: " << norm
-                               << " factor: " << factor << " norm factor: " << norm_factor);
-
-    const float default_value = layer.second->defaultValue();
-    hasNaN = false;
-    for (auto vH : mesh_ptr->vertices())
+    vertex_costs[vH] += factor * cost;
+    if (std::isfinite(cost))
     {
-      const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
-      if (std::isnan(cost))
-        hasNaN = true;
-      vertex_costs[vH] += factor * cost;
-      if (std::isfinite(cost))
-      {
-        combined_max = std::max(combined_max, vertex_costs[vH]);
-        combined_min = std::min(combined_min, vertex_costs[vH]);
-      }
+      combined_max = std::max(combined_max, vertex_costs[vH]);
+      combined_min = std::min(combined_min, vertex_costs[vH]);
     }
-    if (hasNaN)
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer.first << "\" contains NaN values!");
+  }
+  if (hasNaN)
+  {
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << last_layer_name << "\" contains NaN values!");
   }
 
-  const float combined_norm = combined_max - combined_min;
+  RCLCPP_INFO_STREAM(node->get_logger(), "- (min, max): (" << combined_min << ", " << combined_max << ")");
 
   for (auto vH : lethals)
   {
@@ -577,36 +558,39 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
 
   hasNaN = false;
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "Layer weighting factor is: " << layer_factor);
+  // Compute Edge Weights
+  // TODO(@amock): Why should this be computed here and not in the planner (CVP)?
+  RCLCPP_INFO_STREAM(node->get_logger(), "Computing combined edge weights. Layer weighting factor is: " << layer_factor);
   for (auto eH : mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
     std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
     const lvr2::VertexHandle& vH1 = eH_vHs[0];
     const lvr2::VertexHandle& vH2 = eH_vHs[1];
+
+    const float v1cost = vertex_costs[vH1];
+    const float v2cost = vertex_costs[vH2];
+
     // Get the Riskiness for the current Edge (the maximum value from both
     // Vertices)
-    if (layer_factor != 0)
+    if (std::isinf(v1cost) || std::isinf(v2cost))
     {
-      if (std::isinf(vertex_costs[vH1]) || std::isinf(vertex_costs[vH2]))
+      if (layer_factor != 0)
       {
-        edge_weights[eH] = edge_distances[eH];
-        // edge_weights[eH] = std::numeric_limits<float>::infinity();
-      }
-      else
-      {
-        float cost_diff = std::fabs(vertex_costs[vH1] - vertex_costs[vH2]);
-
-        float vertex_factor = layer_factor * cost_diff;
-        if (std::isnan(vertex_factor))
-          RCLCPP_INFO_STREAM(node->get_logger(), "NaN: v1:" << vertex_costs[vH1] << " v2:" << vertex_costs[vH2]
-                                     << " vertex_factor:" << vertex_factor << " cost_diff:" << cost_diff);
-        edge_weights[eH] = edge_distances[eH] * (1 + vertex_factor);
+        // edge_weights[eH] = edge_distances[eH];
+        edge_weights[eH] = std::numeric_limits<float>::infinity();
       }
     }
     else
     {
-      edge_weights[eH] = edge_distances[eH];
+      const float edge_cost = std::max(v1cost, v2cost);
+
+      if (std::isnan(edge_cost))
+      {
+        RCLCPP_INFO_STREAM(node->get_logger(), "NaN: v1:" << v1cost << " v2:" << v2cost
+                                    << " edge_cost:" << edge_cost);
+      }
+      edge_weights[eH] = edge_distances[eH] + edge_cost * layer_factor;
     }
   }
 
@@ -1386,6 +1370,7 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
   }
   else if (map_loaded)
   {
+    bool recompute_combined_vertex_costs = false;
     for (const rclcpp::Parameter& param : parameters)
     {
       const auto& param_name = param.get_name();
@@ -1396,13 +1381,13 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
       else if (param_name == MESH_MAP_NAMESPACE + ".layer_factor")
       {
         layer_factor = param.as_double();
+        recompute_combined_vertex_costs = true;
       }
-      else if (param_name == MESH_MAP_NAMESPACE + ".cost_limit")
-      {
-        cost_limit = param.as_double();
-        combineVertexCosts(node->now());
-        // TODO current implementation should mirror the old behavior; However, it seems like cost_limit and min_contour_size are never used in this class. Only layer_factor is used (in combineVertexCosts). We should probably remove the unused parameters and call combineVertexCosts whenever layer_factor changes.
-      }
+    }
+
+    if(recompute_combined_vertex_costs)
+    {
+      combineVertexCosts(node->now());
     }
   }
   return result;
