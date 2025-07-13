@@ -70,7 +70,8 @@ bool MaxCombinationLayer::computeLayer()
   lethals_.clear();
   for (const auto& ptr: layers)
   {
-    lethals_.merge(ptr->lethals());
+    const auto& set = ptr->lethals();
+    lethals_.insert(set.begin(), set.end());
   }
 
   for (const auto& v: lethals_)
@@ -221,6 +222,7 @@ bool CombinationLayer::computeLayer()
 
   for (const auto& ptr: layers)
   {
+    auto lock = ptr->readLock();
     const auto* cm = &ptr->costs();
     // TODO: Check where factor is read
     if (const auto* p = dynamic_cast<const lvr2::DenseVertexMap<float>*>(cm))
@@ -251,7 +253,8 @@ bool CombinationLayer::computeLayer()
   lethals_.clear();
   for (const auto& ptr: layers)
   {
-    lethals_.merge(ptr->lethals());
+    const auto& set = ptr->lethals();
+    lethals_.insert(set.begin(), set.end());
   }
 
   for (const auto& v: lethals_)
@@ -271,16 +274,20 @@ void CombinationLayer::updateLethal(
   
 void CombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
 {
-  std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers(inputs_.size());
-  layers.clear();
+  std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers;
+  std::vector<std::shared_lock<std::shared_mutex>> locks;
+  layers.reserve(inputs_.size());
+  locks.reserve(inputs_.size());
   for (const auto& ref: inputs_)
   {
     const auto& ptr = ref.lock();
     layers.push_back(ptr);
+    locks.push_back(ptr->readLock());
   }
 
   const float norm = 1.0 / layers.size();
-  for (const lvr2::VertexHandle& v: changed)
+  auto lock = this->writeLock();
+  for (const lvr2::VertexHandle v: changed)
   {
     float cost = 0;
     for (const auto& layer: layers)
@@ -289,6 +296,29 @@ void CombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
     }
     costs_.insert(v, cost * norm);
   }
+
+  // Lethals!
+  for (const lvr2::VertexHandle v: changed)
+  {
+    bool lethal = false;
+    for (auto layer: layers)
+    {
+      lethal = lethal || layer->lethals().count(v) > 0;
+    }
+
+    if (lethal)
+    {
+      lethals_.insert(v);
+      costs_.insert(v, 1.0);
+    }
+    else
+    {
+      lethals_.erase(v);
+    }
+  }
+
+  locks.clear();
+  lock.unlock();
 
   this->notifyChange(changed);
 }
