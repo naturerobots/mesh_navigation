@@ -156,16 +156,16 @@ void DynamicInflationLayer::updateInput(const std::set<lvr2::VertexHandle>& chan
   );
 
   // Figure out which vertices changed their costs
-  // TODO: Should this use an epsilon because floats?
   std::set<lvr2::VertexHandle> update;
   {
     const auto rlock = this->readLock();
+    for (const lvr2::VertexHandle& v: new_costs)
+    {
+      update.insert(v);
+    }
     for (const lvr2::VertexHandle& v: riskiness_)
     {
-      if (riskiness_[v] != new_costs[v])
-      {
-        update.insert(v);
-      }
+      update.insert(v);
     }
   }
 
@@ -251,9 +251,9 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
   const lvr2::VertexHandle& v3h
 ) const
 {
-  const double u1 = distances[v1h];
-  const double u2 = distances[v2h];
-  const double u3 = distances[v3h];
+  const double u1 = distances.containsKey(v1h) ? distances[v1h] : std::numeric_limits<float>::infinity();
+  const double u2 = distances.containsKey(v2h) ? distances[v2h] : std::numeric_limits<float>::infinity();
+  const double u3 = distances.containsKey(v3h) ? distances[v3h] : std::numeric_limits<float>::infinity();
 
   if (u3 == 0)
     return false;
@@ -296,21 +296,21 @@ inline bool DynamicInflationLayer::waveFrontUpdate(
   
     const auto& tmp = ((v3 - v2) + (v3 - v1)).normalized();
     const auto& dir = mesh_map::Vector(tmp.x(), tmp.y(), tmp.z());
-    vector_map[v1h] = (vector_map[v1h] + dir).normalized();
-    vector_map[v2h] = (vector_map[v2h] + dir).normalized();
-    //vector_map_[v3h] = (vector_map_[v1h] * d31 + vector_map[v2h] * d32).normalized();
-    vector_map[v3h] = (vector_map[v3h] + dir).normalized();
+    vector_map.insert(v1h, (vector_map.containsKey(v1h) ? vector_map[v1h] : mesh_map::Vector() + dir).normalized());
+    vector_map.insert(v2h, (vector_map.containsKey(v2h) ? vector_map[v2h] : mesh_map::Vector() + dir).normalized());
+    vector_map.insert(v3h, (vector_map.containsKey(v3h) ? vector_map[v3h] : mesh_map::Vector() + dir).normalized());
     watch_.end_vec();
   }
 
   if (u3tmp < u3)
   {
-    distances[v3h] = static_cast<float>(u3tmp);
+    distances.insert(v3h, static_cast<float>(u3tmp));
   
     watch_.begin();
     if (u1 != 0 || u2 != 0)
     {
-      vector_map[v3h] = (vector_map[v1h] * d31 + vector_map[v2h] * d32).normalized();
+      vector_map.insert(v3h, ((vector_map.containsKey(v1h) ? vector_map[v1h] : mesh_map::Vector()) * d31
+                        + (vector_map.containsKey(v2h) ? vector_map[v2h] : mesh_map::Vector()) * d32).normalized());
     }
     watch_.end_vec();
 
@@ -382,25 +382,19 @@ void DynamicInflationLayer::waveCostInflation(
   lvr2::DenseVertexMap<bool> fixed(mesh.vertices_size(), false);
   watch_.end_alloc();
 
-  // initialize distances with infinity
+  // Clear the distances map
   distances_.clear();
-  for (const auto vertex: mesh.vertices())
-  {
-    distances_.insert(vertex, std::numeric_limits<float>::infinity());
-  }
 
   // Initialize vectors to 0
-  for (const auto vertex: mesh.vertices())
-  {
-    vector_out.insert(vertex, lvr2::BaseVector<float>());
-  }
+  // Clear the vectors map
+  vector_out.clear();
 
   lvr2::Meap<lvr2::VertexHandle, float> pq;
   // Set start distance to zero
   // add start vertex to priority queue
   for (auto vH : lethals)
   {
-    distances_[vH] = 0;
+    distances_.insert(vH, 0.0);
     fixed[vH] = true;
     pq.insert(vH, 0);
   }
@@ -504,9 +498,13 @@ void DynamicInflationLayer::waveCostInflation(
 
   watch_.begin();
   cost_out.reserve(mesh.vertices_size());
-  for (auto vH : mesh.vertices())
+  cost_out.clear();
+  for (auto vH : distances_)
   {
-    cost_out.insert(vH, fading(distances_[vH]));
+    if (!std::isinf(distances_[vH]))
+    {
+      cost_out.insert(vH, fading(distances_[vH]));
+    }
   }
 
   watch_.end_fading();
