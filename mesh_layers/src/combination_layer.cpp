@@ -90,7 +90,10 @@ void MaxCombinationLayer::updateLethal(
 {}
 
 
-void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
+void MaxCombinationLayer::updateInput(
+  const rclcpp::Time& timestamp,
+  const std::set<lvr2::VertexHandle>& changed
+)
 {
   const auto t0 = mesh_map::LayerTimer::Clock::now();
   // Lock this layer for writing and all inputs for reading
@@ -123,9 +126,9 @@ void MaxCombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& change
   locks.clear();
   wlock.unlock();
   const auto t2 = mesh_map::LayerTimer::Clock::now();
-  this->notifyChange(changed);
+  this->notifyChange(timestamp, changed);
   const auto t3 = mesh_map::LayerTimer::Clock::now();
-  mesh_map::LayerTimer::recordUpdateDuration(layer_name_, t0, t1 - t0, t2 - t1, t3 - t2);
+  mesh_map::LayerTimer::recordUpdateDuration(layer_name_, timestamp, t1 - t0, t2 - t1, t3 - t2);
 }
 
 
@@ -272,7 +275,10 @@ void CombinationLayer::updateLethal(
 )
 {}
   
-void CombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
+void CombinationLayer::updateInput(
+  const rclcpp::Time& timestamp,
+  const std::set<lvr2::VertexHandle>& changed
+)
 {
   std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers;
   std::vector<std::shared_lock<std::shared_mutex>> locks;
@@ -320,7 +326,7 @@ void CombinationLayer::updateInput(const std::set<lvr2::VertexHandle>& changed)
   locks.clear();
   lock.unlock();
 
-  this->notifyChange(changed);
+  this->notifyChange(timestamp, changed);
 }
 
 } // namespace mesh_layers

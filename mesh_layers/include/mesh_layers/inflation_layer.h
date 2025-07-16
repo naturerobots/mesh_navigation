@@ -199,7 +199,10 @@ class InflationLayer : public mesh_map::AbstractLayer
    */
   virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal) override;
 
-  virtual void updateInput(const std::set<lvr2::VertexHandle>& changed) override;
+  virtual void updateInput(
+    const rclcpp::Time& timestamp,
+    const std::set<lvr2::VertexHandle>& changed
+  ) override;
 
   /**
    * @brief initializes this layer plugin

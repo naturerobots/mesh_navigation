@@ -53,7 +53,7 @@ class MeshMap;
 typedef lvr2::BaseVector<float> Vector;
 typedef lvr2::Normal<float> Normal;
 
-typedef std::function<void(const std::string&, const std::set<lvr2::VertexHandle>&)> notify_func;
+typedef std::function<void(const std::string&, const rclcpp::Time&, const std::set<lvr2::VertexHandle>&)> notify_func;
 
 class AbstractLayer
 {
@@ -119,10 +119,15 @@ public:
   /**
    *  @brief Called by the mesh map if one of the input layers has changed.
    *
-   *  @param changed The vertices whose cost has changed in one of the input layers.
+   *  @param timestamp  The timestamp of when the change was triggered.
+   *                    Layers whose updateInput() function was called should pass this timestamp on to their notifyChange() call.
+   *  @param changed    The vertices whose cost has changed in one of the input layers.
    */
-  virtual void updateInput(const std::set<lvr2::VertexHandle>& /* changed */)
-  {}
+  virtual void updateInput(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
+  {
+    (void) timestamp;
+    (void) changed;
+  }
 
   /**
    * @brief Optional method if the layer computes vectors. Computes a vector within a triangle using barycentric coordinates.
@@ -133,6 +138,8 @@ public:
   virtual lvr2::BaseVector<float> vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                            const std::array<float, 3>& barycentric_coords)
   {
+    (void) vertices;
+    (void) barycentric_coords;
     return lvr2::BaseVector<float>();
   }
 
@@ -153,6 +160,7 @@ public:
    */
   virtual lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex)
   {
+    (void) vertex;
     return lvr2::BaseVector<float>();
   }
 
@@ -173,15 +181,22 @@ public:
     {
       changed.insert(v);
     }
-    this->notifyChange(changed);
+    this->notifyChange(node_->get_clock()->now(), changed);
   }
 
   /**
+   *  @brief Notfiy the MeshMap and other Layers of a change in this layer.
+   *
+   *  The timestamp indicates the time for which the map update is valid.
+   *  If an update is triggered by a sensor message e.g. a PointCloud, the layer/map
+   *  is up to date to the time of the measurement acquisition.
+   *
+   *  @param timestamp The timestamp of the update
    *  @param changed The vertices whose costs have changed
    */
-  void notifyChange(const std::set<lvr2::VertexHandle>& changed)
+  void notifyChange(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
   {
-    this->notify_(layer_name_, changed);
+    this->notify_(layer_name_, timestamp, changed);
   }
   
   /**

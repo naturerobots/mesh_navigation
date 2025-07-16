@@ -67,7 +67,10 @@ public:
     std::set<lvr2::VertexHandle>& removed_lethal
   );
 
-  virtual void updateInput(const std::set<lvr2::VertexHandle>& changed);
+  virtual void updateInput(
+    const rclcpp::Time& timestamp,
+    const std::set<lvr2::VertexHandle>& changed
+  );
 
   /**
   * @brief Initialize the layer
@@ -111,7 +114,10 @@ public:
     std::set<lvr2::VertexHandle>& removed_lethal
   );
 
-  virtual void updateInput(const std::set<lvr2::VertexHandle>& changed);
+  virtual void updateInput(
+    const rclcpp::Time& timestamp,
+    const std::set<lvr2::VertexHandle>& changed
+  );
 
   /**
   * @brief Initialize the layer

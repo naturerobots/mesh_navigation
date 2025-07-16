@@ -120,12 +120,12 @@ private:
    *  @brief Handle a layer change by updating the depending layers
    *
    *  @param name The name of the changed layer
+   *  @param timestamp The timestamp of the update
    *  @param changed All vertices with changed costs
-   *  @param added_lethal All vertices which are now lethal
-   *  @param remove_lethal All vertices which are no longer lethal
    */
   void layer_changed(
     const std::string& name,
+    const rclcpp::Time& timestamp,
     const std::set<lvr2::VertexHandle>& changed
   );
 

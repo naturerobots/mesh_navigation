@@ -21,7 +21,7 @@ void LayerTimer::disable()
 
 void LayerTimer::recordUpdateDuration(
   const std::string& layer,
-  const TimePoint& timestamp,
+  const rclcpp::Time& timestamp,
   const Duration& locking,
   const Duration& update,
   const Duration& notify
@@ -40,7 +40,7 @@ void LayerTimer::recordUpdateDuration(
 
   std::ofstream& file = instance().file_;
   constexpr const char sep = ';';
-  file << std::chrono::duration_cast<Duration>(timestamp.time_since_epoch()).count() << sep;
+  file << timestamp.nanoseconds() << sep;
   file << layer << sep;
   file << locking.count() << sep;
   file << update.count() << sep;

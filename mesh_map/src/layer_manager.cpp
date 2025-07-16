@@ -149,7 +149,12 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       continue;
     }
 
-    auto callback = std::bind(&LayerManager::layer_changed, this, std::placeholders::_1, std::placeholders::_2);
+    auto callback = std::bind(
+      &LayerManager::layer_changed, this,
+      std::placeholders::_1,
+      std::placeholders::_2,
+      std::placeholders::_3
+    );
 
     if (!instance->initialize(name, callback, map, node))
     {
@@ -176,6 +181,7 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
 
 void LayerManager::layer_changed(
   const std::string& name,
+  const rclcpp::Time& timestamp,
   const std::set<lvr2::VertexHandle>& changed
 )
 {
@@ -215,8 +221,7 @@ void LayerManager::layer_changed(
     c.insert(v, cm.containsKey(v)? cm[v]: ptr->defaultValue());
   }
   rlock.unlock();
-  // TODO: We need to get the proper timestamp, but from where?
-  map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, node_->get_clock()->now());
+  map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, timestamp);
   
   // Notify the map
   map_.layerChanged(name, changed);
@@ -233,7 +238,7 @@ void LayerManager::layer_changed(
       continue;
     }
 
-    layer->updateInput(changed);
+    layer->updateInput(timestamp, changed);
   }
 }
 

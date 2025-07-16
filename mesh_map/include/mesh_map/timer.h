@@ -43,6 +43,8 @@
 #include <fstream>
 #include <mutex>
 
+#include <rclcpp/time.hpp>
+
 namespace mesh_map
 {
 
@@ -70,6 +72,9 @@ public:
   /**
   * @brief Record update duration.
   *
+  * The timestamp is a rclcpp::Time object because the layers pass timestamps
+  * as rclcpp::Time to each other. Also this supports simtime.
+  *
   * @param layer The layer name
   * @param timestamp The timestamp to associate with this record
   * @param locking Time spend waiting for locks
@@ -79,7 +84,7 @@ public:
   */
   static void recordUpdateDuration(
     const std::string& layer,
-    const TimePoint& timestamp,
+    const rclcpp::Time& timestamp,
     const Duration& locking,
     const Duration& update,
     const Duration& notify
