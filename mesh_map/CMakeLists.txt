@@ -37,6 +37,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
+  src/abstract_layer.cpp
   src/mesh_map.cpp
   src/util.cpp
 )

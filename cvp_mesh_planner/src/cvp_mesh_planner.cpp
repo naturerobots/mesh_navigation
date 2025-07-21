@@ -633,7 +633,7 @@ inline bool CVPMeshPlanner::waveFrontUpdateFMM(
     }
   }
 
-return false;
+  return false;
 }
 
 uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_start,

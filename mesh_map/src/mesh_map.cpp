@@ -104,25 +104,15 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , map_loaded(false)
   , layer_loader("mesh_map", "mesh_map::AbstractLayer")
 {
-  auto min_contour_size_desc = rcl_interfaces::msg::ParameterDescriptor{}; 
-  min_contour_size_desc.name = MESH_MAP_NAMESPACE + ".min_contour_size";
-  min_contour_size_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;  
-  min_contour_size_desc.description = "Defines the minimum size for a contour to be classified as 'lethal'.";
-  auto min_contour_size_range = rcl_interfaces::msg::IntegerRange{};
-  min_contour_size_range.from_value = 0;
-  min_contour_size_range.to_value = 100000;
-  min_contour_size_desc.integer_range.push_back(min_contour_size_range);
-  min_contour_size = node->declare_parameter(MESH_MAP_NAMESPACE + ".min_contour_size", 3);
-
-  auto layer_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  layer_factor_desc.name = MESH_MAP_NAMESPACE + ".layer_factor";
-  layer_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
-  layer_factor_desc.description = "Defines the factor for combining edge distances and vertex costs.";
-  auto layer_factor_range = rcl_interfaces::msg::FloatingPointRange{};
-  layer_factor_range.from_value = 0.0;
-  layer_factor_range.to_value = 10.0;
-  layer_factor_desc.floating_point_range.push_back(layer_factor_range);
-  layer_factor = node->declare_parameter(MESH_MAP_NAMESPACE + ".layer_factor", 1.0, layer_factor_desc);
+  auto edge_cost_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  edge_cost_factor_desc.name = MESH_MAP_NAMESPACE + ".edge_cost_factor";
+  edge_cost_factor_desc.type = rclcpp::ParameterType::PARAMETER_DOUBLE;  
+  edge_cost_factor_desc.description = "Defines the factor that is applied to the vertex costs before adding them to edge distances. Together they make the weights for graph-based search: The higher this factor is chosen the more the path planner is avoiding high-cost regions.";
+  auto edge_cost_factor_range = rcl_interfaces::msg::FloatingPointRange{};
+  edge_cost_factor_range.from_value = 0.0;
+  edge_cost_factor_range.to_value = 10.0;
+  edge_cost_factor_desc.floating_point_range.push_back(edge_cost_factor_range);
+  edge_cost_factor = node->declare_parameter(MESH_MAP_NAMESPACE + ".edge_cost_factor", 0.0, edge_cost_factor_desc);
 
   hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
 
@@ -400,6 +390,7 @@ bool MeshMap::readMap()
   }
 
   combineVertexCosts(map_stamp);
+  computeEdgeWeights();
   publishCostLayers(map_stamp);
 
   map_loaded = true;
@@ -474,6 +465,7 @@ void MeshMap::layerChanged(const std::string& layer_name)
   RCLCPP_INFO_STREAM(node->get_logger(), "Combine layer costs...");
 
   combineVertexCosts(node->now());
+  computeEdgeWeights();
   // TODO new lethals old lethals -> renew potential field! around this areas
 }
 
@@ -514,40 +506,38 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Combining costs...");
 
-  // instead: just store last layer
   float combined_min = std::numeric_limits<float>::max();
   float combined_max = std::numeric_limits<float>::lowest();
 
   vertex_costs = lvr2::DenseVertexMap<float>(mesh_ptr->nextVertexIndex(), 0);
 
-  auto [last_layer_name, last_layer] = loaded_layers.back();
-
-  const float default_value = last_layer->defaultValue();
-  const auto& costs = last_layer->costs();
   bool hasNaN = false;
-
-  const float factor = 1.0;
-
-  for (auto vH : mesh_ptr->vertices())
+  for (auto [layer_name, layer] : loaded_layers)
   {
-    const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
-    if (std::isnan(cost))
+    const auto& costs = layer->costs();
+    const float combination_weight = layer->combinationWeight();
+
+    RCLCPP_INFO_STREAM(node->get_logger(), "Layer \"" << layer_name << "\", combination weight: " << combination_weight);
+
+    const float default_value = layer->defaultValue();
+    hasNaN = false;
+    for (auto vH : mesh_ptr->vertices())
     {
-      hasNaN = true;
+      const float cost = costs.containsKey(vH) ? costs[vH] : default_value;
+      if (std::isnan(cost))
+        hasNaN = true;
+      vertex_costs[vH] += combination_weight * cost;
+      if (std::isfinite(cost))
+      {
+        combined_max = std::max(combined_max, vertex_costs[vH]);
+        combined_min = std::min(combined_min, vertex_costs[vH]);
+      }
     }
-    vertex_costs[vH] += factor * cost;
-    if (std::isfinite(cost))
-    {
-      combined_max = std::max(combined_max, vertex_costs[vH]);
-      combined_min = std::min(combined_min, vertex_costs[vH]);
-    }
-  }
-  if (hasNaN)
-  {
-    RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << last_layer_name << "\" contains NaN values!");
+    if (hasNaN)
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Layer \"" << layer_name << "\" contains NaN values!");
   }
 
-  RCLCPP_INFO_STREAM(node->get_logger(), "- (min, max): (" << combined_min << ", " << combined_max << ")");
+  const float combined_norm = combined_max - combined_min;
 
   for (auto vH : lethals)
   {
@@ -556,11 +546,14 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
 
   vertex_costs_pub->publish(mesh_msgs_conversions::toVertexCostsStamped(vertex_costs, "Combined Costs", global_frame, uuid_str, map_stamp));
 
-  hasNaN = false;
+  RCLCPP_INFO(node->get_logger(), "Successfully combined costs!");
+}
 
+void MeshMap::computeEdgeWeights()
+{
   // Compute Edge Weights
   // TODO(@amock): Why should this be computed here and not in the planner (CVP)?
-  RCLCPP_INFO_STREAM(node->get_logger(), "Computing combined edge weights. Layer weighting factor is: " << layer_factor);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Computing combined edge weights. Vertex costs are weighted: " << edge_cost_factor);
   for (auto eH : mesh_ptr->edges())
   {
     // Get both Vertices of the current Edge
@@ -571,121 +564,29 @@ void MeshMap::combineVertexCosts(const rclcpp::Time& map_stamp)
     const float v1cost = vertex_costs[vH1];
     const float v2cost = vertex_costs[vH2];
 
+    if (std::isnan(v1cost) || std::isnan(v2cost))
+    {
+      RCLCPP_ERROR_STREAM(node->get_logger(), "NaN: v1:" << v1cost << " v2:" << v2cost);
+    }
+
     // Get the Riskiness for the current Edge (the maximum value from both
     // Vertices)
     if (std::isinf(v1cost) || std::isinf(v2cost))
     {
-      if (layer_factor != 0)
-      {
-        // edge_weights[eH] = edge_distances[eH];
-        edge_weights[eH] = std::numeric_limits<float>::infinity();
-      }
+      // edge_weights[eH] = edge_distances[eH];
+      edge_weights[eH] = std::numeric_limits<float>::infinity();
     }
     else
     {
-      const float edge_cost = std::max(v1cost, v2cost);
-
-      if (std::isnan(edge_cost))
-      {
-        RCLCPP_INFO_STREAM(node->get_logger(), "NaN: v1:" << v1cost << " v2:" << v2cost
-                                    << " edge_cost:" << edge_cost);
-      }
-      edge_weights[eH] = edge_distances[eH] + edge_cost * layer_factor;
+      // the edge weight is used for searching the best path and is composed of
+      // 1. `vertex_dist`: distance between the connecting vertices
+      const float vertex_dist = edge_distances[eH];
+      // 2. `edge_cost`: the total costs that are collected along the edge
+      const float edge_cost = vertex_dist * (v1cost + v2cost) / 2.0;
+      // combined via a weighted sum
+      edge_weights[eH] = vertex_dist + edge_cost_factor * edge_cost;
     }
   }
-
-  RCLCPP_INFO(node->get_logger(), "Successfully combined costs!");
-}
-
-void MeshMap::findLethalByContours(const int& min_contour_size, std::set<lvr2::VertexHandle>& lethals)
-{
-  int size = lethals.size();
-  std::vector<std::vector<lvr2::VertexHandle>> contours;
-  findContours(contours, min_contour_size);
-  for (auto contour : contours)
-  {
-    lethals.insert(contour.begin(), contour.end());
-  }
-  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << lethals.size() - size << " lethal vertices as contour vertices");
-}
-
-void MeshMap::findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size)
-{
-  RCLCPP_INFO_STREAM(node->get_logger(), "Find contours...");
-
-  std::vector<std::vector<lvr2::VertexHandle>> tmp_contours;
-
-  array<lvr2::OptionalFaceHandle, 2> facepair;
-  lvr2::SparseEdgeMap<bool> usedEdges(false);
-  for (auto eHStart : mesh_ptr->edges())
-  {
-    lvr2::SparseVertexMap<bool> usedVertices(false);
-    lvr2::SparseEdgeMap<bool> local_usedEdges(false);
-    int count = 0;
-
-    // Look for border Edges
-    facepair = mesh_ptr->getFacesOfEdge(eHStart);
-
-    // If border Edge found
-    if ((!facepair[0] || !facepair[1]) && !usedEdges[eHStart])
-    {
-      std::vector<lvr2::VertexHandle> contour;
-      // Set vector which links to the following Edge
-      std::array<lvr2::VertexHandle, 2> vertexPair = mesh_ptr->getVerticesOfEdge(eHStart);
-      lvr2::VertexHandle vH = vertexPair[1];
-      std::vector<lvr2::EdgeHandle> curEdges;
-      lvr2::EdgeHandle eHTemp = eHStart;
-      bool moving = true;
-      bool vertex_flag = false;
-
-      // While the conotur did not come full circle
-      while (moving)
-      {
-        moving = false;
-        usedEdges.insert(eHTemp, true);
-        local_usedEdges.insert(eHTemp, true);
-        // Set vector which links to the following Edge
-        vertexPair = mesh_ptr->getVerticesOfEdge(eHTemp);
-        // Eliminate the possibility to choose the previous Vertex
-        if (vH != vertexPair[0])
-        {
-          vH = vertexPair[0];
-        }
-        else if (vH != vertexPair[1])
-        {
-          vH = vertexPair[1];
-        }
-
-        // Add the current Vertex to the contour
-        usedVertices.insert(vH, true);
-        count++;
-        contour.push_back(vH);
-        mesh_ptr->getEdgesOfVertex(vH, curEdges);
-
-        // Look for other edge of vertex that is a border Edge
-        for (auto eHT : curEdges)
-        {
-          if (!usedEdges[eHT] && !local_usedEdges[eHT])
-          {
-            facepair = mesh_ptr->getFacesOfEdge(eHT);
-            if (!facepair[0] || !facepair[1])
-            {
-              eHTemp = eHT;
-              moving = true;
-              continue;
-            }
-          }
-        }
-      }
-      // Add contour to list of contours
-      if (contour.size() > min_contour_size)
-      {
-        contours.push_back(contour);
-      }
-    }
-  }
-
-  RCLCPP_INFO_STREAM(node->get_logger(), "Found " << contours.size() << " contours.");
 }
 
 void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
@@ -1374,13 +1275,9 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
     for (const rclcpp::Parameter& param : parameters)
     {
       const auto& param_name = param.get_name();
-      if (param_name == MESH_MAP_NAMESPACE + ".min_contour_size")
+      if (param_name == MESH_MAP_NAMESPACE + ".edge_cost_factor")
       {
-        min_contour_size = param.as_int();
-      }
-      else if (param_name == MESH_MAP_NAMESPACE + ".layer_factor")
-      {
-        layer_factor = param.as_double();
+        edge_cost_factor = param.as_double();
         recompute_combined_vertex_costs = true;
       }
     }
@@ -1388,6 +1285,7 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
     if(recompute_combined_vertex_costs)
     {
       combineVertexCosts(node->now());
+      computeEdgeWeights();
     }
   }
   return result;

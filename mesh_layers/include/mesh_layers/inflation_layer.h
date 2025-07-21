@@ -227,7 +227,6 @@ class InflationLayer : public mesh_map::AbstractLayer
   struct {
     double inscribed_radius = 0.25;
     double inflation_radius = 0.4;
-    double factor = 1.0;
     double lethal_value = 1.0;
     double inscribed_value = 0.99;
     double cost_scaling_factor = 1.0;

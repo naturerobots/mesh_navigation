@@ -46,7 +46,6 @@
 
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
-
 namespace mesh_map
 {
 class MeshMap;
@@ -149,41 +148,55 @@ public:
   }
 
   /**
-   * @brief Initializes the layer plugin with the given name.
-   */
-  virtual bool initialize() = 0;
-
-  /**
    * @brief Initializes the layer plugin under the mesh_map namespace ans sets some basic attributes.
    */
-  virtual bool initialize(
+  bool initialize(
     const std::string& name,
     const notify_func notify_update,
     std::shared_ptr<mesh_map::MeshMap> map,
-    const rclcpp::Node::SharedPtr node)
-  {
-    layer_name_ = name;
-    node_ = node;
-    layer_namespace_ = "mesh_map/" + name;
-    notify_ = notify_update;
-    map_ptr_ = map;
-    return initialize();
-  }
+    const rclcpp::Node::SharedPtr node);
 
   void notifyChange()
   {
     this->notify_(layer_name_);
   }
 
+  inline float combinationWeight() const
+  {
+    return combination_weight_;
+  }
+
 protected:
+
+  /**
+   * @brief Initializes a custom layer plugin and is invoked at the end of the abstract layer's initialization.
+   */
+  virtual bool initialize() = 0;
+
   std::string layer_name_;
   std::shared_ptr<mesh_map::MeshMap> map_ptr_;
 
   rclcpp::Node::SharedPtr node_;
   std::string layer_namespace_;
 
+  //! Factor used to linearly combine layers to a combined layer in MeshMap
+  float combination_weight_ = 1.0;
+
 private:
   notify_func notify_;
+
+  /**
+   * @brief declares all ROS parameters
+   */
+  void declare_parameters();
+
+  /**
+   * @brief callback for incoming param changes
+   */
+  rcl_interfaces::msg::SetParametersResult reconfigureCallback(
+    const std::vector<rclcpp::Parameter>& parameters);
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 };
 
 } /* namespace mesh_map */

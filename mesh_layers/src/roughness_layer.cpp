@@ -156,8 +156,6 @@ rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std
       has_threshold_changed = true;
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius") {
       config_.radius = parameter.as_double();
-    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
-      config_.factor = parameter.as_double();
     }
   }
 
@@ -190,16 +188,6 @@ bool RoughnessLayer::initialize() {
     range.to_value = 1.0;
     descriptor.floating_point_range.push_back(range);
     config_.radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".radius", config_.radius, descriptor);
-  }
-  { // factor
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = "The local roughness factor to weight this layer.";
-    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
-    rcl_interfaces::msg::FloatingPointRange range;
-    range.from_value = 0.0;
-    range.to_value = 1.0;
-    descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(
       &RoughnessLayer::reconfigureCallback, this, std::placeholders::_1));

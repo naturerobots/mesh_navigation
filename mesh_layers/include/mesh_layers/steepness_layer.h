@@ -138,7 +138,6 @@ class SteepnessLayer : public mesh_map::AbstractLayer
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   struct {
     double threshold = 0.3;
-    double factor = 1.0;
   } config_;
 
 };

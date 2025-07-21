@@ -139,7 +139,6 @@ class BorderLayer : public mesh_map::AbstractLayer
   struct {
     double threshold = 0.5;
     double border_cost = 1.0;
-    double factor = 1.0;
   } config_;
 };
 

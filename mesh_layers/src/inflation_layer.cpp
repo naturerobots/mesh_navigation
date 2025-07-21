@@ -595,16 +595,6 @@ bool InflationLayer::initialize()
     descriptor.floating_point_range.push_back(range);
     config_.inflation_radius = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inflation_radius", config_.inflation_radius, descriptor);
   }
-  { // factor
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = "The factor to weight this layer";
-    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
-    rcl_interfaces::msg::FloatingPointRange range;
-    range.from_value = 0.0;
-    range.to_value = 1.0;
-    descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor", config_.factor, descriptor);
-  }
   { // lethal_value
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.description = "Defines the 'lethal' value for obstacles. -1 results in infinity";
