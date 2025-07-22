@@ -198,7 +198,7 @@ void DijkstraMeshPlanner::computeVectorMap()
 uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& start, const mesh_map::Vector& goal,
                                        std::list<lvr2::VertexHandle>& path)
 {
-  return dijkstra(start, goal, mesh_map_->edgeDistances(), mesh_map_->vertexCosts(), path, potential_, predecessors_);
+  return dijkstra(start, goal, mesh_map_->edgeWeights(), mesh_map_->vertexCosts(), path, potential_, predecessors_);
 }
 
 uint32_t DijkstraMeshPlanner::dijkstra(const mesh_map::Vector& original_start, const mesh_map::Vector& original_goal,

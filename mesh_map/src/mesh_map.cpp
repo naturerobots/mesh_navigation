@@ -124,6 +124,13 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 
   RCLCPP_INFO_STREAM(node->get_logger(), "mesh file is set to: " << mesh_file);
 
+  { // publish edge weights as text markers
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.description = "Publish computed edge weights as text markers. Good to debug planners.";
+    descriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_BOOL;
+    publish_edge_weights_text = node->declare_parameter(MESH_MAP_NAMESPACE + ".publish_edge_weights_text", publish_edge_weights_text, descriptor);
+  }
+
   // params for map layer names to types:
   const auto layer_names = node->declare_parameter(MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>());
   const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
@@ -154,6 +161,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(1).transient_local());
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
+  edge_weights_text_pub = node->create_publisher<visualization_msgs::msg::MarkerArray>("~/edge_weights", rclcpp::QoS(1).transient_local());
   config_callback = node->add_on_set_parameters_callback(std::bind(&MeshMap::reconfigureCallback, this, std::placeholders::_1));
 
   save_service = node->create_service<std_srvs::srv::Trigger>("~/save_map", [this](
@@ -587,6 +595,11 @@ void MeshMap::computeEdgeWeights()
       edge_weights[eH] = vertex_dist + edge_cost_factor * edge_cost;
     }
   }
+  
+  if(publish_edge_weights_text)
+  {
+    publishEdgeWeightsAsText();
+  }
 }
 
 void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
@@ -702,6 +715,56 @@ void MeshMap::publishVectorField(const std::string& name,
                                  const bool publish_face_vectors)
 {
   publishVectorField(name, vector_map, vertex_costs, {}, publish_face_vectors);
+}
+
+void MeshMap::publishEdgeWeightsAsText()
+{
+  visualization_msgs::msg::MarkerArray text_markers;
+
+  size_t id = 0;
+  for(auto eH : mesh_ptr->edges())
+  {
+    std::array<lvr2::VertexHandle, 2> eH_vHs = mesh_ptr->getVerticesOfEdge(eH);
+    const lvr2::VertexHandle& vH1 = eH_vHs[0];
+    const lvr2::VertexHandle& vH2 = eH_vHs[1];
+
+    const mesh_map::Vector v1 = mesh_ptr->getVertexPosition(vH1);
+    const mesh_map::Vector v2 = mesh_ptr->getVertexPosition(vH2);
+
+    const mesh_map::Vector c = (v1 + v2) / 2.0;
+
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = mapFrame();
+    marker.header.stamp = node->now();
+    marker.ns = "edge_weights";
+    marker.id = id;
+    marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2) << edge_weights[eH];
+    marker.text = ss.str();
+    
+    marker.color.r = 0.0;
+    marker.color.g = 0.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+
+    marker.scale.x = 0.07;
+    marker.scale.y = 0.07;
+    marker.scale.z = 0.07;
+
+    marker.pose.orientation.w = 1.0;
+    marker.pose.position.x = c.x;
+    marker.pose.position.y = c.y;
+    marker.pose.position.z = c.z + 0.03;
+
+    id++;
+
+    text_markers.markers.push_back(marker);
+  }
+
+  edge_weights_text_pub->publish(text_markers);
 }
 
 void MeshMap::publishCombinedVectorField()
@@ -1279,6 +1342,14 @@ rcl_interfaces::msg::SetParametersResult MeshMap::reconfigureCallback(
       {
         edge_cost_factor = param.as_double();
         recompute_combined_vertex_costs = true;
+      } 
+      else if (param_name == MESH_MAP_NAMESPACE + ".publish_edge_weights_text")
+      {
+        publish_edge_weights_text = param.as_bool();
+        if(publish_edge_weights_text)
+        {
+          publishEdgeWeightsAsText();
+        }
       }
     }
 

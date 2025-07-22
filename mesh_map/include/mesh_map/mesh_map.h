@@ -53,6 +53,7 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
 #include <lvr2/geometry/BaseVector.hpp>
@@ -438,6 +439,13 @@ protected:
   std::string hem_impl_;
 
 private:
+  
+  /**
+   * @brief Publishes the edge computed weights as visualisation_msgs/MarkerArray
+   *        consisting of one text marker per edge weight.
+   */
+  void publishEdgeWeightsAsText();
+
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -517,6 +525,12 @@ private:
 
   //! publisher for the stored vector field
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vector_field_pub;
+
+  //! publisher for the edge costs
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr edge_weights_text_pub;
+
+  //! publish edge weights as array of text markers
+  bool publish_edge_weights_text = false;
 
   //! first reconfigure call
   bool first_config;
