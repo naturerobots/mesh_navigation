@@ -176,8 +176,6 @@ rcl_interfaces::msg::SetParametersResult ClearanceLayer::reconfigureCallback(std
     } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".height_inflation") {
       config_.height_inflation = parameter.as_double();
       needs_cost_recompute = true;
-    } else if (parameter.get_name() == mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor") {
-      config_.factor = parameter.as_double();
     }
   }
 
@@ -211,19 +209,6 @@ bool ClearanceLayer::initialize()
     config_.height_inflation = node_->declare_parameter<double>(
       mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".height_inflation",
       config_.height_inflation,
-      descriptor
-    );
-  }
-  { // factor
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = "Using this factor to weight this layer.";
-    rcl_interfaces::msg::FloatingPointRange range;
-    range.from_value = 0.0;
-    range.to_value = 1.0;
-    descriptor.floating_point_range.push_back(range);
-    config_.factor = node_->declare_parameter(
-      mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".factor",
-      config_.factor,
       descriptor
     );
   }

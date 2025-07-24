@@ -53,6 +53,7 @@
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
 #include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
 #include <lvr2/geometry/BaseVector.hpp>
@@ -61,7 +62,6 @@
 
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
-
 
 namespace mesh_map
 {
@@ -136,11 +136,18 @@ public:
   void combineVertexCosts(const rclcpp::Time& map_stamp);
 
   /**
+   * @brief pre-computes edge weights from combined vertex costs.
+   * The result can be directly used inside a search algorithm 
+   * that searches over the edges to a given target
+   */
+  void computeEdgeWeights();
+
+  /**
    * @brief Computes contours
    * @param contours the vector to bo filled with contours
    * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
    */
-  void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
+  // void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
 
   /**
    * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
@@ -187,14 +194,6 @@ public:
    * @param layer_name the name of the layer.
    */
   void layerChanged(const std::string& layer_name);
-
-  /**
-   * @brief Compute all contours and returns the corresponding vertices to use these as lethal vertices.
-   * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
-   * @param min_contour_size
-   * @param lethals the vector which is filled with contour vertices
-   */
-  void findLethalByContours(const int& min_contour_size, std::set<lvr2::VertexHandle>& lethals);
 
   /**
    * @brief Returns the global frame / coordinate system id string
@@ -440,6 +439,13 @@ protected:
   std::string hem_impl_;
 
 private:
+  
+  /**
+   * @brief Publishes the edge computed weights as visualisation_msgs/MarkerArray
+   *        consisting of one text marker per edge weight.
+   */
+  void publishEdgeWeightsAsText();
+
   //! plugin class loader for for the layer plugins
   pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
 
@@ -484,8 +490,7 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_service;
 
   // Reconfigurable parameters (see reconfigureCallback method)
-  int min_contour_size;
-  double layer_factor;
+  double edge_cost_factor;
   double cost_limit;
 
   //! combined layer costs
@@ -520,6 +525,12 @@ private:
 
   //! publisher for the stored vector field
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vector_field_pub;
+
+  //! publisher for the edge costs
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr edge_weights_text_pub;
+
+  //! publish edge weights as array of text markers
+  bool publish_edge_weights_text = false;
 
   //! first reconfigure call
   bool first_config;

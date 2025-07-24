@@ -142,7 +142,6 @@ private:
   struct {
     double robot_height = 0.5;
     double height_inflation = 0.3;
-    double factor = 1.0;
   } config_;
 };
 

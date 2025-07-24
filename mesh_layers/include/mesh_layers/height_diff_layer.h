@@ -139,7 +139,6 @@ class HeightDiffLayer : public mesh_map::AbstractLayer
   struct {
     double threshold = 0.185;
     double radius = 0.3;
-    double factor = 1.0;
   } config_;
 };
 
