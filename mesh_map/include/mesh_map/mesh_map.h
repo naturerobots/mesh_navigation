@@ -82,20 +82,6 @@ public:
   bool readMap();
 
   /**
-   * @brief Loads all configured layer plugins
-   * @return true if the layer plugins have been load successfully.
-   */
-  [[deprecated]]
-  bool loadLayerPlugins();
-
-  /**
-   * @brief Initialized all loaded layer plugins
-   * @return true if the loaded layer plugins have been initialized successfully.
-   */
-  [[deprecated]]
-  bool initLayerPlugins();
-
-  /**
    * @brief Return and optional vertex handle of to the closest vertex to the given position
    * @param pos the search position
    * @return

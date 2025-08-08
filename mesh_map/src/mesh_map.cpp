@@ -391,6 +391,10 @@ bool MeshMap::readMap()
   while (map_stamp.nanoseconds() == 0) { // TODO check whether time is zero
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     map_stamp = node->now();
+    RCLCPP_INFO_SKIPFIRST_THROTTLE(
+      node->get_logger(), *node->get_clock(), 1000,
+      "Waiting for the ROS Clock to start running. Is the simulation running? Or did you set 'use_sim_time' to true on a real robot?"
+    );
   }
   mesh_geometry_pub->publish(mesh_msgs_conversions::toMeshGeometryStamped<float>(mesh_ptr, global_frame, uuid_str, vertex_normals, map_stamp));
   publishVertexColors(map_stamp);
@@ -447,11 +451,6 @@ bool MeshMap::readMap()
   return true;
 }
 
-bool MeshMap::loadLayerPlugins()
-{
-  return layer_manager_.load_layer_plugins(node->get_logger());
-}
-
 void MeshMap::layerChanged(const std::string& layer_name, const std::set<lvr2::VertexHandle>& changes)
 {
   std::lock_guard lock(layer_mtx);
@@ -491,11 +490,6 @@ void MeshMap::layerChanged(const std::string& layer_name, const std::set<lvr2::V
   // Update the edge weights
   const auto ts = node->get_clock()->now();
   this->updateEdgeWeights(ts, changes);
-}
-
-bool MeshMap::initLayerPlugins()
-{
-  return layer_manager_.initialize_layer_plugins(node, shared_from_this());
 }
 
 bool MeshMap::copyVertexCostsFromDefaultLayer()

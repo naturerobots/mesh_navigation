@@ -55,6 +55,18 @@ install(TARGETS
   RUNTIME DESTINATION bin
 )
 
+if (BUILD_TESTING)
+  # Add GTest tests
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(${PROJECT_NAME}_inflation_layer_test test/inflation_layer_test.cpp)
+  target_include_directories(${PROJECT_NAME}_inflation_layer_test PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(${PROJECT_NAME}_inflation_layer_test ${PROJECT_NAME})
+endif()
+
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(mesh_map)
