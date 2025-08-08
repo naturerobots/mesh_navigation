@@ -39,6 +39,7 @@
 #include <signal.h>
 #include <tf2_ros/transform_listener.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
 
 mbf_mesh_nav::MeshNavigationServer::Ptr mesh_nav_srv_ptr;
 rclcpp::Node::SharedPtr node;
@@ -66,7 +67,9 @@ int main(int argc, char** argv)
 
   signal(SIGINT, sigintHandler);
 
-  rclcpp::spin(node);
+  rclcpp::executors::MultiThreadedExecutor exec;
+  exec.add_node(node);
+  exec.spin();
 
   return EXIT_SUCCESS;
 }

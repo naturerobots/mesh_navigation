@@ -207,16 +207,42 @@ lvr2::MeshBufferPtr extractMeshByName(
     lvr2::Channel<unsigned char> vertex_colors(amesh->mNumVertices, 4);
     for(size_t i=0; i<amesh->mNumVertices; i++)
     {
-      vertex_colors[i][0] = amesh->mColors[0][i].r;
-      vertex_colors[i][1] = amesh->mColors[0][i].g;
-      vertex_colors[i][2] = amesh->mColors[0][i].b;
-      vertex_colors[i][3] = amesh->mColors[0][i].a;
+      vertex_colors[i][0] = amesh->mColors[0][i].r * 255.0f;
+      vertex_colors[i][1] = amesh->mColors[0][i].g * 255.0f;
+      vertex_colors[i][2] = amesh->mColors[0][i].b * 255.0f;
+      vertex_colors[i][3] = amesh->mColors[0][i].a * 255.0f;
     }
     (*mesh)["vertex_colors"] = vertex_colors;
   }
 
   return mesh;
 }
+
+
+lvr2::DenseVertexMap<lvr2::RGB8Color> extractColorAttributeMap(const lvr2::MeshBuffer& buffer)
+{
+  if (!buffer.hasVertexColors())
+  {
+    throw std::invalid_argument("extractColorAttributeMap: Input Buffer contains no color data!");
+  }
+
+  // Somehow lvr2::MeshBuffer::getVertexColors has no const version
+  const lvr2::Channel<uint8_t>& channel = buffer.getChannel<uint8_t>("vertex_colors").value();
+  size_t width = channel.width();
+
+  lvr2::DenseVertexMap<lvr2::RGB8Color> map;
+  for (size_t i = 0; i < buffer.numVertices(); i++)
+  {
+    lvr2::RGB8Color color;
+    color[0] = channel[i][0];
+    color[1] = channel[i][1];
+    color[2] = channel[i][2];
+    map.insert(lvr2::VertexHandle(i), color);
+  }
+
+  return map;
+}
+
 
 void getMinMax(const lvr2::VertexMap<float>& costs, float& min, float& max)
 {

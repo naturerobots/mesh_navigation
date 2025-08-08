@@ -46,9 +46,11 @@
 #include <memory>
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/layer_manager.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_costs_sparse_stamped.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
@@ -78,18 +80,6 @@ public:
    * @return true f the mesh and its attributes have been load successfully.
    */
   bool readMap();
-
-  /**
-   * @brief Loads all configured layer plugins
-   * @return true if the layer plugins have been load successfully.
-   */
-  bool loadLayerPlugins();
-
-  /**
-   * @brief Initialized all loaded layer plugins
-   * @return true if the loaded layer plugins have been initialized successfully.
-   */
-  bool initLayerPlugins();
 
   /**
    * @brief Return and optional vertex handle of to the closest vertex to the given position
@@ -130,12 +120,6 @@ public:
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
-   * @brief A method which combines all layer costs with the respective weightings
-   * @param map_stamp timestamp for published cost data
-   */
-  void combineVertexCosts(const rclcpp::Time& map_stamp);
-
-  /**
    * @brief pre-computes edge weights from combined vertex costs.
    * The result can be directly used inside a search algorithm 
    * that searches over the edges to a given target
@@ -143,11 +127,11 @@ public:
   void computeEdgeWeights();
 
   /**
-   * @brief Computes contours
-   * @param contours the vector to bo filled with contours
-   * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
+   * @brief update the per edge costs of the edges incident to changed vertices.
+   * @param map_stamp timestamp for published cost data
+   * @param changed The Vertices whose costs have changed.
    */
-  // void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
+  void updateEdgeWeights(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
@@ -155,6 +139,13 @@ public:
    * @param name The name of the cost map
    */
   void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp);
+
+  /**
+   * @brief Publishes the given vertex map as mesh_msgs/VertexCostsSparse, e.g. to update the visualization in RVIZ.
+   * @param costs The cost map to publish
+   * @param name The name of the cost map
+   */
+  void publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp);
 
   /**
    * @briefP Publishes the vertex colors if these exists.
@@ -193,7 +184,7 @@ public:
    * @brief Callback function which is called from inside a layer plugin if cost values change
    * @param layer_name the name of the layer.
    */
-  void layerChanged(const std::string& layer_name);
+  void layerChanged(const std::string& layer_name, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Returns the global frame / coordinate system id string
@@ -410,7 +401,7 @@ public:
   /**
    * @brief returns a shared pointer to the specified layer
    */
-  mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
+  AbstractLayer::Ptr layer(const std::string& layer_name);
 
   /**
    * @brief calls 'writeLayer' on every active layer. Every layer itself writes its costs 
@@ -429,6 +420,11 @@ public:
 
   lvr2::DenseVertexMap<bool> invalid;
 
+  const std::string& getUUID() const
+  {
+    return uuid_str;
+  }
+
 protected:
   //! This is an abstract interface to load mesh information from somewhere
   //! The default case is loading from a HDF5 file
@@ -439,6 +435,13 @@ protected:
   std::string hem_impl_;
 
 private:
+
+  /**
+   * @brief Copies the per vertex costs from the configured default layer into the map.
+   *
+   * @return true on success false on failure
+   */
+  bool copyVertexCostsFromDefaultLayer();
   
   /**
    * @brief Publishes the edge computed weights as visualisation_msgs/MarkerArray
@@ -446,19 +449,11 @@ private:
    */
   void publishEdgeWeightsAsText();
 
-  //! plugin class loader for for the layer plugins
-  pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+  //! Manages loading, configuration and updating the cost map layers
+  LayerManager layer_manager_;
 
-  //! mapping from layer name to layer type, as configured via ros params. 
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, std::string>> configured_layers;
-
-  //! mapping from layer name to instance of respective layer
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> loaded_layers;
-
-  //! each layer maps to a set of impassable indices
-  std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
+  //! The layer used to provide the lethal and combined vertex costs
+  std::string default_layer_;
 
   //! all impassable vertices
   std::set<lvr2::VertexHandle> lethals;
@@ -513,6 +508,7 @@ private:
 
   //! publisher for vertex costs
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr vertex_costs_update_pub_;
 
   //! publisher for vertex colors
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;

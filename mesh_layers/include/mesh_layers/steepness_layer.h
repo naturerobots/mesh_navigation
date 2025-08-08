@@ -111,14 +111,6 @@ class SteepnessLayer : public mesh_map::AbstractLayer
   }
 
   /**
-   * @brief update set of lethal vertices by adding and removing vertices
-   *
-   * @param added_lethal vertices to be marked as lethal
-   * @param removed_lethal vertices to be removed from the set of lethal vertices
-   */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal) override {};
-
-  /**
    * @brief initializes this layer plugin
    *
    * @return true if initialization was successfull; else false
