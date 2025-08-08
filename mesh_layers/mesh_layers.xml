@@ -27,13 +27,6 @@
             A inflation mesh layer, computing the inflation of the surface as cost layer.
         </description>
     </class>
-    <class name="mesh_layers/DynamicInflationLayer"
-            type="mesh_layers::DynamicInflationLayer"
-            base_class_type="mesh_map::AbstractLayer">
-        <description>
-            A faster inflation mesh layer, computing the inflation of the surface as cost layer.
-        </description>
-    </class>
     <class name="mesh_layers/SteepnessLayer"
             type="mesh_layers::SteepnessLayer"
             base_class_type="mesh_map::AbstractLayer">
