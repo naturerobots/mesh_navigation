@@ -22,10 +22,6 @@ class TestLayer : public mesh_map::AbstractLayer {
     return lethal_vertices_;
   };
 
-  virtual void
-  updateLethal(std::set<lvr2::VertexHandle> &added_lethal,
-               std::set<lvr2::VertexHandle> &removed_lethal) override{};
-
   virtual bool initialize() override { return true; };
 
   // set of all current lethal vertices

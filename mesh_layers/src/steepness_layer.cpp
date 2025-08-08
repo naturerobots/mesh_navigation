@@ -36,6 +36,7 @@
  */
 
 #include "mesh_layers/steepness_layer.h"
+#include <mesh_map/mesh_map.h>
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>

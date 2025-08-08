@@ -60,6 +60,7 @@
 #include <lvr2/geometry/HalfEdgeMesh.hpp>
 #include <lvr2/geometry/PMPMesh.hpp>
 
+#include <mesh_map/abstract_layer.h>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
 #include <mesh_map/timer.h>
@@ -121,8 +122,12 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   default_layer_desc.type = rclcpp::ParameterType::PARAMETER_STRING;
   default_layer_ = node->declare_parameter<std::string>(default_layer_desc.name, default_layer_desc);
 
-  hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
+  auto publish_edge_weights_text_desc = rcl_interfaces::msg::ParameterDescriptor();
+  publish_edge_weights_text_desc.name = MESH_MAP_NAMESPACE + ".default_layer";
+  publish_edge_weights_text_desc.description = "Publish the maps edge weights as text markers. This can overwhelm RViz due to the number of markers!";
+  publish_edge_weights_text = node->declare_parameter(MESH_MAP_NAMESPACE + ".publish_edge_weights_text", false, publish_edge_weights_text_desc);
 
+  hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
   mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
@@ -430,6 +435,11 @@ bool MeshMap::readMap()
     return false;
   }
 
+  if (!copyVertexCostsFromDefaultLayer())
+  {
+    RCLCPP_FATAL_STREAM(node->get_logger(), "Could not initialize per vertex cost values in MeshMap!");
+    return false;
+  }
   computeEdgeWeights();
   publishCostLayers(map_stamp);
 
@@ -465,27 +475,22 @@ void MeshMap::layerChanged(const std::string& layer_name, const std::set<lvr2::V
     return;
   }
   
-  // Lock the layer were about to read from
-  auto rlock = ptr->readLock();
-
-  const auto default_value = ptr->defaultValue();
-  const auto& cost_map = ptr->costs();
-
-  // Update only the changed vertices
-  for (const auto vH: changes)
+  // Update the global cost map
   {
-    vertex_costs.insert(vH, cost_map.containsKey(vH) ? cost_map[vH] : default_value);
+    const auto rlock = ptr->readLock();
+
+    const auto default_value = ptr->defaultValue();
+    const auto& cost_map = ptr->costs();
+
+    for (const auto vH: changes)
+    {
+      vertex_costs.insert(vH, cost_map.get(vH).value_or(default_value));
+    }
   }
 
-  // Is this necessary?
-  for (const auto vH : ptr->lethals())
-  {
-    vertex_costs[vH] = 1.0;
-  }
-  // We are done reading from the layer
-  rlock.unlock();
+  // Update the edge weights
   const auto ts = node->get_clock()->now();
-  this->updateEdgeCosts(ts, changes);
+  this->updateEdgeWeights(ts, changes);
 }
 
 bool MeshMap::initLayerPlugins()
@@ -493,45 +498,26 @@ bool MeshMap::initLayerPlugins()
   return layer_manager_.initialize_layer_plugins(node, shared_from_this());
 }
 
-void MeshMap::calculateEdgeCosts(const rclcpp::Time& map_stamp)
+bool MeshMap::copyVertexCostsFromDefaultLayer()
 {
-  // Use a user chosen layer as the default layer for accessing costs
-  // TODO: Costs are copied, so they need to be updated when the underlaying layer changes
-  RCLCPP_INFO_STREAM(node->get_logger(), "Calculating edge costs from layer " << default_layer_);
+  auto layer = this->layer(default_layer_);
   
+  if (nullptr == layer)
+  {
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Could not retrieve configured default layer: '" << default_layer_ << "'");
+    return false;
+  }
+
   vertex_costs.reserve(mesh()->nextVertexIndex());
-
-  const auto ptr = layer(default_layer_);
-  
-  if (nullptr == ptr)
+  const auto rlock = layer->readLock();
+  const auto& cm = layer->costs();
+  const float def = layer->defaultValue();
+  for (const lvr2::VertexHandle vH: mesh()->vertices())
   {
-    RCLCPP_ERROR(
-      node->get_logger(),
-      "Default layer '%s' could not be loaded or was not configured!",
-      default_layer_.c_str()
-    );
-    throw rclcpp::exceptions::InvalidParameterValueException(
-      "The default_layer " + default_layer_ + " could not be loaded or was not configured!"
-    );
-  }
-  
-  // Lock the layer were about to read from
-  auto rlock = ptr->readLock();
-
-  const auto default_value = ptr->defaultValue();
-  const auto& cost_map = ptr->costs();
-
-  for (const auto& vH: mesh()->vertices())
-  {
-    vertex_costs.insert(vH, cost_map.containsKey(vH) ? cost_map[vH] : default_value);
+    vertex_costs.insert(vH, cm.get(vH).value_or(def));
   }
 
-  for (auto vH : ptr->lethals())
-  {
-    vertex_costs[vH] = 1.0;
-  }
-  // We are done reading from the layer
-  rlock.unlock();
+  return true;
 }
 
 void MeshMap::computeEdgeWeights()
@@ -580,7 +566,7 @@ void MeshMap::computeEdgeWeights()
   RCLCPP_INFO(node->get_logger(), "Successfully calculated edge costs!");
 }
 
-void MeshMap::updateEdgeCosts(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changed)
+void MeshMap::updateEdgeWeights(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changed)
 {
   RCLCPP_DEBUG(node->get_logger(), "Updating edge costs from layer %s", default_layer_.c_str());
 

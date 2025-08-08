@@ -43,6 +43,8 @@
 
 #include <lvr2/geometry/Handles.hpp>
 
+#include <mesh_map/abstract_layer.h>
+
 namespace mesh_map
 {
 

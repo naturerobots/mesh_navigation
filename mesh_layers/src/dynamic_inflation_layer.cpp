@@ -36,6 +36,7 @@
  */
 
 #include "mesh_layers/dynamic_inflation_layer.h"
+#include <mesh_map/mesh_map.h>
 
 #include <lvr2/util/Meap.hpp>
 #include <pluginlib/class_list_macros.hpp>
@@ -92,21 +93,7 @@ float DynamicInflationLayer::threshold()
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-void DynamicInflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                                  std::set<lvr2::VertexHandle>& removed_lethal)
-{
-  lethal_vertices_ = added_lethal;
-
-  RCLCPP_INFO_STREAM(get_logger(), "Update lethal for inflation layer.");
-  const auto lock = this->writeLock();
-  waveCostInflation(
-    lethal_vertices_,
-    riskiness_,
-    vector_map_
-  );
-}
-
-void DynamicInflationLayer::updateInput(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
+void DynamicInflationLayer::onInputChanged(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
 {
   const mesh_map::LayerTimer::TimePoint t0 = mesh_map::LayerTimer::Clock::now();
   const std::vector<std::string> inputs = node_->get_parameter(

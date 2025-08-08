@@ -191,15 +191,7 @@ class InflationLayer : public mesh_map::AbstractLayer
     return lethal_vertices_;
   }  // TODO remove... layer types
 
-  /**
-   * @brief update set of lethal vertices by adding and removing vertices
-   *
-   * @param added_lethal vertices to be marked as lethal
-   * @param removed_lethal vertices to be removed from the set of lethal vertices
-   */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal) override;
-
-  virtual void updateInput(
+  virtual void onInputChanged(
     const rclcpp::Time& timestamp,
     const std::set<lvr2::VertexHandle>& changed
   ) override;
@@ -238,8 +230,6 @@ class InflationLayer : public mesh_map::AbstractLayer
     int min_contour_size = 3;
     bool repulsive_field = true;
   } config_;
-
-  std::ofstream logfile_;
 };
 
 } /* namespace mesh_layers */

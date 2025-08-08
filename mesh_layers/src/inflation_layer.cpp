@@ -36,8 +36,8 @@
  */
 
 #include "mesh_layers/inflation_layer.h"
+#include <mesh_map/mesh_map.h>
 
-#include <queue>
 #include <lvr2/util/Meap.hpp>
 #include <pluginlib/class_list_macros.hpp>
 #include <mesh_map/util.h>
@@ -92,17 +92,8 @@ float InflationLayer::threshold()
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                                  std::set<lvr2::VertexHandle>& removed_lethal)
-{
-  lethal_vertices_ = added_lethal;
 
-  RCLCPP_INFO_STREAM(get_logger(), "Update lethal for inflation layer.");
-  waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value,
-                    std::numeric_limits<float>::infinity());
-}
-
-void InflationLayer::updateInput(
+void InflationLayer::onInputChanged(
   const rclcpp::Time& timestamp,
   const std::set<lvr2::VertexHandle>& changed
 )
@@ -132,16 +123,7 @@ void InflationLayer::updateInput(
     return;
   }
 
-
-  // TODO: The inflation algorithm overwrites all costs
-  // Copy all changed costs from the input layer
-  // for (const lvr2::VertexHandle& v: changed)
-  // {
-  //   riskiness_.insert(v, input->costs()[v]);
-  // }
-
   auto wlock = this->writeLock();
-  // TODO: This layer should probably be sparse?
   std::set<lvr2::VertexHandle> old;
   for (const lvr2::VertexHandle& v: riskiness_)
   {
@@ -165,7 +147,7 @@ void InflationLayer::updateInput(
     config_.inflation_radius,
     config_.inscribed_radius,
     config_.inscribed_value,
-    1.0
+    config_.lethal_value
   );
 
   std::set<lvr2::VertexHandle> new_;
@@ -521,11 +503,6 @@ void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& letha
 
     map->publishVectorField("inflation", vector_map_, distances_,
                                 std::bind(&InflationLayer::fading, this, std::placeholders::_1));
-
-    logfile_ << t0.time_since_epoch().count() << ',';
-    logfile_ << (t1 - t0).count() << ',';
-    logfile_ << (t2 - t1).count() << ',';
-    logfile_ << (t3 - t2).count() << std::endl;
   }
   else
   {
@@ -649,15 +626,13 @@ bool InflationLayer::computeLayer()
   }
   
   // Copy lethal vertices of base layer
-  // TODO: Copy all cost values
-  // TODO: Implement update on change
   lethal_vertices_ = input->lethals();
   waveCostInflation(
     lethal_vertices_,
     config_.inflation_radius,
     config_.inscribed_radius,
     config_.inscribed_value,
-    1.0
+    config_.lethal_value
   );
 
   return true;
@@ -704,7 +679,13 @@ rcl_interfaces::msg::SetParametersResult InflationLayer::reconfigureCallback(std
   {
     {
       const auto wlock = this->writeLock();
-      waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, std::numeric_limits<float>::infinity());
+      waveCostInflation(
+        lethal_vertices_,
+        config_.inflation_radius,
+        config_.inscribed_radius,
+        config_.inscribed_value,
+        config_.lethal_value
+      );
     }
     auto map = map_ptr_.lock();
     if (nullptr == map)
@@ -795,9 +776,6 @@ bool InflationLayer::initialize()
     config_.repulsive_field = node_->declare_parameter(mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".repulsive_field", config_.repulsive_field, descriptor);
   }
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(&InflationLayer::reconfigureCallback, this, std::placeholders::_1));
-  const std::string filename = layer_name_ + "_waveCostInflationTimes.csv";
-  logfile_.open(filename, std::ios::app);
-  logfile_ << "Timestamp, Allocation, Initialization, Calculation" << std::endl;
   return true;
 }
 

@@ -1,5 +1,6 @@
 #include <mesh_layers/combination_layer.h>
 #include <mesh_map/timer.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mesh_layers
 {
@@ -42,9 +43,6 @@ bool MaxCombinationLayer::initialize()
 
 bool MaxCombinationLayer::computeLayer()
 {
-  // TODO: Can this be more efficient?
-  // TODO: Normalize each layers cost?
-
   // Lock all layers so they cannot be destroyed while updating
   std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers(inputs_.size());
   layers.clear();
@@ -61,7 +59,8 @@ bool MaxCombinationLayer::computeLayer()
     for (const auto& ptr: layers)
     {
       const auto& cm = ptr->costs();
-      const float tmp = cm.containsKey(vertex) ? cm[vertex] : ptr->defaultValue();
+      const float def = ptr->defaultValue();
+      const float tmp = cm.get(vertex).value_or(def);
       cost = std::max(cost, tmp);
     }
     costs_.insert(vertex, cost);
@@ -74,23 +73,13 @@ bool MaxCombinationLayer::computeLayer()
     lethals_.insert(set.begin(), set.end());
   }
 
-  for (const auto& v: lethals_)
-  {
-    costs_[v] = 1.0;
-  }
+  // No special handling for lethal vertices.
+  // This layer only takes the max from all inputs and does not modify the costs any other way.
 
   return true;
 }
 
-
-void MaxCombinationLayer::updateLethal(
-  std::set<lvr2::VertexHandle>& added_lethal,
-  std::set<lvr2::VertexHandle>& removed_lethal
-)
-{}
-
-
-void MaxCombinationLayer::updateInput(
+void MaxCombinationLayer::onInputChanged(
   const rclcpp::Time& timestamp,
   const std::set<lvr2::VertexHandle>& changed
 )
@@ -117,7 +106,9 @@ void MaxCombinationLayer::updateInput(
     float cost = 0;
     for (const auto& layer: layers)
     {
-      const float tmp = layer->costs().containsKey(v) ? layer->costs()[v] : layer->defaultValue();
+      const auto& cm = layer->costs();
+      const float def = layer->defaultValue();
+      const float tmp = cm.get(v).value_or(def);
       cost = std::max(tmp, cost);
     }
     costs_.insert(v, cost);
@@ -167,92 +158,58 @@ bool CombinationLayer::initialize()
   return true;
 }
 
-template <typename MapT>
-void integrate_vertex_map(lvr2::DenseVertexMap<float>& out, const std::remove_pointer_t<MapT>& costs, const float factor, const float default_value)
-{
-
-  float min = std::numeric_limits<float>::infinity();
-  float max = -std::numeric_limits<float>::infinity();
-
-  for (const auto& v: costs)
-  {
-    const float c = costs[v];
-    if (std::isfinite(c))
-    {
-      min = std::min(min, c);
-      max = std::max(max, c);
-    }
-  }
-
-  min = std::min(min, default_value);
-  max = std::max(max, default_value);
-
-  // TODO: This is the old behavior, but is this correct?
-  float norm = factor / (max - min);
-
-  // If the range in the layer is too small we cannot normalize, but we also dont have to right?
-  if (norm <= 0.00001)
-  {
-    norm = factor;
-  }
-
-  for (const auto& v: out)
-  {
-    if (costs.containsKey(v))
-    {
-      out[v] += norm * costs[v];
-    }
-    else
-    {
-      out[v] += norm * default_value;
-    }
-  }
-}
-
 bool CombinationLayer::computeLayer()
 {
-  // TODO: Is this faster than just using the interface?
-  // TODO: Normalize each layers cost
-
-  // Lock all layers so they cannot be destroyed while updating. Is this necessary? Layers should have no dependency loops anyway?
-  std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers(inputs_.size());
-  layers.clear();
+  // Lock all layer points so they cannot be destroyed while updating. Is this necessary? Layers should have no dependency loops anyway?
+  std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers;
+  layers.reserve(inputs_.size());
   for (const auto& ref: inputs_)
   {
     const auto& ptr = ref.lock();
     layers.push_back(ptr);
   }
 
+  // Calculate a weighted average over all input layers
   for (const auto& ptr: layers)
   {
-    auto lock = ptr->readLock();
-    const auto* cm = &ptr->costs();
-    // TODO: Check where factor is read
-    if (const auto* p = dynamic_cast<const lvr2::DenseVertexMap<float>*>(cm))
+    const auto lock = ptr->readLock();
+    const auto& cm = ptr->costs();
+    const float def = ptr->defaultValue();
+    const float weight = ptr->combinationWeight();
+    bool has_nan = false;
+
+    for (const lvr2::VertexHandle v: costs_)
     {
-      integrate_vertex_map<lvr2::DenseVertexMap<float>>(costs_, *p, 1.0, ptr->defaultValue());
+      const float tmp = cm.get(v).value_or(def);
+      costs_[v] += weight * tmp;
+
+      has_nan = has_nan || std::isnan(tmp);
     }
-    else if (const auto* p = dynamic_cast<const lvr2::SparseVertexMap<float>*>(cm))
+
+    if (has_nan)
     {
-      integrate_vertex_map<lvr2::SparseVertexMap<float>>(costs_, *p, 1.0, ptr->defaultValue());
-    }
-    else if (const auto* p = dynamic_cast<const lvr2::TinyVertexMap<float>*>(cm))
-    {
-      integrate_vertex_map<lvr2::TinyVertexMap<float>>(costs_, *p, 1.0, ptr->defaultValue());
-    }
-    else
-    {
-      integrate_vertex_map<lvr2::VertexMap<float>>(costs_, *cm, 1.0, ptr->defaultValue());
+      RCLCPP_ERROR(
+        get_logger(),
+        "Input layer '%s' contains NaN values! This breaks downstream costs and algorithms!",
+        ptr->name().c_str()
+      );
+      // TODO: We could return false here to ensure users notice?
     }
   }
 
-  // Normalize the resulting layer to cost range 1
-  const float norm = 1.0 / inputs_.size();
-  for (const auto& v: costs_)
+  float max = std::numeric_limits<float>::lowest();
+  float min = std::numeric_limits<float>::max();
+  for (auto vh: costs_)
   {
-    costs_[v] *= norm;
+    max = std::max(costs_[vh], max);
+    min = std::min(costs_[vh], min);
   }
 
+  RCLCPP_DEBUG(get_logger(), "Cost values are in range [%f - %f]", min, max);
+
+  // TODO: Normalize the costs?
+
+  // Merge all lethals to a combined set
   lethals_.clear();
   for (const auto& ptr: layers)
   {
@@ -260,22 +217,12 @@ bool CombinationLayer::computeLayer()
     lethals_.insert(set.begin(), set.end());
   }
 
-  for (const auto& v: lethals_)
-  {
-    costs_[v] = 1.0;
-  }
+  // TODO: Overwrite the cost of lethal vertices??
 
   return true;
 }
 
-
-void CombinationLayer::updateLethal(
-  std::set<lvr2::VertexHandle>& added_lethal,
-  std::set<lvr2::VertexHandle>& removed_lethal
-)
-{}
-  
-void CombinationLayer::updateInput(
+void CombinationLayer::onInputChanged(
   const rclcpp::Time& timestamp,
   const std::set<lvr2::VertexHandle>& changed
 )
@@ -291,19 +238,20 @@ void CombinationLayer::updateInput(
     locks.push_back(ptr->readLock());
   }
 
-  const float norm = 1.0 / layers.size();
   auto lock = this->writeLock();
   for (const lvr2::VertexHandle v: changed)
   {
     float cost = 0;
     for (const auto& layer: layers)
     {
-      cost += layer->costs().containsKey(v) ? layer->costs()[v] : layer->defaultValue();
+      const auto& cm = layer->costs();
+      const float def = layer->defaultValue();
+      cost += layer->combinationWeight() * cm.get(v).value_or(def);
     }
-    costs_.insert(v, cost * norm);
+    costs_.insert(v, cost);
   }
 
-  // Lethals!
+  // Update lethal vertex set!
   for (const lvr2::VertexHandle v: changed)
   {
     bool lethal = false;
@@ -315,7 +263,6 @@ void CombinationLayer::updateInput(
     if (lethal)
     {
       lethals_.insert(v);
-      costs_.insert(v, 1.0);
     }
     else
     {

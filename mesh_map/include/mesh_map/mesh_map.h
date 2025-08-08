@@ -134,12 +134,6 @@ public:
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
-   * @brief A method which calculates the per edge costs from the configured default layer
-   * @param map_stamp timestamp for published cost data
-   */
-  void calculateEdgeCosts(const rclcpp::Time& map_stamp);
-
-  /**
    * @brief pre-computes edge weights from combined vertex costs.
    * The result can be directly used inside a search algorithm 
    * that searches over the edges to a given target
@@ -147,18 +141,11 @@ public:
   void computeEdgeWeights();
 
   /**
-   * @brief A method which updates the per edge costs from the changed vertices.
+   * @brief update the per edge costs of the edges incident to changed vertices.
    * @param map_stamp timestamp for published cost data
-   * @param changed The Vertices which costs have changed.
+   * @param changed The Vertices whose costs have changed.
    */
-  void updateEdgeCosts(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changes);
-
-  /**
-   * @brief Computes contours
-   * @param contours the vector to bo filled with contours
-   * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
-   */
-  // void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
+  void updateEdgeWeights(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
@@ -428,7 +415,7 @@ public:
   /**
    * @brief returns a shared pointer to the specified layer
    */
-  mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
+  AbstractLayer::Ptr layer(const std::string& layer_name);
 
   /**
    * @brief calls 'writeLayer' on every active layer. Every layer itself writes its costs 
@@ -462,6 +449,13 @@ protected:
   std::string hem_impl_;
 
 private:
+
+  /**
+   * @brief Copies the per vertex costs from the configured default layer into the map.
+   *
+   * @return true on success false on failure
+   */
+  bool copyVertexCostsFromDefaultLayer();
   
   /**
    * @brief Publishes the edge computed weights as visualisation_msgs/MarkerArray

@@ -47,35 +47,30 @@ class MaxCombinationLayer
 {
 public:
 
-  bool readLayer() {return false;}
-  bool writeLayer() {return true;}
-  float defaultValue() {return 0.0;}
-  float threshold() {return 1.0;}
-  lvr2::VertexMap<float>& costs() {return costs_;}
-  std::set<lvr2::VertexHandle>& lethals() {return lethals_;}
+  bool readLayer() override {return false;}
+  bool writeLayer() override {return true;}
+  float defaultValue() override {return 0.0;}
+  float threshold() override {return 1.0;}
+  lvr2::VertexMap<float>& costs() override {return costs_;}
+  std::set<lvr2::VertexHandle>& lethals() override {return lethals_;}
 
   /**
   * @brief Combines the configured layers
   */
-  bool computeLayer();
+  bool computeLayer() override;
   
   /**
   * @brief Process a change in a lower layer
   */
-  void updateLethal(
-    std::set<lvr2::VertexHandle>& added_lethal,
-    std::set<lvr2::VertexHandle>& removed_lethal
-  );
-
-  virtual void updateInput(
+  virtual void onInputChanged(
     const rclcpp::Time& timestamp,
     const std::set<lvr2::VertexHandle>& changed
-  );
+  ) override;
 
   /**
   * @brief Initialize the layer
   */
-  bool initialize();
+  bool initialize() override;
 
 private:
   // Combined costs
@@ -94,35 +89,30 @@ class CombinationLayer
 {
 public:
 
-  bool readLayer() {return false;}
-  bool writeLayer() {return true;}
-  float defaultValue() {return 0.0;}
-  float threshold() {return 1.0;}
-  lvr2::VertexMap<float>& costs() {return costs_;}
-  std::set<lvr2::VertexHandle>& lethals() {return lethals_;}
+  bool readLayer() override {return false;}
+  bool writeLayer() override {return true;}
+  float defaultValue() override {return 0.0;}
+  float threshold() override {return 1.0;}
+  lvr2::VertexMap<float>& costs() override {return costs_;}
+  std::set<lvr2::VertexHandle>& lethals() override {return lethals_;}
 
   /**
   * @brief Combines the configured layers
   */
-  bool computeLayer();
+  bool computeLayer() override;
   
   /**
   * @brief Process a change in a lower layer
   */
-  void updateLethal(
-    std::set<lvr2::VertexHandle>& added_lethal,
-    std::set<lvr2::VertexHandle>& removed_lethal
-  );
-
-  virtual void updateInput(
+  virtual void onInputChanged(
     const rclcpp::Time& timestamp,
     const std::set<lvr2::VertexHandle>& changed
-  );
+  ) override;
 
   /**
   * @brief Initialize the layer
   */
-  bool initialize();
+  bool initialize() override;
 
 private:
   // Combined costs

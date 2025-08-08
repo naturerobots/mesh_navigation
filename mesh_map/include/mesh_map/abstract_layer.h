@@ -42,8 +42,6 @@
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <rclcpp/node.hpp>
 
-#include <mesh_map/mesh_map.h>
-
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
 namespace mesh_map
@@ -106,24 +104,17 @@ public:
    * @return set of vertex handles which are associated with lethal obstalces.
    */
   virtual std::set<lvr2::VertexHandle>& lethals() = 0;
-
-  /**
-   * @brief Called by the mesh map if another previously processed layer triggers an update.
-   * @param added_lethal    The "lethal" obstacle vertex handles which are new with respect to the previous call.
-   * @param removed_lethal  Old "lethal" obstacle vertex handles, i.e. vertices which are no "lethal" obstacles anymore.
-   */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                            std::set<lvr2::VertexHandle>& removed_lethal) = 0;
   
-  // TODO: Should this replace updateLethal, should this be named onInputChanged?
   /**
    *  @brief Called by the mesh map if one of the input layers has changed.
+   *
+   *  Implement this callback to be notified when an input layer changed.
    *
    *  @param timestamp  The timestamp of when the change was triggered.
    *                    Layers whose updateInput() function was called should pass this timestamp on to their notifyChange() call.
    *  @param changed    The vertices whose cost has changed in one of the input layers.
    */
-  virtual void updateInput(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
+  virtual void onInputChanged(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
   {
     (void) timestamp;
     (void) changed;
@@ -173,7 +164,40 @@ public:
     std::shared_ptr<mesh_map::MeshMap> map,
     const rclcpp::Node::SharedPtr node);
 
-  // TODO: Should these be protected functions?
+  /**
+   *  @brief Aquire a read lock on the layer to prevent changes while reading.
+   *
+   *  Before reading data from a layer a readLock *must* be aquired to prevent
+   *  raceconditions through parallel changes.
+   */
+  [[nodiscard]] std::shared_lock<std::shared_mutex> readLock()
+  {
+    return std::shared_lock(mutex_);
+  }
+
+  /**
+   *  @brief The weight to use when combining this layer with others.
+   */
+  inline float combinationWeight() const
+  {
+    return combination_weight_;
+  }
+
+  /**
+   *  @brief Get the layer's name
+   */
+  inline const std::string& name() const
+  {
+    return layer_name_;
+  }
+
+protected:
+
+  /**
+   *  @brief Notfiy the MeshMap and other Layers of a change in this layer.
+   *
+   *  The use of this overload is discouraged use \ref notifyChange(const rclcpp::Time&, const std::set<lvr2::VertexHandle>&) instead.
+   */
   void notifyChange()
   {
     std::set<lvr2::VertexHandle> changed;
@@ -198,27 +222,7 @@ public:
   {
     this->notify_(layer_name_, timestamp, changed);
   }
-  
-  /**
-   *  @brief Aquire a read lock on the layer to prevent changes while reading.
-   *
-   *  Before reading data from a layer a readLock *must* be aquired to prevent
-   *  raceconditions through parallel changes.
-   */
-  [[nodiscard]] std::shared_lock<std::shared_mutex> readLock()
-  {
-    return std::shared_lock(mutex_);
-  }
 
-  /**
-   *  @brief The weight to use when combining this layer with others.
-   */
-  inline float combinationWeight() const
-  {
-    return combination_weight_;
-  }
-
-protected:
   /**
    *  @brief Aquire a write lock on the layer to prevent simultaneaus reads or writes.
    *

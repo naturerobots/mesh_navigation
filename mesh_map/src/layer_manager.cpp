@@ -238,7 +238,7 @@ void LayerManager::layer_changed(
       continue;
     }
 
-    layer->updateInput(timestamp, changed);
+    layer->onInputChanged(timestamp, changed);
   }
 }
 

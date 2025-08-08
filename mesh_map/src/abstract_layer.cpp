@@ -36,6 +36,7 @@
  */
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mesh_map
 {
