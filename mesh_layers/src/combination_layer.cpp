@@ -52,6 +52,7 @@ bool MaxCombinationLayer::computeLayer()
     layers.push_back(ptr);
   }
 
+  // Compute the maximum cost for each vertex
   auto map = map_ptr_.lock();
   for (const auto& vertex: map->mesh()->vertices())
   {
@@ -66,6 +67,10 @@ bool MaxCombinationLayer::computeLayer()
     costs_.insert(vertex, cost);
   }
 
+  // NOTE: We decided to not normalize the combined costs to [0 - 1] to elimitate
+  // the need to recompute/renormalize the costs when an input layer changes.
+
+  // Build the combined lethal vertex set
   lethals_.clear();
   for (const auto& ptr: layers)
   {
@@ -112,6 +117,25 @@ void MaxCombinationLayer::onInputChanged(
       cost = std::max(tmp, cost);
     }
     costs_.insert(v, cost);
+  }
+
+  // Update lethal vertex set!
+  for (const lvr2::VertexHandle v: changed)
+  {
+    bool lethal = false;
+    for (auto layer: layers)
+    {
+      lethal = lethal || layer->lethals().count(v) > 0;
+    }
+
+    if (lethal)
+    {
+      lethals_.insert(v);
+    }
+    else
+    {
+      lethals_.erase(v);
+    }
   }
 
   locks.clear();
@@ -207,7 +231,8 @@ bool CombinationLayer::computeLayer()
 
   RCLCPP_DEBUG(get_logger(), "Cost values are in range [%f - %f]", min, max);
 
-  // TODO: Normalize the costs?
+  // NOTE: We decided to not normalize the combined costs to [0 - 1] to elimitate
+  // the need to recompute/renormalize the costs when an input layer changes.
 
   // Merge all lethals to a combined set
   lethals_.clear();
