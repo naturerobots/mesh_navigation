@@ -51,8 +51,8 @@ public:
   bool writeLayer() override {return true;}
   float defaultValue() override {return 0.0;}
   float threshold() override {return 1.0;}
-  lvr2::VertexMap<float>& costs() override {return costs_;}
-  std::set<lvr2::VertexHandle>& lethals() override {return lethals_;}
+  const lvr2::VertexMap<float>& costs() override {return costs_;}
+  const std::set<lvr2::VertexHandle>& lethals() override {return lethals_;}
 
   /**
   * @brief Combines the configured layers

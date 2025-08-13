@@ -108,7 +108,7 @@ bool HeightDiffLayer::computeLayer()
   return computeLethals();
 }
 
-lvr2::VertexMap<float>& HeightDiffLayer::costs()
+const lvr2::VertexMap<float>& HeightDiffLayer::costs()
 {
   return height_diff_;
 }

@@ -146,7 +146,7 @@ bool RoughnessLayer::computeLayer() {
   return computeLethals();
 }
 
-lvr2::VertexMap<float> &RoughnessLayer::costs() { return roughness_; }
+const lvr2::VertexMap<float>& RoughnessLayer::costs() { return roughness_; }
 
 rcl_interfaces::msg::SetParametersResult RoughnessLayer::reconfigureCallback(std::vector<rclcpp::Parameter> parameters)
 {

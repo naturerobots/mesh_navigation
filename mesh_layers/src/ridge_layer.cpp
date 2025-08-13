@@ -186,7 +186,7 @@ bool RidgeLayer::computeLayer()
   return computeLethals();
 }
 
-lvr2::VertexMap<float>& RidgeLayer::costs()
+const lvr2::VertexMap<float>& RidgeLayer::costs()
 {
   return ridge_;
 }

@@ -596,7 +596,7 @@ bool InflationLayer::computeLayer()
   return true;
 }
 
-lvr2::VertexMap<float>& InflationLayer::costs()
+const lvr2::VertexMap<float>& InflationLayer::costs()
 {
   return riskiness_;
 }

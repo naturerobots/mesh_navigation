@@ -97,13 +97,13 @@ public:
    * in the map, the mesh_map will use the default value from threshold().
    * @return a vertex map containing floats.
    */
-  virtual lvr2::VertexMap<float>& costs() = 0;
+  virtual const lvr2::VertexMap<float>& costs() = 0;
 
   /**
    * @brief Returns a set of vertex handles which are associated with "lethal" obstacles.
    * @return set of vertex handles which are associated with lethal obstalces.
    */
-  virtual std::set<lvr2::VertexHandle>& lethals() = 0;
+  virtual const std::set<lvr2::VertexHandle>& lethals() = 0;
   
   /**
    *  @brief Called by the mesh map if one of the input layers has changed.

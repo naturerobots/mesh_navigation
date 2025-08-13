@@ -99,14 +99,14 @@ class RoughnessLayer : public mesh_map::AbstractLayer
    *
    * @return calculated costmap
    */
-  virtual lvr2::VertexMap<float>& costs() override;
+  virtual const lvr2::VertexMap<float>& costs() override;
 
   /**
    * @brief deliver set containing all vertices marked as lethal
    *
    * @return lethal vertices
    */
-  virtual std::set<lvr2::VertexHandle>& lethals() override
+  virtual const std::set<lvr2::VertexHandle>& lethals() override
   {
     return lethal_vertices_;
   }

@@ -168,7 +168,7 @@ bool SteepnessLayer::computeLayer()
   return computeLethals();
 }
 
-lvr2::VertexMap<float>& SteepnessLayer::costs()
+const lvr2::VertexMap<float>& SteepnessLayer::costs()
 {
   return steepness_;
 }

@@ -109,7 +109,7 @@ bool BorderLayer::computeLayer()
   return computeLethals();
 }
 
-lvr2::VertexMap<float>& BorderLayer::costs()
+const lvr2::VertexMap<float>& BorderLayer::costs()
 {
   return border_costs_;
 }

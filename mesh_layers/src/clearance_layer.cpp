@@ -163,7 +163,7 @@ bool ClearanceLayer::computeLayer()
   return computeLethalsAndCosts();
 }
 
-lvr2::VertexMap<float>& ClearanceLayer::costs()
+const lvr2::VertexMap<float>& ClearanceLayer::costs()
 {
   return costs_;
 }
