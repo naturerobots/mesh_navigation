@@ -67,6 +67,8 @@ int main(int argc, char** argv)
 
   signal(SIGINT, sigintHandler);
 
+  // NOTE: Using a multithreaded executor is recommended so cost layers can use
+  // different callback groups when processing sensor data.
   rclcpp::executors::MultiThreadedExecutor exec;
   exec.add_node(node);
   exec.spin();
