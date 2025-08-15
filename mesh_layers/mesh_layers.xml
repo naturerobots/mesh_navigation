@@ -62,4 +62,12 @@
             Combines a set of input layers using a weighted average
         </description>
     </class>
+    <class name="mesh_layers/ObstacleLayer"
+            type="mesh_layers::ObstacleLayer"
+            base_class_type="mesh_map::AbstractLayer">
+        <description>
+            This layer integrates detected obstacles in the form of PointCloud2 messages into the layered MeshMap.
+            The obstacle points are projected onto the map's surface by casting a ray along the robots down axis.
+        </description>
+    </class>
 </library>

@@ -103,6 +103,7 @@ The package structure is as follows:
   - ClearanceLayer - `mesh_layers/ClearanceLayer`
   - InflationLayer - `mesh_layers/InflationLayer`
   - BorderLayer - `mesh_layers/BorderLayer`
+  - ObstacleLayer - `mesh_layers/ObstacleLayer`
 
 - `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm. It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed vertex to the goal pose can be computed. This leads to a sub-optimal potential field, which highly depends on the mesh structure.
 
@@ -125,6 +126,7 @@ The following table gives an overview of all currently implemented layer plugins
 | **ClearanceLayer**  | `mesh_layers/ClearanceLayer`  | comparison of robot height and clearance along each vertex normal | ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |
 | **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
 | **BorderLayer** | `mesh_layers/BorderLayer` | give vertices close to the border a certain cost | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer")   |
+| **ObstacleLayer**   | `mesh_layers/ObstacleLayer`   | marks vertices blocked by dynamic obstacles as lethal. Cost layer (left) and gazebo sim with unmapped obstacle (right) | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
 
 ## Planners
 Currently the following planners are available:
