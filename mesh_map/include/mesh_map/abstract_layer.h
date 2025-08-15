@@ -42,8 +42,6 @@
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <rclcpp/node.hpp>
 
-#include <mesh_map/mesh_map.h>
-
 #ifndef MESH_MAP__ABSTRACT_LAYER_H
 #define MESH_MAP__ABSTRACT_LAYER_H
 namespace mesh_map
@@ -53,7 +51,7 @@ class MeshMap;
 typedef lvr2::BaseVector<float> Vector;
 typedef lvr2::Normal<float> Normal;
 
-typedef std::function<void(const std::string&)> notify_func;
+typedef std::function<void(const std::string&, const rclcpp::Time&, const std::set<lvr2::VertexHandle>&)> notify_func;
 
 class AbstractLayer
 {
@@ -99,21 +97,28 @@ public:
    * in the map, the mesh_map will use the default value from threshold().
    * @return a vertex map containing floats.
    */
-  virtual lvr2::VertexMap<float>& costs() = 0;
+  virtual const lvr2::VertexMap<float>& costs() = 0;
 
   /**
    * @brief Returns a set of vertex handles which are associated with "lethal" obstacles.
    * @return set of vertex handles which are associated with lethal obstalces.
    */
-  virtual std::set<lvr2::VertexHandle>& lethals() = 0;
-
+  virtual const std::set<lvr2::VertexHandle>& lethals() = 0;
+  
   /**
-   * @brief Called by the mesh map if another previously processed layer triggers an update.
-   * @param added_lethal    The "lethal" obstacle vertex handles which are new with respect to the previous call.
-   * @param removed_lethal  Old "lethal" obstacle vertex handles, i.e. vertices which are no "lethal" obstacles anymore.
+   *  @brief Called by the mesh map if one of the input layers has changed.
+   *
+   *  Implement this callback to be notified when an input layer changed.
+   *
+   *  @param timestamp  The timestamp of when the change was triggered.
+   *                    Layers whose updateInput() function was called should pass this timestamp on to their notifyChange() call.
+   *  @param changed    The vertices whose cost has changed in one of the input layers.
    */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                            std::set<lvr2::VertexHandle>& removed_lethal) = 0;
+  virtual void onInputChanged(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
+  {
+    (void) timestamp;
+    (void) changed;
+  }
 
   /**
    * @brief Optional method if the layer computes vectors. Computes a vector within a triangle using barycentric coordinates.
@@ -124,6 +129,8 @@ public:
   virtual lvr2::BaseVector<float> vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                            const std::array<float, 3>& barycentric_coords)
   {
+    (void) vertices;
+    (void) barycentric_coords;
     return lvr2::BaseVector<float>();
   }
 
@@ -144,6 +151,7 @@ public:
    */
   virtual lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex)
   {
+    (void) vertex;
     return lvr2::BaseVector<float>();
   }
 
@@ -156,25 +164,92 @@ public:
     std::shared_ptr<mesh_map::MeshMap> map,
     const rclcpp::Node::SharedPtr node);
 
-  void notifyChange()
+  /**
+   *  @brief Aquire a read lock on the layer to prevent changes while reading.
+   *
+   *  Before reading data from a layer a readLock *must* be aquired to prevent
+   *  raceconditions through parallel changes.
+   */
+  [[nodiscard]] std::shared_lock<std::shared_mutex> readLock()
   {
-    this->notify_(layer_name_);
+    return std::shared_lock(mutex_);
   }
 
+  /**
+   *  @brief The weight to use when combining this layer with others.
+   */
   inline float combinationWeight() const
   {
     return combination_weight_;
   }
 
+  /**
+   *  @brief Get the layer's name
+   */
+  inline const std::string& name() const
+  {
+    return layer_name_;
+  }
+
 protected:
+
+  /**
+   *  @brief Notfiy the MeshMap and other Layers of a change in this layer.
+   *
+   *  The use of this overload is discouraged use \ref notifyChange(const rclcpp::Time&, const std::set<lvr2::VertexHandle>&) instead.
+   */
+  void notifyChange()
+  {
+    std::set<lvr2::VertexHandle> changed;
+    for (const auto& v: costs())
+    {
+      changed.insert(v);
+    }
+    this->notifyChange(node_->get_clock()->now(), changed);
+  }
+
+  /**
+   *  @brief Notfiy the MeshMap and other Layers of a change in this layer.
+   *
+   *  The timestamp indicates the time for which the map update is valid.
+   *  If an update is triggered by a sensor message e.g. a PointCloud, the layer/map
+   *  is up to date to the time of the measurement acquisition.
+   *
+   *  @param timestamp The timestamp of the update
+   *  @param changed The vertices whose costs have changed
+   */
+  void notifyChange(const rclcpp::Time& timestamp, const std::set<lvr2::VertexHandle>& changed)
+  {
+    this->notify_(layer_name_, timestamp, changed);
+  }
+
+  /**
+   *  @brief Aquire a write lock on the layer to prevent simultaneaus reads or writes.
+   *
+   *  Before making any changes to the layer a write lock *must* be aquired!
+   *  This is to prevent parallel reads and writes
+   */
+  [[nodiscard]] std::unique_lock<std::shared_mutex> writeLock()
+  {
+    return std::unique_lock(mutex_);
+  }
 
   /**
    * @brief Initializes a custom layer plugin and is invoked at the end of the abstract layer's initialization.
    */
   virtual bool initialize() = 0;
 
+  /**
+   *  @brief Get the layer specific logger (mesh_map.layer_name)
+   */
+  const rclcpp::Logger& get_logger() const
+  {
+    return logger_;
+  }
+
   std::string layer_name_;
-  std::shared_ptr<mesh_map::MeshMap> map_ptr_;
+  // Use weak ptr here to prevent cyclic shared ptrs map -> layer -> map
+  std::weak_ptr<mesh_map::MeshMap> map_ptr_;
 
   rclcpp::Node::SharedPtr node_;
   std::string layer_namespace_;
@@ -197,6 +272,12 @@ private:
     const std::vector<rclcpp::Parameter>& parameters);
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+
+  //! Mutex to protect against concurrent reads and writes
+  std::shared_mutex mutex_;
+  
+  // Logger will be replaced by the init function
+  rclcpp::Logger logger_ = rclcpp::get_logger("abstract_layer");
 };
 
 } /* namespace mesh_map */

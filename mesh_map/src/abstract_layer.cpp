@@ -36,6 +36,7 @@
  */
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/mesh_map.h>
 
 namespace mesh_map
 {
@@ -87,6 +88,7 @@ bool AbstractLayer::initialize(
   layer_namespace_ = "mesh_map/" + name;
   notify_ = notify_update;
   map_ptr_ = map;
+  logger_ = node->get_logger().get_child(layer_name_);
 
   declare_parameters();
   dyn_params_handler_ = node_->add_on_set_parameters_callback(std::bind(&AbstractLayer::reconfigureCallback, this, std::placeholders::_1));

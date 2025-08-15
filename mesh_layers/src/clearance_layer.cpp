@@ -36,6 +36,7 @@
  */
 
 #include "mesh_layers/clearance_layer.h"
+#include <mesh_map/mesh_map.h>
 
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
@@ -47,12 +48,14 @@ namespace mesh_layers
 {
 bool ClearanceLayer::readLayer()
 {
-  RCLCPP_INFO(node_->get_logger(), "Try to read '%s' from map file...", layer_name_.c_str());
-  auto clearance_opt = map_ptr_->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
+  RCLCPP_INFO(get_logger(), "Try to read '%s' from map file...", layer_name_.c_str());
+  // Since this is called by the map we do not need to check if this is successful
+  const auto map = map_ptr_.lock();
+  auto clearance_opt = map->meshIO()->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
 
   if (clearance_opt)
   {
-    RCLCPP_INFO(node_->get_logger(), "'%s' has been read successfully.", layer_name_.c_str());
+    RCLCPP_INFO(get_logger(), "'%s' has been read successfully.", layer_name_.c_str());
     clearance_ = clearance_opt.get();
 
     return computeLethalsAndCosts();
@@ -63,7 +66,7 @@ bool ClearanceLayer::readLayer()
 
 bool ClearanceLayer::computeLethalsAndCosts()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Compute lethals for '" << layer_name_ << "' (Clearance Layer) with robot_height " << config_.robot_height << " and height_inflation " << config_.height_inflation);
+  RCLCPP_INFO_STREAM(get_logger(), "Compute lethals for '" << layer_name_ << "' (Clearance Layer) with robot_height " << config_.robot_height << " and height_inflation " << config_.height_inflation);
   lethal_vertices_.clear();
   costs_.clear();
 
@@ -91,21 +94,22 @@ bool ClearanceLayer::computeLethalsAndCosts()
       costs_.insert(vH, 0.0);
     }
   }
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
+  RCLCPP_INFO_STREAM(get_logger(), "Found " << lethal_vertices_.size() << " lethal vertices.");
   return true;
 }
 
 bool ClearanceLayer::writeLayer()
 {
-  RCLCPP_INFO(node_->get_logger(), "Saving '%s' to map file...", layer_name_.c_str());
-  if (map_ptr_->meshIO()->addDenseAttributeMap(clearance_, layer_name_))
+  RCLCPP_INFO(get_logger(), "Saving '%s' to map file...", layer_name_.c_str());
+  const auto map = map_ptr_.lock();
+  if (map->meshIO()->addDenseAttributeMap(clearance_, layer_name_))
   {
-    RCLCPP_INFO(node_->get_logger(), "Saved '%s' to map file.", layer_name_.c_str());
+    RCLCPP_INFO(get_logger(), "Saved '%s' to map file.", layer_name_.c_str());
     return true;
   }
   else
   {
-    RCLCPP_ERROR(node_->get_logger(), "Could not save '%s' to map file!", layer_name_.c_str());
+    RCLCPP_ERROR(get_logger(), "Could not save '%s' to map file!", layer_name_.c_str());
     return false;
   }
 }
@@ -117,48 +121,49 @@ float ClearanceLayer::threshold()
 
 bool ClearanceLayer::computeLayer()
 {
-  RCLCPP_INFO(node_->get_logger(), "Computing clearance along vertex normals...");
+  RCLCPP_INFO(get_logger(), "Computing clearance along vertex normals...");
+  const auto map = map_ptr_.lock();
 
   // Load vertex normals
   using VertexNormalMap = lvr2::DenseVertexMap<mesh_map::Normal>;
   VertexNormalMap vertex_normals;
-  auto vertex_normals_opt = map_ptr_->meshIO()->getDenseAttributeMap<VertexNormalMap>("vertex_normals");
+  auto vertex_normals_opt = map->meshIO()->getDenseAttributeMap<VertexNormalMap>("vertex_normals");
 
   if (vertex_normals_opt)
   {
-    RCLCPP_INFO(node_->get_logger(), "Using vertex normals from map file");
+    RCLCPP_INFO(get_logger(), "Using vertex normals from map file");
     vertex_normals = vertex_normals_opt.value();
   }
   else
   {
-    RCLCPP_INFO(node_->get_logger(), "No vertex normals in map file!");
+    RCLCPP_INFO(get_logger(), "No vertex normals in map file!");
 
     // Load or calculate face normals
     using FaceNormalMap = lvr2::DenseFaceMap<mesh_map::Normal>;
     FaceNormalMap face_normals;
-    auto face_normals_opt = map_ptr_->meshIO()->getDenseAttributeMap<FaceNormalMap>("face_normals");
+    auto face_normals_opt = map->meshIO()->getDenseAttributeMap<FaceNormalMap>("face_normals");
     if (face_normals_opt)
     {
-      RCLCPP_INFO(node_->get_logger(), "Using face normals from map file");
+      RCLCPP_INFO(get_logger(), "Using face normals from map file");
       face_normals = face_normals_opt.value();
     }
     else
     {
-      RCLCPP_INFO(node_->get_logger(), "Calculating face normals");
-      face_normals = lvr2::calcFaceNormals(*map_ptr_->mesh());
+      RCLCPP_INFO(get_logger(), "Calculating face normals");
+      face_normals = lvr2::calcFaceNormals(*map->mesh());
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Calculating vertex normals");
-    VertexNormalMap vertex_normals = lvr2::calcVertexNormals(*map_ptr_->mesh(), face_normals);
+    RCLCPP_INFO(get_logger(), "Calculating vertex normals");
+    VertexNormalMap vertex_normals = lvr2::calcVertexNormals(*map->mesh(), face_normals);
   }
 
   // Finally calculate the clearance layer
-  clearance_ = lvr2::calcNormalClearance(*map_ptr_->mesh(), vertex_normals);
+  clearance_ = lvr2::calcNormalClearance(*map->mesh(), vertex_normals);
 
   return computeLethalsAndCosts();
 }
 
-lvr2::VertexMap<float>& ClearanceLayer::costs()
+const lvr2::VertexMap<float>& ClearanceLayer::costs()
 {
   return costs_;
 }
@@ -180,7 +185,7 @@ rcl_interfaces::msg::SetParametersResult ClearanceLayer::reconfigureCallback(std
   }
 
   if (needs_cost_recompute) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Recompute costs and notify change from " << layer_name_ << " due to cfg change.");
+    RCLCPP_INFO_STREAM(get_logger(), "Recompute costs and notify change from " << layer_name_ << " due to cfg change.");
     computeLethalsAndCosts();
     notifyChange();
   }

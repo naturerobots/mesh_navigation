@@ -64,6 +64,13 @@ typedef lvr2::BaseVector<float> Vector;
 lvr2::MeshBufferPtr extractMeshByName(const aiScene* ascene, std::string name);
 
 /**
+ *  @brief Convert a MeshBuffer color channel to a vertex map
+ *  @param buffer the MeshBuffer to take the colors from
+ *  @retrun Vertex map containing a color for each vertex
+ */
+lvr2::DenseVertexMap<lvr2::RGB8Color> extractColorAttributeMap(const lvr2::MeshBuffer& buffer);
+
+/**
  * @brief Function to build std_msgs color instances
  * @param r red, value between 0 and 1
  * @param g green, value between 0 and 1

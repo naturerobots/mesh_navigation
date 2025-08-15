@@ -36,11 +36,12 @@
  */
 
 #include "mesh_layers/inflation_layer.h"
+#include <mesh_map/mesh_map.h>
 
-#include <queue>
 #include <lvr2/util/Meap.hpp>
 #include <pluginlib/class_list_macros.hpp>
 #include <mesh_map/util.h>
+#include <mesh_map/timer.h>
 
 PLUGINLIB_EXPORT_CLASS(mesh_layers::InflationLayer, mesh_map::AbstractLayer);
 
@@ -48,13 +49,16 @@ namespace mesh_layers
 {
 bool InflationLayer::readLayer()
 {
+  return false;
+  // Since this is called by the map we do not need to check if this is successful
+  const auto map = map_ptr_.lock();
   // riskiness
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Try to read riskiness from map file...");
-  auto mesh_io = map_ptr_->meshIO();
+  RCLCPP_INFO_STREAM(get_logger(), "Try to read riskiness from map file...");
+  auto mesh_io = map->meshIO();
   auto riskiness_opt = mesh_io->getDenseAttributeMap<lvr2::DenseVertexMap<float>>(layer_name_);
   if (riskiness_opt)
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Riskiness has been read successfully.");
+    RCLCPP_INFO_STREAM(get_logger(), "Riskiness has been read successfully.");
     riskiness_ = riskiness_opt.get();
     return true;
   }
@@ -66,17 +70,19 @@ bool InflationLayer::readLayer()
 
 bool InflationLayer::writeLayer()
 {
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Saving " << riskiness_.numValues() << " riskiness values to map file...");
+  RCLCPP_INFO_STREAM(get_logger(), "Saving " << riskiness_.numValues() << " riskiness values to map file...");
+  // Since this is called by the map we do not need to check if this is successful
+  const auto map = map_ptr_.lock();
 
-  auto mesh_io = map_ptr_->meshIO();
+  auto mesh_io = map->meshIO();
   if (mesh_io->addDenseAttributeMap(riskiness_, layer_name_))
   {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Saved riskiness to map file.");
+    RCLCPP_INFO_STREAM(get_logger(), "Saved riskiness to map file.");
     return true;
   }
   else
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not save riskiness to map file!");
+    RCLCPP_ERROR_STREAM(get_logger(), "Could not save riskiness to map file!");
     return false;
   }
 }
@@ -86,18 +92,96 @@ float InflationLayer::threshold()
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-void InflationLayer::updateLethal(std::set<lvr2::VertexHandle>& added_lethal,
-                                  std::set<lvr2::VertexHandle>& removed_lethal)
-{
-  lethal_vertices_ = added_lethal;
 
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Update lethal for inflation layer.");
-  waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value,
-                    std::numeric_limits<float>::infinity());
+void InflationLayer::onInputChanged(
+  const rclcpp::Time& timestamp,
+  const std::set<lvr2::VertexHandle>& changed
+)
+{
+  const mesh_map::LayerTimer::TimePoint t0 = mesh_map::LayerTimer::Clock::now();
+  const std::vector<std::string> inputs = node_->get_parameter(
+    mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inputs"
+  ).as_string_array();
+
+  if (inputs.size() != 1)
+  {
+    RCLCPP_ERROR(get_logger(), "Exactly one input layer is required!");
+    return;
+  }
+
+  auto map = map_ptr_.lock();
+  if (nullptr == map)
+  {
+    RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() map in onInputChanged()!");
+    return;
+  }
+
+  const auto input = map->layer(inputs[0]);
+  if (nullptr == input)
+  {
+    RCLCPP_ERROR(get_logger(), "Could not get layer '%s' from map!", inputs[0].c_str());
+    return;
+  }
+
+  // Copy lethal vertices of base layer
+  mesh_map::LayerTimer::TimePoint t1 = mesh_map::LayerTimer::Clock::now();
+  std::set<lvr2::VertexHandle> lethals;
+  {
+    const auto input_lock = input->readLock();
+    t1 = mesh_map::LayerTimer::Clock::now();
+    lethals = input->lethals();
+  }
+
+  // TODO: waveCostInflation uses the instance buffer to store distances and is
+  // therefore not thread safe! We protect the public state (riskiness_, vector_map_
+  // and lethals) against concurrent access but not waveCostInflation. We could
+  // use another mutex to allow only one thread to enter this updateChanged method
+  // and allocate all used buffers in the class (new_costs, new_vectors)
+  lvr2::DenseVertexMap<float> new_costs;
+  lvr2::DenseVertexMap<mesh_map::Vector> new_vectors;
+  waveCostInflation(
+    lethals,
+    new_costs,
+    new_vectors,
+    config_.inflation_radius,
+    config_.inscribed_radius,
+    config_.inscribed_value,
+    config_.lethal_value
+  );
+
+  // Figure out which vertices changed their costs
+  std::set<lvr2::VertexHandle> update;
+  {
+    const auto rlock = this->readLock();
+    for (const lvr2::VertexHandle& v: new_costs)
+    {
+      update.insert(v);
+    }
+    for (const lvr2::VertexHandle& v: riskiness_)
+    {
+      update.insert(v);
+    }
+  }
+
+  // Update the public state
+  {
+    const auto wlock = this->writeLock();
+    lethal_vertices_ = std::move(lethals);
+    riskiness_ = std::move(new_costs);
+    vector_map_ = std::move(new_vectors);
+  }
+
+  const mesh_map::LayerTimer::TimePoint t2 = mesh_map::LayerTimer::Clock::now();
+  this->notifyChange(timestamp, update);
+  const mesh_map::LayerTimer::TimePoint t3 = mesh_map::LayerTimer::Clock::now();
+  mesh_map::LayerTimer::recordUpdateDuration(layer_name_, timestamp, t1 - t0, t2 - t1, t3 - t2);
 }
 
-inline float InflationLayer::computeUpdateSethianMethod(const float& d1, const float& d2, const float& a,
-                                                        const float& b, const float& dot, const float& F)
+inline float InflationLayer::computeUpdateSethianMethod(
+  const float& d1, const float& d2,
+  const float& a, const float& b,
+  const float& dot, const float& F
+) const
 {
   float t = std::numeric_limits<float>::infinity();
   float r_cos_angle = dot;
@@ -148,32 +232,36 @@ inline float InflationLayer::computeUpdateSethianMethod(const float& d1, const f
   }
 }
 
-inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distances_,
-                                            lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
-                                            const float& max_distance, const lvr2::DenseEdgeMap<float>& edge_weights,
-                                            const lvr2::FaceHandle& fh, const lvr2::BaseVector<float>& normal,
-                                            const lvr2::VertexHandle& v1h, const lvr2::VertexHandle& v2h,
-                                            const lvr2::VertexHandle& v3h)
+bool InflationLayer::waveFrontUpdate(
+  const lvr2::PMPMesh<mesh_map::Vector>& mesh,
+  lvr2::DenseVertexMap<float>& distances,
+  lvr2::DenseVertexMap<mesh_map::Vector>& vector_map,
+  const float& max_distance,
+  const lvr2::DenseEdgeMap<float>& edge_weights,
+  const lvr2::VertexHandle& v1h,
+  const lvr2::VertexHandle& v2h,
+  const lvr2::VertexHandle& v3h
+) const
 {
-  const auto mesh = map_ptr_->mesh();
-
-  const double u1 = distances_[v1h];
-  const double u2 = distances_[v2h];
-  const double u3 = distances_[v3h];
+  const float inf = INFINITY;
+  const float u1 = std::as_const(distances).get(v1h).value_or(inf);
+  const float u2 = std::as_const(distances).get(v2h).value_or(inf);
+  const float u3 = std::as_const(distances).get(v3h).value_or(inf);
 
   if (u3 == 0)
     return false;
 
-  const lvr2::OptionalEdgeHandle e12h = mesh->getEdgeBetween(v1h, v2h);
-  const float c = edge_weights[e12h.unwrap()];
+  const lvr2::OptionalEdgeHandle e12h = mesh.getEdgeBetween(v1h, v2h);
+  const lvr2::OptionalEdgeHandle e13h = mesh.getEdgeBetween(v1h, v3h);
+  const lvr2::OptionalEdgeHandle e23h = mesh.getEdgeBetween(v2h, v3h);
+
+  const float c = edge_weights.get(e12h.unwrap()).value_or(inf);
   const float c_sq = c * c;
 
-  const lvr2::OptionalEdgeHandle e13h = mesh->getEdgeBetween(v1h, v3h);
-  const float b = edge_weights[e13h.unwrap()];
+  const float b = edge_weights.get(e13h.unwrap()).value_or(inf);
   const float b_sq = b * b;
 
-  const lvr2::OptionalEdgeHandle e23h = mesh->getEdgeBetween(v2h, v3h);
-  const float a = edge_weights[e23h.unwrap()];
+  const float a = edge_weights.get(e23h.unwrap()).value_or(inf);
   const float a_sq = a * a;
 
   float dot = (a_sq + b_sq - c_sq) / (2 * a * b);
@@ -187,40 +275,37 @@ inline bool InflationLayer::waveFrontUpdate(lvr2::DenseVertexMap<float>& distanc
 
   if (u1 == 0 && u2 == 0)
   {
-    const auto& v1 = mesh->getVertexPosition(v1h);
-    const auto& v2 = mesh->getVertexPosition(v2h);
-    const auto& v3 = mesh->getVertexPosition(v3h);
+    const auto& v1 = mesh.getVertexPosition(v1h);
+    const auto& v2 = mesh.getVertexPosition(v2h);
+    const auto& v3 = mesh.getVertexPosition(v3h);
     const auto& dir = ((v3 - v2) + (v3 - v1)).normalized();
-    const auto& face_normals = map_ptr_->faceNormals();
-    cutting_faces_.insert(v1h, fh);
-    cutting_faces_.insert(v2h, fh);
-    cutting_faces_.insert(v3h, fh);
-    vector_map_[v1h] = (vector_map_[v1h] + dir).normalized();
-    vector_map_[v2h] = (vector_map_[v2h] + dir).normalized();
-    //vector_map_[v3h] = (vector_map_[v1h] * d31 + vector_map[v2h] * d32).normalized();
-    vector_map_[v3h] = (vector_map_[v3h] + dir).normalized();
+
+    // Declaring the zero vector is necessary because boost cannot
+    // bind rvalue references to lvalue references. The std::as_const is
+    // necessary to call the const overload of lvr2::AttributeMap::get()
+    // otherwise the zero vector would have to be mutable.
+    // This is all due to the boost's support for optional types containing references!
+    // Also the lvr2 maps do not provide a const get overload with provided default value
+    // e.g.: vector_map.get(v1h, Vector()) <-- this would be much nicer to write and read;
+    const mesh_map::Vector zero;
+    vector_map.insert(v1h, (std::as_const(vector_map).get(v1h).value_or(zero) + dir).normalized());
+    vector_map.insert(v2h, (std::as_const(vector_map).get(v2h).value_or(zero) + dir).normalized());
+    vector_map.insert(v3h, (std::as_const(vector_map).get(v3h).value_or(zero) + dir).normalized());
   }
 
   if (u3tmp < u3)
   {
-    distances_[v3h] = static_cast<float>(u3tmp);
+    distances.insert(v3h, static_cast<float>(u3tmp));
 
     if (u1 != 0 || u2 != 0)
     {
-      cutting_faces_.insert(v3h, fh);
-      vector_map_[v3h] = (vector_map_[v1h] * d31 + vector_map_[v2h] * d32).normalized();
+      // The zero vector is needed for the same reason as above
+      const mesh_map::Vector zero;
+      const mesh_map::Vector& vec_a = std::as_const(vector_map).get(v1h).value_or(zero);
+      const mesh_map::Vector& vec_b = std::as_const(vector_map).get(v2h).value_or(zero);
+      vector_map.insert(v3h, (vec_a * d31 + vec_b * d32).normalized());
     }
 
-    if (d31 < d32)
-    {
-      predecessors.insert(v3h, v1h);
-    }
-    else  // right face check
-    {
-      predecessors.insert(v3h, v2h);
-    }
-
-    // backToSource(v3h, predecessors, vector_map);
     return u1 <= max_distance && u2 <= max_distance;
   }
   return false;
@@ -254,184 +339,168 @@ float InflationLayer::fading(const float squared_distance)
   return config_.lethal_value;
 }
 
-void InflationLayer::waveCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
-                                       const float inscribed_radius, const float inscribed_value,
-                                       const float lethal_value)
+void InflationLayer::waveCostInflation(
+  const std::set<lvr2::VertexHandle>& lethals,
+  lvr2::DenseVertexMap<float>& cost_out,
+  lvr2::DenseVertexMap<mesh_map::Vector>& vector_out,
+  const float inflation_radius,
+  const float inscribed_radius,
+  const float inscribed_value,
+  const float lethal_value
+)
 {
-  if (map_ptr_->mesh())
+  const auto map = map_ptr_.lock();
+  if (nullptr == map)
   {
-    // auto const& mesh = *map_ptr_->mesh();
-    const auto mesh = map_ptr_->mesh();
+    RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() the map in waveCostInflation()!");
+    return;
+  }
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "inflation radius:" << inflation_radius);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Init wave inflation.");
+  if (nullptr == map->mesh())
+  {
+    RCLCPP_ERROR(get_logger(), "Cannot init wave inflation: mesh_ptr points to null");
+    return;
+  }
 
-    lvr2::DenseVertexMap<bool> seen(mesh->nextVertexIndex(), false);
-    distances_ = lvr2::DenseVertexMap<float>(mesh->nextVertexIndex(), std::numeric_limits<float>::infinity());
-    lvr2::DenseVertexMap<lvr2::VertexHandle> predecessors;
-    predecessors.reserve(mesh->nextVertexIndex());
+  // The LVR2 PMP wrapper
+  const auto mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
+  if (nullptr == mesh)
+  {
+    RCLCPP_ERROR(get_logger(), "Failed to dynamic_cast mesh to lvr2::PMPMesh! Currently only the lvr2::PMPMesh backend is supported!");
+    return;
+  }
 
-    vector_map_ = lvr2::DenseVertexMap<lvr2::BaseVector<float>>(mesh->nextVertexIndex(), lvr2::BaseVector<float>());
+  // The PMP half-edge-mesh datastructure
+  const pmp::SurfaceMesh& pmp_mesh = mesh->getSurfaceMesh();
 
-    direction_ = lvr2::DenseVertexMap<float>();
+  RCLCPP_DEBUG(get_logger(), "Inflation radius: %f", config_.inflation_radius);
+  RCLCPP_DEBUG(get_logger(), "Lethals: %lu", lethals.size());
 
-    const auto& edge_distances = map_ptr_->edgeDistances();
-    const auto& face_normals = map_ptr_->faceNormals();
+  // Buffer is allocated in the class to prevent unnecessary reallocations
+  distances_.reserve(mesh->nextVertexIndex());
+  cost_out.reserve(mesh->nextVertexIndex());
+  vector_out.reserve(mesh->nextVertexIndex());
 
-    lvr2::DenseVertexMap<bool> fixed(mesh->nextVertexIndex(), false);
+  const auto& edge_distances = map->edgeDistances();
+  const auto& face_normals = map->faceNormals();
 
-    // initialize distances with infinity
-    // initialize predecessor of each vertex with itself
-    for (auto const& vH : mesh->vertices())
+  lvr2::DenseVertexMap<bool> fixed(mesh->nextVertexIndex(), false);
+
+  // Clear the distances map
+  distances_.clear();
+
+  // Clear the vectors map
+  vector_out.clear();
+
+  lvr2::Meap<lvr2::VertexHandle, float> pq;
+  // Set start distance to zero
+  // add start vertex to priority queue
+  for (auto vH : lethals)
+  {
+    distances_.insert(vH, 0.0);
+    fixed[vH] = true;
+    pq.insert(vH, 0);
+  }
+
+  RCLCPP_DEBUG(get_logger(), "Initialized wave inflation");
+  RCLCPP_DEBUG(get_logger(), "Starting inflation wave front propagation");
+
+  while (!pq.isEmpty())
+  {
+    lvr2::VertexHandle current_vh = pq.popMin().key();
+    auto _t1 = std::chrono::steady_clock::now();
+    
+    if (current_vh.idx() >= mesh->nextVertexIndex())
     {
-      predecessors.insert(vH, vH);
+      continue;
     }
 
-    lvr2::Meap<lvr2::VertexHandle, float> pq;
-    // Set start distance to zero
-    // add start vertex to priority queue
-    for (auto vH : lethals)
+    if (map->invalid[current_vh])
+      continue;
+
+    // check if already fixed
+    // if(fixed[current_vh]) continue;
+    fixed[current_vh] = true;
+    for (const auto nh : pmp_mesh.vertices(current_vh))
     {
-      distances_[vH] = 0;
-      fixed[vH] = true;
-      pq.insert(vH, 0);
-    }
-
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Start inflation wave front propagation");
-
-    while (!pq.isEmpty())
-    {
-      lvr2::VertexHandle current_vh = pq.popMin().key();
-
-      if (current_vh.idx() >= map_ptr_->mesh()->nextVertexIndex())
+      // Current VH is now fixed, check if we can update the neighbours via one of the common faces
+      const pmp::Halfedge halfedge = pmp_mesh.find_halfedge(current_vh, nh);
+      for (const auto fh : {pmp_mesh.face(halfedge), pmp_mesh.face(halfedge.opposite())})
       {
-        continue;
-      }
-
-      if (map_ptr_->invalid[current_vh])
-        continue;
-      // check if already fixed
-      // if(fixed[current_vh]) continue;
-      fixed[current_vh] = true;
-
-      std::vector<lvr2::VertexHandle> neighbours;
-      try
-      {
-        mesh->getNeighboursOfVertex(current_vh, neighbours);
-      }
-      catch (lvr2::PanicException exception)
-      {
-        map_ptr_->invalid.insert(current_vh, true);
-        continue;
-      }
-      catch (lvr2::VertexLoopException exception)
-      {
-        map_ptr_->invalid.insert(current_vh, true);
-        continue;
-      }
-
-      for (auto nh : neighbours)
-      {
-        std::vector<lvr2::FaceHandle> faces;
-        try
+        if (!fh.is_valid())
         {
-          mesh->getFacesOfVertex(nh, faces);
-        }
-        catch (lvr2::PanicException exception)
-        {
-          map_ptr_->invalid.insert(nh, true);
           continue;
         }
+        // Using the pmp::VertexAroundFaceCirculator is slower here because it builds
+        // an internal unordered set to detect loops. We know that the mesh must be a
+        // valid triangle mesh, therefore we can to this ourselves
+        pmp::Halfedge half_edge_handle = pmp_mesh.halfedge(fh);
+        const lvr2::VertexHandle& a = pmp_mesh.to_vertex(half_edge_handle);
+        half_edge_handle = pmp_mesh.next_halfedge(half_edge_handle);
+        const lvr2::VertexHandle& b = pmp_mesh.to_vertex(half_edge_handle);
+        half_edge_handle = pmp_mesh.next_halfedge(half_edge_handle);
+        const lvr2::VertexHandle& c = pmp_mesh.to_vertex(half_edge_handle);
 
-        for (auto fh : faces)
+        if (fixed[a] && fixed[b] && fixed[c])
         {
-          const auto vertices = mesh->getVerticesOfFace(fh);
-          const lvr2::VertexHandle& a = vertices[0];
-          const lvr2::VertexHandle& b = vertices[1];
-          const lvr2::VertexHandle& c = vertices[2];
-
-          try
+          continue;
+        }
+        else if (fixed[a] && fixed[b] && !fixed[c])
+        {
+          // c is free
+          if (waveFrontUpdate(*mesh, distances_, vector_out, config_.inflation_radius, edge_distances, a, b, c))
           {
-            if (fixed[a] && fixed[b] && fixed[c])
-            {
-              // RCLCPP_INFO_STREAM(node_->get_logger(), "All fixed!");
-              continue;
-            }
-            else if (fixed[a] && fixed[b] && !fixed[c])
-            {
-              // c is free
-              if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], a, b,
-                                  c))
-              {
-                pq.insert(c, distances_[c]);
-              }
-              // if(pq.containsKey(c)) pq.updateValue(c, distances[c]);
-            }
-            else if (fixed[a] && !fixed[b] && fixed[c])
-            {
-              // b is free
-              if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], c, a,
-                                  b))
-              {
-                pq.insert(b, distances_[b]);
-              }
-              // if(pq.containsKey(b)) pq.updateValue(b, distances[b]);
-            }
-            else if (!fixed[a] && fixed[b] && fixed[c])
-            {
-              // a if free
-              if (waveFrontUpdate(distances_, predecessors, inflation_radius, edge_distances, fh, face_normals[fh], b, c,
-                                  a))
-              {
-                pq.insert(a, distances_[a]);
-              }
-              // if(pq.containsKey(a)) pq.updateValue(a, distances[a]);
-            }
-            else
-            {
-              // two free vertices -> skip that face
-              // RCLCPP_INFO_STREAM(node_->get_logger(), "two vertices are free.");
-              continue;
-            }
+            pq.insert(c, distances_[c]);
           }
-          catch (lvr2::PanicException exception)
+        }
+        else if (fixed[a] && !fixed[b] && fixed[c])
+        {
+          // b is free
+          if (waveFrontUpdate(*mesh, distances_, vector_out, config_.inflation_radius, edge_distances, c, a, b))
           {
-            map_ptr_->invalid.insert(nh, true);
+            pq.insert(b, distances_[b]);
           }
-          catch (lvr2::VertexLoopException exception)
+        }
+        else if (!fixed[a] && fixed[b] && fixed[c])
+        {
+          // a if free
+          if (waveFrontUpdate(*mesh, distances_, vector_out, config_.inflation_radius, edge_distances, b, c, a))
           {
-            map_ptr_->invalid.insert(nh, true);
+            pq.insert(a, distances_[a]);
           }
+        }
+        else
+        {
+          // two free vertices -> skip that face
+          continue;
         }
       }
     }
-
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Finished inflation wave front propagation.");
-
-    for (auto vH : mesh->vertices())
-    {
-      riskiness_.insert(vH, fading(distances_[vH]));
-    }
-
-    map_ptr_->publishVectorField("inflation", vector_map_, distances_,
-                                std::bind(&InflationLayer::fading, this, std::placeholders::_1));
   }
-  else
+
+  RCLCPP_DEBUG(get_logger(), "Finished inflation wave front propagation.");
+
+  cost_out.reserve(mesh->nextVertexIndex());
+  cost_out.clear();
+  for (auto vH : distances_)
   {
-    RCLCPP_ERROR_STREAM(node_->get_logger(), "Cannot init wave inflation: mesh_ptr points to null");
+    if (!std::isinf(distances_[vH]))
+    {
+      cost_out.insert(vH, fading(distances_[vH]));
+    }
   }
 }
 
-lvr2::BaseVector<float> InflationLayer::vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
+mesh_map::Vector InflationLayer::vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                                  const std::array<float, 3>& barycentric_coords)
 {
   if (!config_.repulsive_field)
-    return lvr2::BaseVector<float>();
+    return mesh_map::Vector();
 
   const float distance = mesh_map::linearCombineBarycentricCoords(vertices, distances_, barycentric_coords);
 
   if (distance > config_.inflation_radius)
-    return lvr2::BaseVector<float>();
+    return mesh_map::Vector();
 
   // Inflation radius
   if (distance > config_.inscribed_radius)
@@ -452,13 +521,13 @@ lvr2::BaseVector<float> InflationLayer::vectorAt(const std::array<lvr2::VertexHa
   return mesh_map::linearCombineBarycentricCoords(vertices, vector_map_, barycentric_coords) * config_.lethal_value;
 }
 
-lvr2::BaseVector<float> InflationLayer::vectorAt(const lvr2::VertexHandle& vH)
+mesh_map::Vector InflationLayer::vectorAt(const lvr2::VertexHandle& vH)
 {
   if (!config_.repulsive_field)
-    return lvr2::BaseVector<float>();
+    return mesh_map::Vector();
 
   float distance = 0;
-  lvr2::BaseVector<float> vec;
+  mesh_map::Vector vec;
 
   auto dist_opt = distances_.get(vH);
   auto vector_opt = vector_map_.get(vH);
@@ -492,39 +561,42 @@ lvr2::BaseVector<float> InflationLayer::vectorAt(const lvr2::VertexHandle& vH)
   return vec * config_.lethal_value;
 }
 
-void InflationLayer::backToSource(const lvr2::VertexHandle& current_vertex,
-                                  const lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
-                                  lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map)
-{
-  const auto mesh = map_ptr_->mesh();
-
-  if (vector_map.containsKey(current_vertex))
-    return;
-
-  const auto& pre = predecessors[current_vertex];
-
-  if (pre != current_vertex)
-  {
-    backToSource(pre, predecessors, vector_map);
-    const auto& v0 = mesh->getVertexPosition(current_vertex);
-    const auto& v1 = mesh->getVertexPosition(pre);
-    vector_map.insert(current_vertex, v1 - v0 + vector_map[pre]);
-  }
-  else
-  {
-    vector_map.insert(current_vertex, lvr2::BaseVector<float>());
-  }
-}
-
 bool InflationLayer::computeLayer()
 {
-  waveCostInflation(lethal_vertices_, config_.inflation_radius,
-                      config_.inscribed_radius, config_.inscribed_value,
-                      std::numeric_limits<float>::infinity());
+  const std::vector<std::string> inputs = node_->get_parameter(
+    mesh_map::MeshMap::MESH_MAP_NAMESPACE + "." + layer_name_ + ".inputs"
+  ).as_string_array();
+
+  if (inputs.size() != 1)
+  {
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Exactly one input layer is required!");
+    return false;
+  }
+  
+  const auto map = map_ptr_.lock();
+  const auto input = map->layer(inputs[0]);
+  if (nullptr == input)
+  {
+    RCLCPP_ERROR(get_logger(), "[InflationLayer] Could not get layer '%s' from map!", inputs[0].c_str());
+    return false;
+  }
+  
+  // Copy lethal vertices of base layer
+  lethal_vertices_ = input->lethals();
+  waveCostInflation(
+    lethal_vertices_,
+    riskiness_,
+    vector_map_,
+    config_.inflation_radius,
+    config_.inscribed_radius,
+    config_.inscribed_value,
+    config_.lethal_value
+  );
+
   return true;
 }
 
-lvr2::VertexMap<float>& InflationLayer::costs()
+const lvr2::VertexMap<float>& InflationLayer::costs()
 {
   return riskiness_;
 }
@@ -563,9 +635,31 @@ rcl_interfaces::msg::SetParametersResult InflationLayer::reconfigureCallback(std
 
   if (recompute_inflation_costs)
   {
-    waveCostInflation(lethal_vertices_, config_.inflation_radius, config_.inscribed_radius, config_.inscribed_value, std::numeric_limits<float>::infinity());
-    map_ptr_->publishVectorField("inflation", vector_map_, distances_,
-                                std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
+    {
+      const auto wlock = this->writeLock();
+      waveCostInflation(
+        lethal_vertices_,
+        riskiness_,
+        vector_map_,
+        config_.inflation_radius,
+        config_.inscribed_radius,
+        config_.inscribed_value,
+        config_.lethal_value
+      );
+    }
+    auto map = map_ptr_.lock();
+    if (nullptr == map)
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to weak_ptr::lock() map in reconfigureCallback()");
+      result.successful = false;
+      result.reason = "Failed to weak_ptr::lock() map!";
+      return result;
+    }
+    {
+      const auto rlock = this->readLock();
+      map->publishVectorField("inflation", vector_map_, distances_,
+                              std::bind(&mesh_layers::InflationLayer::fading, this, std::placeholders::_1));
+    }
     RCLCPP_INFO_STREAM(node_->get_logger(), "Inflation layer (name: " << layer_name_ << ") changed due to cfg update.");
     notifyChange();
   }
