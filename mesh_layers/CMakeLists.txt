@@ -25,6 +25,7 @@ add_library(${PROJECT_NAME}
   src/ridge_layer.cpp
   src/clearance_layer.cpp
   src/combination_layer.cpp
+  src/obstacle_layer.cpp
 )
 include_directories(
   include

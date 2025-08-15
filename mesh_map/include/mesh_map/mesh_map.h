@@ -295,6 +295,14 @@ public:
   }
 
   /**
+   * @brief Returns the TF2 Buffer instance
+   */
+  const tf2_ros::Buffer& tf2Buffer()
+  {
+    return tf_buffer;
+  }
+
+  /**
    * @brief Returns the mesh's triangle normals
    */
   const lvr2::DenseFaceMap<Normal>& faceNormals()
