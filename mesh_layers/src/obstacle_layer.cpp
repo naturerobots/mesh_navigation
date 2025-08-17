@@ -1,11 +1,3 @@
-#include <lvr2/geometry/BaseMesh.hpp>
-#include <lvr2/algorithm/FinalizeAlgorithms.hpp>
-#ifdef LVR2_USE_EMBREE
-  #include <lvr2/algorithm/raycasting/EmbreeRaycaster.hpp>
-#else
-  #include <lvr2/algorithm/raycasting/BVHRaycaster.hpp>
-#endif
-
 #include <mesh_layers/obstacle_layer.h>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/timer.h>
@@ -36,25 +28,6 @@ bool ObstacleLayer::initialize()
   RCLCPP_DEBUG(get_logger(), "Initializing 'ObstacleLayer' with name '%s'", name().c_str());
 
   auto map = map_ptr_.lock();
-
-  // Convert the Half-Edge-Mesh to a MeshBuffer
-  // Sadly we cannot use the map->meshIO to get the buffer since the interface
-  // does not support loading to a MeshBuffer (it can only load directly to a HalfEdgeMesh).
-  lvr2::SimpleFinalizer<mesh_map::Vector> fin;
-  auto mesh_buffer = fin.apply(*map->mesh());
-
-  // Create the raycasting acceleration structure
-  // We prefer to use the Embree integration because embree is better optimized
-  // than the native lvr2 implementation and therefore faster.
-#ifdef LVR2_USE_EMBREE
-  RCLCPP_DEBUG(get_logger(), "Building lvr2::EmbreeRaycaster...");
-  raycaster_ = std::make_shared<lvr2::EmbreeRaycaster<IntersectionT>>(mesh_buffer);
-  RCLCPP_DEBUG(get_logger(), "Finished building lvr2::EmbreeRaycaster");
-#else
-  RCLCPP_DEBUG(get_logger(), "Building lvr2::BVHRaycaster...");
-  raycaster_ = std::make_shared<lvr2::BVHRaycaster<IntersectionT>>(mesh_buffer);
-  RCLCPP_DEBUG(get_logger(), "Finished building lvr2::BVHRaycaster");
-#endif
 
   // Read parameters
   {
@@ -144,6 +117,13 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
     return;
   }
 
+  const auto raycaster = map->raycaster();
+  if (nullptr == map)
+  {
+    RCLCPP_ERROR(get_logger(), "Could not get raycasting interface from map! nullptr == raycaster");
+    return;
+  }
+
   mesh_map::LayerTimer::TimePoint t1 = mesh_map::LayerTimer::Clock::now();
 
   // Get transform from message to map frame
@@ -193,7 +173,7 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
   // TODO: Use the robots down axis as projection direction.
   // This requires access to the base_frame parameter of move_base_flex
   std::vector<lvr2::Vector3f> dirs(origins.size(), -lvr2::Vector3f::UnitZ());
-  std::vector<IntersectionT> results(origins.size());
+  std::vector<mesh_map::MeshMap::RayCastResult> results(origins.size());
   std::vector<uint8_t> hits(origins.size());
 
   RCLCPP_DEBUG(
@@ -201,7 +181,7 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
     "Casting %lu rays; Robot height: %f; Max obstacle dist: %f",
     origins.size(), config_.robot_height, config_.max_obstacle_dist
   );
-  raycaster_->castRays(origins, dirs, results, hits);
+  raycaster->castRays(origins, dirs, results, hits);
 
   // Update the lethal vertices and cost map
   // Create new cost map and lethal set

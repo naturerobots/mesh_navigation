@@ -58,6 +58,7 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
+#include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <lvr2/geometry/BaseMesh.hpp>
@@ -72,6 +73,9 @@ class MeshMap : public std::enable_shared_from_this<MeshMap>
 public:
   inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
   typedef std::shared_ptr<MeshMap> Ptr;
+  // NOTE: This defines what data is returned from the shared Raycaster interface.
+  // If some component needs more/different data we can extend this type
+  using RayCastResult = lvr2::Intersection<lvr2::intelem::Distance, lvr2::intelem::Face, lvr2::intelem::Point>;
 
   MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node);
 
@@ -297,9 +301,19 @@ public:
   /**
    * @brief Returns the TF2 Buffer instance
    */
-  const tf2_ros::Buffer& tf2Buffer()
+  const tf2_ros::Buffer& tf2Buffer() const
   {
     return tf_buffer;
+  }
+
+  /**
+   * @brief Return the shared lvr2::RaycasterBase
+   *
+   * This interface allows plugins to cast rays inside the MeshMap.
+   */
+  std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster() const
+  {
+    return raycaster_ptr;
   }
 
   /**
@@ -564,6 +578,9 @@ private:
 
   //! k-d tree to query mesh vertices in logarithmic time
   std::unique_ptr<KDTree> kd_tree_ptr;
+
+  //! Shared Raycasting interface for layers/planners/controllers etc.
+  std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster_ptr;
 };
 
 } /* namespace mesh_map */

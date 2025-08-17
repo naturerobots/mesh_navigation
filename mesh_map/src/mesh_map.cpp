@@ -60,6 +60,13 @@
 #include <lvr2/geometry/HalfEdgeMesh.hpp>
 #include <lvr2/geometry/PMPMesh.hpp>
 
+// Raycaster implementations
+#ifdef LVR2_USE_EMBREE
+  #include <lvr2/algorithm/raycasting/EmbreeRaycaster.hpp>
+#else
+  #include <lvr2/algorithm/raycasting/BVHRaycaster.hpp>
+#endif
+
 #include <mesh_map/abstract_layer.h>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
@@ -320,7 +327,21 @@ bool MeshMap::readMap()
     adaptor_ptr = std::make_unique<NanoFlannMeshAdaptor>(mesh_ptr);
     kd_tree_ptr = std::make_unique<KDTree>(3,*adaptor_ptr, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     kd_tree_ptr->buildIndex();
-    RCLCPP_INFO_STREAM(node->get_logger(), "The k-d tree has been build successfully!");
+    RCLCPP_INFO(node->get_logger(), "Initialized the k-d tree");
+
+    // Create a shared raycasting acceleration data structure
+    // We prefer to use the *embree* integration because *embree* is better optimized
+    // than the native lvr2 implementation and therefore faster.
+#ifdef LVR2_USE_EMBREE
+    RCLCPP_DEBUG(node->get_logger(), "Building lvr2::EmbreeRaycaster...");
+    raycaster_ptr = std::make_shared<lvr2::EmbreeRaycaster<RayCastResult>>(mesh_buffer);
+    RCLCPP_DEBUG(node->get_logger(), "Finished building lvr2::EmbreeRaycaster");
+#else
+    RCLCPP_DEBUG(node->get_logger(), "Building lvr2::BVHRaycaster...");
+    raycaster_ptr = std::make_shared<lvr2::BVHRaycaster<RayCastResult>>(mesh_buffer);
+    RCLCPP_DEBUG(node->get_logger(), "Finished building lvr2::BVHRaycaster");
+#endif
+    RCLCPP_INFO(node->get_logger(), "Initialized the raycasting interface");
   }
   else
   {

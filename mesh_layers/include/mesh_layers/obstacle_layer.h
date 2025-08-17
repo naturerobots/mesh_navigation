@@ -38,7 +38,6 @@
 #ifndef MESH_MAP__OBSTACLE_LAYER_H
 #define MESH_MAP__OBSTACLE_LAYER_H
 
-#include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
 #include <mesh_map/abstract_layer.h>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -134,10 +133,6 @@ private:
   lvr2::SparseVertexMap<float> costs_;
   // The current set of lethal vertices
   std::set<lvr2::VertexHandle> lethals_;
-  // The raycasting result type
-  using IntersectionT = lvr2::Intersection<lvr2::intelem::Face, lvr2::intelem::Distance>;
-  // The Raycasting accelerator
-  lvr2::RaycasterBasePtr<IntersectionT> raycaster_;
   // Callback group for parallel execution with other layers
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   // The obstacle point cloud subscriber
