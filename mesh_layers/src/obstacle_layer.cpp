@@ -82,6 +82,32 @@ bool ObstacleLayer::initialize()
     const double tf_tolerance = node_->declare_parameter(desc.name, config_.tf_tolerance.seconds(), desc);
     config_.tf_tolerance = rclcpp::Duration::from_seconds(tf_tolerance);
   }
+  {
+    rcl_interfaces::msg::ParameterDescriptor desc;
+    desc.name = layer_namespace_ + '.' + "down_axis";
+    desc.description = "The vector to use when projecting obstacle points to the surface. "
+      "Defaults to [0.0, 0.0, -1.0]. This parameter is not reconfigurable at runtime!";
+    desc.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY;
+    const auto dir = node_->declare_parameter<std::vector<double>>(desc.name, {0.0, 0.0, -1.0}, desc);
+    // Check for exactly 3 coords!
+    if (3 != dir.size())
+    {
+      RCLCPP_ERROR(get_logger(), "Invalid parameter value for 'down_axis'! Must be exactly 3 values!");
+      return false;
+    }
+    config_.down_axis = lvr2::Vector3f(dir[0], dir[1], dir[2]).normalized();
+  }
+  {
+    rcl_interfaces::msg::ParameterDescriptor desc;
+    desc.name = layer_namespace_ + '.' + "axis_frame";
+    desc.description = "The reference frame of the 'down_axis' parameter. Defaults to the value of the robot_frame parameter. "
+      "This parameter is not reconfigurable at runtime!";
+    desc.type =rcl_interfaces::msg::ParameterType::PARAMETER_STRING;
+
+    // Default to the 'robot_frame' parameter. This should always have a value
+    const std::string robot_frame = node_->get_parameter("robot_frame").as_string();
+    config_.axis_frame_id = node_->declare_parameter(desc.name, robot_frame, desc);
+  }
 
   // Support reconfiguration of parameters at runtime
   dyn_params_handler_ = node_->add_on_set_parameters_callback(
@@ -136,12 +162,13 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
       msg->header.stamp,
       config_.tf_tolerance
     );
-  } catch (const tf2::TransformException& ex)
+  }
+  catch (const tf2::TransformException& ex)
   {
     RCLCPP_ERROR(
       get_logger(),
-      "[%s] Failed to lookup transform from %s -> %s: %s",
-      layer_name_.c_str(), msg->header.frame_id.c_str(), map->mapFrame().c_str(), ex.what()
+      "Failed to lookup transform from %s -> %s: %s",
+      msg->header.frame_id.c_str(), map->mapFrame().c_str(), ex.what()
     );
     return;
   }
@@ -152,6 +179,36 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
   quat.normalize();
   Eigen::Isometry3f eigen_tf(
     Eigen::Translation3f(tf.transform.translation.x, tf.transform.translation.y, tf.transform.translation.z) * quat
+  );
+
+  // Transform the axis from the axis_frame_id to map
+  lvr2::Vector3f transformed_axis = config_.down_axis;
+  try
+  {
+    geometry_msgs::msg::TransformStamped axis_tf = map->tf2Buffer().lookupTransform(
+      map->mapFrame(),
+      config_.axis_frame_id,
+      msg->header.stamp,
+      config_.tf_tolerance
+    );
+
+    // Rotate the down_axis vector
+    Eigen::Quaternionf quat(axis_tf.transform.rotation.w, axis_tf.transform.rotation.x, axis_tf.transform.rotation.y, axis_tf.transform.rotation.z);
+    quat.normalize();
+    transformed_axis = quat * config_.down_axis;
+  }
+  catch (const tf2::TransformException& ex)
+  {
+    RCLCPP_ERROR(
+      get_logger(),
+      "Failed to lookup transform from %s -> %s: %s",
+      config_.axis_frame_id.c_str(), map->mapFrame().c_str(), ex.what()
+    );
+    return;
+  }
+  RCLCPP_DEBUG(
+    get_logger(), "Transformed down_axis from %s -> %s; Axis: [%f.2, %f.2, %f.2]",
+    config_.axis_frame_id.c_str(), map->mapFrame().c_str(), transformed_axis.x(), transformed_axis.y(), transformed_axis.z()
   );
 
   // Convert to lvr2 representation and filter by distance!
@@ -170,9 +227,7 @@ void ObstacleLayer::processPointCloud(const sensor_msgs::msg::PointCloud2::Const
   }
 
   // Allocate buffers
-  // TODO: Use the robots down axis as projection direction.
-  // This requires access to the base_frame parameter of move_base_flex
-  std::vector<lvr2::Vector3f> dirs(origins.size(), -lvr2::Vector3f::UnitZ());
+  std::vector<lvr2::Vector3f> dirs(origins.size(), transformed_axis);
   std::vector<mesh_map::MeshMap::RayCastResult> results(origins.size());
   std::vector<uint8_t> hits(origins.size());
 

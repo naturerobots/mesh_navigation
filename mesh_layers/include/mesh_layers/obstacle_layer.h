@@ -142,6 +142,8 @@ private:
   struct {
     double robot_height = std::numeric_limits<float>::infinity();
     double max_obstacle_dist = std::numeric_limits<float>::infinity();
+    lvr2::Vector3f down_axis;
+    std::string axis_frame_id;
     std::string topic;
     rclcpp::QoS qos = rclcpp::QoS(1).reliable();
     rclcpp::Duration tf_tolerance = rclcpp::Duration::from_seconds(0.1);
