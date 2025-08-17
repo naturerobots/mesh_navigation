@@ -85,7 +85,7 @@ bool AbstractLayer::initialize(
 {
   layer_name_ = name;
   node_ = node;
-  layer_namespace_ = "mesh_map/" + name;
+  layer_namespace_ = mesh_map::MeshMap::MESH_MAP_NAMESPACE + '.' + name;
   notify_ = notify_update;
   map_ptr_ = map;
   logger_ = node->get_logger().get_child(layer_name_);
