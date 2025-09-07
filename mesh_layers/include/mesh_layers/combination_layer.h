@@ -84,7 +84,7 @@ private:
 };
 
 
-class CombinationLayer
+class AvgCombinationLayer
 : public mesh_map::AbstractLayer
 {
 public:

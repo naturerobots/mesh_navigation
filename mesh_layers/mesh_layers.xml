@@ -55,8 +55,8 @@
             Combines a set of input layers using a max operation
         </description>
     </class>
-    <class name="mesh_layers/CombinationLayer"
-            type="mesh_layers::CombinationLayer"
+    <class name="mesh_layers/AvgCombinationLayer"
+            type="mesh_layers::AvgCombinationLayer"
             base_class_type="mesh_map::AbstractLayer">
         <description>
             Combines a set of input layers using a weighted average

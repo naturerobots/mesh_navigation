@@ -147,7 +147,7 @@ void MaxCombinationLayer::onInputChanged(
 }
 
 
-bool CombinationLayer::initialize()
+bool AvgCombinationLayer::initialize()
 {
   // Read the layers dependents
   // TODO: Maybe these could be provided in the abstract layer
@@ -182,7 +182,7 @@ bool CombinationLayer::initialize()
   return true;
 }
 
-bool CombinationLayer::computeLayer()
+bool AvgCombinationLayer::computeLayer()
 {
   // Lock all layer points so they cannot be destroyed while updating. Is this necessary? Layers should have no dependency loops anyway?
   std::vector<std::shared_ptr<mesh_map::AbstractLayer>> layers;
@@ -247,7 +247,7 @@ bool CombinationLayer::computeLayer()
   return true;
 }
 
-void CombinationLayer::onInputChanged(
+void AvgCombinationLayer::onInputChanged(
   const rclcpp::Time& timestamp,
   const std::set<lvr2::VertexHandle>& changed
 )
@@ -305,4 +305,4 @@ void CombinationLayer::onInputChanged(
 
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(mesh_layers::MaxCombinationLayer, mesh_map::AbstractLayer)
-PLUGINLIB_EXPORT_CLASS(mesh_layers::CombinationLayer, mesh_map::AbstractLayer)
+PLUGINLIB_EXPORT_CLASS(mesh_layers::AvgCombinationLayer, mesh_map::AbstractLayer)
