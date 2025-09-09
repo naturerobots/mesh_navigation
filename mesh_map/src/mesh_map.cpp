@@ -1221,10 +1221,24 @@ std_srvs::srv::Trigger::Response MeshMap::writeLayers()
     auto lock = layer_plugin->readLock();
 
     RCLCPP_INFO_STREAM(node->get_logger(), "Writing '" << layer_name << "' to file.");
-    if(layer_plugin->writeLayer())
+    bool success = false;
+    // Layers can throw exceptions (e.g. if a layer has 0 cost values and tries to write to HDF5)
+    try
+    {
+      success = layer_plugin->writeLayer();
+    }
+    catch(std::exception err)
+    {
+      RCLCPP_ERROR(node->get_logger(), "Cought exception while writing '%s' to file: %s", layer_name.c_str(), err.what());
+      success = false;
+    }
+
+    if(success)
     {
       RCLCPP_INFO_STREAM(node->get_logger(), "Finished writing '" << layer_name << "' to file.");
-    } else {
+    } 
+    else 
+    {
       // this is not the first failure. add a comma in between 
       if(write_failure){ss << ",";}
       ss << layer_name;
