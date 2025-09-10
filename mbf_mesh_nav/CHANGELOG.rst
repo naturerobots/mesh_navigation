@@ -4,6 +4,7 @@ Changelog for package mbf_mesh_nav
 
 3.0.0 (2025-09-10)
 ------------------
+* Multi-threaded executor
 
 2.0.1 (2025-08-11)
 ------------------
