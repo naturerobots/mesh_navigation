@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
     <name>mesh_controller</name>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <description>The mesh_controller package</description>
 
     <maintainer email="matthias.holoch@naturerobots.com">Matthias Holoch</maintainer>
