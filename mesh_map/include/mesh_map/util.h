@@ -49,16 +49,14 @@
 #include <tf2/LinearMath/Vector3.h>
 
 #include <lvr2/types/MeshBuffer.hpp>
+#include <lvr2/geometry/PMPMesh.hpp>
 #include <assimp/scene.h>
+
+#include <mesh_map/definitions.h>
 
 namespace mesh_map
 {
 
-//! use normals with datatype float
-typedef lvr2::Normal<float> Normal;
-
-//! use vectors with datatype folat
-typedef lvr2::BaseVector<float> Vector;
 
 
 lvr2::MeshBufferPtr extractMeshByName(const aiScene* ascene, std::string name);

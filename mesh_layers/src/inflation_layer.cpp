@@ -364,7 +364,7 @@ void InflationLayer::waveCostInflation(
   }
 
   // The LVR2 PMP wrapper
-  const auto mesh = std::dynamic_pointer_cast<lvr2::PMPMesh<mesh_map::Vector>>(map->mesh());
+  const std::shared_ptr<lvr2::PMPMesh<mesh_map::Vector> > mesh = map->mesh();
   if (nullptr == mesh)
   {
     RCLCPP_ERROR(get_logger(), "Failed to dynamic_cast mesh to lvr2::PMPMesh! Currently only the lvr2::PMPMesh backend is supported!");

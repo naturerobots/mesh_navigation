@@ -35,6 +35,9 @@
  *
  */
 
+#ifndef MESH_MAP__ABSTRACT_LAYER_H
+#define MESH_MAP__ABSTRACT_LAYER_H
+
 #include <functional>
 #include <memory>
 
@@ -42,14 +45,10 @@
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <rclcpp/node.hpp>
 
-#ifndef MESH_MAP__ABSTRACT_LAYER_H
-#define MESH_MAP__ABSTRACT_LAYER_H
+#include <mesh_map/definitions.h>
+
 namespace mesh_map
 {
-class MeshMap;
-
-typedef lvr2::BaseVector<float> Vector;
-typedef lvr2::Normal<float> Normal;
 
 typedef std::function<void(const std::string&, const rclcpp::Time&, const std::set<lvr2::VertexHandle>&)> notify_func;
 
@@ -126,12 +125,12 @@ public:
    * @param barycentric_coords The thee barycentric coordinates.
    * @return The vector for the given barycentric coordinates with respect to the corresponding triangle. Default is an vertex with length 0.
    */
-  virtual lvr2::BaseVector<float> vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
+  virtual Vector vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                            const std::array<float, 3>& barycentric_coords)
   {
     (void) vertices;
     (void) barycentric_coords;
-    return lvr2::BaseVector<float>();
+    return Vector();
   }
 
   /**
@@ -140,7 +139,7 @@ public:
    * the vector field into the mesh map.
    * @return an optional vector map.
    */
-  virtual const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
+  virtual const boost::optional<lvr2::VertexMap<Vector>&> vectorMap()
   {
     return boost::none;
   }
@@ -149,10 +148,10 @@ public:
    * @brief Optional method if the layer computes vectors. Computes a vector for a given vertex handle
    * @return a vector for the given vertex. Default is an vertex with length 0.
    */
-  virtual lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex)
+  virtual Vector vectorAt(const lvr2::VertexHandle& vertex)
   {
     (void) vertex;
-    return lvr2::BaseVector<float>();
+    return Vector();
   }
 
   /**

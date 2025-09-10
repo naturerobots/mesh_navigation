@@ -61,14 +61,16 @@
 #include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
-#include <lvr2/geometry/BaseMesh.hpp>
+#include <lvr2/geometry/PMPMesh.hpp>
 
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
 namespace mesh_map
 {
-class MeshMap : public std::enable_shared_from_this<MeshMap>
+
+class MeshMap 
+: public std::enable_shared_from_this<MeshMap>
 {
 public:
   inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
@@ -212,7 +214,7 @@ public:
    * @param barycentric_coords The barycentric coordinates of the query position.
    * @return An optional vector of the computed direction. It is valid if a vector has been computed successfully.
    */
-  boost::optional<Vector> directionAtPosition(const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+  boost::optional<Vector> directionAtPosition(const lvr2::VertexMap<Vector>& vector_map,
                                               const std::array<lvr2::VertexHandle, 3>& vertices,
                                               const std::array<float, 3>& barycentric_coords);
 
@@ -269,7 +271,7 @@ public:
   /**
    * @brief Returns the stored mesh
    */
-  std::shared_ptr<lvr2::BaseMesh<Vector> > mesh()
+  std::shared_ptr<lvr2::PMPMesh<Vector> > mesh()
   {
     return mesh_ptr;
   }
@@ -399,7 +401,7 @@ public:
    * @param vector_map The vector field to publish
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
-  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<Vector>& vector_map,
                           const bool publish_face_vectors = false);
 
   /**
@@ -410,7 +412,7 @@ public:
    * @param cost_function A cost function to compute costs inside a triangle
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
-  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<Vector>& vector_map,
                           const lvr2::DenseVertexMap<float>& values,
                           const std::function<float(float)>& cost_function = {},
                           const bool publish_face_vectors = false);
@@ -453,8 +455,7 @@ protected:
   //! However we could also implement a server connection here
   //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::BaseMesh<Vector>> mesh_ptr;
-  std::string hem_impl_;
+  std::shared_ptr<lvr2::PMPMesh<Vector> >    mesh_ptr;
 
 private:
 

@@ -53,11 +53,7 @@
 #include <lvr2/io/deprecated/hdf5/MeshIO.hpp>
 #include <lvr2/types/MeshBuffer.hpp>
 
-// Half Edge Mesh (HEM) Base
-#include <lvr2/geometry/BaseMesh.hpp>
-
-// Half Edge Mesh (HEM) Implementations
-#include <lvr2/geometry/HalfEdgeMesh.hpp>
+// Mesh structure for fast surface traversal
 #include <lvr2/geometry/PMPMesh.hpp>
 
 // Raycaster implementations
@@ -88,21 +84,21 @@ namespace fs = std::filesystem;
 namespace mesh_map
 {
 
-std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, lvr2::MeshBufferPtr mesh_buffer)
-{
-  if(hem_impl == "pmp")
-  {
-    return std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
-  } 
-  else if(hem_impl == "lvr")
-  {
-    return std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
-  }
+// std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, lvr2::MeshBufferPtr mesh_buffer)
+// {
+//   if(hem_impl == "pmp")
+//   {
+//     return std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
+//   } 
+//   else if(hem_impl == "lvr")
+//   {
+//     return std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
+//   }
 
-  std::stringstream error_msg;
-  error_msg << "'" << hem_impl << "' not known." << std::endl;
-  throw std::runtime_error(error_msg.str());
-}
+//   std::stringstream error_msg;
+//   error_msg << "'" << hem_impl << "' not known." << std::endl;
+//   throw std::runtime_error(error_msg.str());
+// }
 
 using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
@@ -134,7 +130,6 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   publish_edge_weights_text_desc.description = "Publish the maps edge weights as text markers. This can overwhelm RViz due to the number of markers!";
   publish_edge_weights_text = node->declare_parameter(MESH_MAP_NAMESPACE + ".publish_edge_weights_text", false, publish_edge_weights_text_desc);
 
-  hem_impl_ = node->declare_parameter(MESH_MAP_NAMESPACE + ".hem", "pmp");
   mesh_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_file", "");
   mesh_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_part", "");
   mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
@@ -289,8 +284,8 @@ bool MeshMap::readMap()
   if(mesh_buffer)
   {
     RCLCPP_DEBUG_STREAM(node->get_logger(), "Convert buffer to HEM: \n" << *mesh_buffer);
-    RCLCPP_DEBUG_STREAM(node->get_logger(), "Creating mesh of type '" << hem_impl_ << "'");
-    mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
+    
+    mesh_ptr = std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
 
     // Detect if a non manifold mesh was loaded. These break everything
     if (mesh_ptr->numFaces() != mesh_buffer->numFaces()
@@ -314,13 +309,13 @@ bool MeshMap::readMap()
       }
 
       mesh_buffer = fin.apply(*mesh_ptr);
-      mesh_ptr = createHemByName(hem_impl_, mesh_buffer);
+      mesh_ptr = std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
       // Overwrite the mesh_buffer in the HDF5
       hdf5_mesh_input->save(mesh_working_part, mesh_buffer);
     }
 
 
-    RCLCPP_INFO_STREAM(node->get_logger(), "The mesh of type '" << hem_impl_ <<  "' has been loaded successfully with " 
+    RCLCPP_INFO_STREAM(node->get_logger(), "The mesh has been loaded successfully with " 
       << mesh_ptr->numVertices() << " vertices and " << mesh_ptr->numFaces() << " faces and "
       << mesh_ptr->numEdges() << " edges.");
     // build a tree for fast lookups
@@ -644,7 +639,7 @@ void MeshMap::setVectorMap(lvr2::DenseVertexMap<mesh_map::Vector>& vector_map)
 }
 
 boost::optional<Vector> MeshMap::directionAtPosition(
-    const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+    const lvr2::VertexMap<Vector>& vector_map,
     const std::array<lvr2::VertexHandle, 3>& vertices,
     const std::array<float, 3>& barycentric_coords)
 {
@@ -654,7 +649,7 @@ boost::optional<Vector> MeshMap::directionAtPosition(
 
   if (a || b || c)
   {
-    lvr2::BaseVector<float> vec;
+    Vector vec;
     if (a) vec += a.get() * barycentric_coords[0];
     if (b) vec += b.get() * barycentric_coords[1];
     if (c) vec += c.get() * barycentric_coords[2];
@@ -747,7 +742,7 @@ void MeshMap::publishDebugFace(const lvr2::FaceHandle& face_handle, const std_ms
 }
 
 void MeshMap::publishVectorField(const std::string& name,
-                                 const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+                                 const lvr2::DenseVertexMap<Vector>& vector_map,
                                  const bool publish_face_vectors)
 {
   publishVectorField(name, vector_map, vertex_costs, {}, publish_face_vectors);
@@ -817,7 +812,9 @@ void MeshMap::publishCombinedVectorField()
     lvr2::DenseFaceMap<uint8_t> vector_field_faces(mesh_ptr->nextFaceIndex(), 0);
     auto opt_vec_map = layer->vectorMap();
     if (!opt_vec_map)
+    {
       continue;
+    }
 
     const auto& vecs = opt_vec_map.get();
     for (auto vH : vecs)
@@ -825,13 +822,17 @@ void MeshMap::publishCombinedVectorField()
       auto opt_val = vertex_vectors.get(vH);
       vertex_vectors.insert(vH, opt_val ? opt_val.get() + vecs[vH] : vecs[vH]);
       for (auto fH : mesh_ptr->getFacesOfVertex(vH))
+      {
         vector_field_faces[fH]++;
+      }
     }
 
     for (auto fH : vector_field_faces)
     {
       if (vector_field_faces[fH] != 3)
+      {
         continue;
+      }
 
       const auto& vertices = mesh_ptr->getVertexPositionsOfFace(fH);
       const auto& vertex_handles = mesh_ptr->getVerticesOfFace(fH);
@@ -852,7 +853,7 @@ void MeshMap::publishCombinedVectorField()
 }
 
 void MeshMap::publishVectorField(const std::string& name,
-                                 const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+                                 const lvr2::DenseVertexMap<Vector>& vector_map,
                                  const lvr2::DenseVertexMap<float>& values,
                                  const std::function<float(float)>& cost_function, const bool publish_face_vectors)
 {

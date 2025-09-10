@@ -35,7 +35,8 @@
  *
  */
 
-#pragma once
+#ifndef MESH_MAP__LAYER_MANAGER_H
+#define MESH_MAP__LAYER_MANAGER_H
 
 #include <boost/graph/adjacency_list.hpp>
 #include <pluginlib/class_loader.hpp>
@@ -44,12 +45,10 @@
 #include <lvr2/geometry/Handles.hpp>
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/definitions.h>
 
 namespace mesh_map
 {
-
-class AbstractLayer;
-class MeshMap;
 
 class LayerManager
 {
@@ -166,3 +165,5 @@ private:
 };
 
 } /* namespace mesh_map */
+
+#endif // MESH_MAP__LAYER_MANAGER_H

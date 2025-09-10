@@ -38,16 +38,21 @@
 #ifndef MESH_MAP__NANOFLANN_MESH_ADAPTOR_H
 #define MESH_MAP__NANOFLANN_MESH_ADAPTOR_H
 
-#include <lvr2/geometry/BaseMesh.hpp>
+#include <lvr2/geometry/PMPMesh.hpp>
 #include "nanoflann.hpp"
+#include <mesh_map/util.h>
 
-namespace mesh_map{
+namespace mesh_map
+{
+
 struct NanoFlannMeshAdaptor
 {
-  const std::shared_ptr<lvr2::BaseMesh<lvr2::BaseVector<float>>> mesh;
+  const std::shared_ptr<lvr2::PMPMesh<Vector> > mesh;
 
   /// The constructor that sets the data set source
-  NanoFlannMeshAdaptor(const std::shared_ptr<lvr2::BaseMesh<lvr2::BaseVector<float>>> mesh) : mesh(mesh) { }
+  NanoFlannMeshAdaptor(const std::shared_ptr<lvr2::PMPMesh<Vector> > mesh) 
+  :mesh(mesh) 
+  { }
 
   inline lvr2::Index kdtree_get_point_count() const { return mesh->nextVertexIndex(); }
 
@@ -56,7 +61,7 @@ struct NanoFlannMeshAdaptor
     const lvr2::VertexHandle vH(idx);
     if(mesh->containsVertex(vH))
     {
-      const lvr2::BaseVector<float>& vertex = mesh->getVertexPosition(vH);
+      const Vector& vertex = mesh->getVertexPosition(vH);
       if (dim == 0) return vertex.x;
       else if (dim == 1) return vertex.y;
       else return vertex.z;
@@ -68,6 +73,7 @@ struct NanoFlannMeshAdaptor
   bool kdtree_get_bbox(BBOX& /*bb*/) const { return false; }
 
 }; // end of PointCloudAdaptor
-}
+
+} // namespace mesh_map
 
 #endif /* MESH_MAP__NANOFLANN_MESH_ADAPTOR_H */
