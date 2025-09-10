@@ -2,6 +2,10 @@
 Changelog for package dijkstra_mesh_planner
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.0 (2025-09-10)
+------------------
+* Cost-aware planning
+
 2.0.1 (2025-08-11)
 ------------------
 * Bug fixes and cleanup since initial ROS 2 port

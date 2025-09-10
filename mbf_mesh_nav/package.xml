@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
     <name>mbf_mesh_nav</name>
-    <version>2.0.1</version>
+    <version>3.0.0</version>
     <description>The mbf_mesh_nav package</description>
 
     <maintainer email="matthias.holoch@naturerobots.com">Matthias Holoch</maintainer>
