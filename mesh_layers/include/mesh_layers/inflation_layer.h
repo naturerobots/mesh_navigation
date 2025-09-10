@@ -39,6 +39,7 @@
 #define MESH_MAP__INFLATION_LAYER_H
 
 #include <mesh_map/abstract_layer.h>
+#include <lvr2/geometry/PMPMesh.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace mesh_layers
@@ -50,6 +51,7 @@ const float EPSILON = 1e-9;
  */
 class InflationLayer : public mesh_map::AbstractLayer
 {
+public:
   /**
    * @brief try read layer from map file
    *
@@ -81,13 +83,17 @@ class InflationLayer : public mesh_map::AbstractLayer
    */
   virtual float threshold() override;
 
-  inline float computeUpdateSethianMethod(const float& d1, const float& d2, const float& a, const float& b,
-                                          const float& dot, const float& F);
+  inline float computeUpdateSethianMethod(
+    const float& d1, const float& d2,
+    const float& a, const float& b,
+    const float& dot, const float& F
+  ) const;
 
   /**
    * @brief updates the wavefront
    *
    * @param distances current distances from the start vertices
+   * @param vector_map buffer to store new vectors towards the source in
    * @param predecessors current predecessors of vertices visited during the wave front propagation
    * @param max_distance max distance of propagation
    * @param edge_weights weights of the edges
@@ -99,11 +105,14 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return true if successful; else false
    */
-  inline bool waveFrontUpdate(lvr2::DenseVertexMap<float>& distances,
-                              lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors, const float& max_distance,
-                              const lvr2::DenseEdgeMap<float>& edge_weights, const lvr2::FaceHandle& fh,
-                              const lvr2::BaseVector<float>& normal, const lvr2::VertexHandle& v1,
-                              const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3);
+  bool waveFrontUpdate(
+    const lvr2::PMPMesh<mesh_map::Vector>& mesh,
+    lvr2::DenseVertexMap<float>& distances,
+    lvr2::DenseVertexMap<mesh_map::Vector>& vector_map,
+    const float& max_distance,
+    const lvr2::DenseEdgeMap<float>& edge_weights,
+    const lvr2::VertexHandle& v1, const lvr2::VertexHandle& v2, const lvr2::VertexHandle& v3
+  ) const;
 
   /**
    * @brief fade cost value based on lethal and inscribed area
@@ -118,13 +127,22 @@ class InflationLayer : public mesh_map::AbstractLayer
    * @brief inflate around lethal vertices by using an wave front propagation and assign riskiness values to vertices
    *
    * @param lethals set of current lethal vertices
+   * @param[out] costs buffer to write the costs to
+   * @param[out] vectors buffer to write the vectors to
    * @param inflation_radius radius of inflation
    * @param inscribed_radius rarius of inscribed area
    * @param inscribed_value value assigned to inscribed vertices
    * @param lethal_value value of lethal vertices
    */
-  void waveCostInflation(const std::set<lvr2::VertexHandle>& lethals, const float inflation_radius,
-                         const float inscribed_radius, const float inscribed_value, const float lethal_value);
+  void waveCostInflation(
+    const std::set<lvr2::VertexHandle>& lethals,
+    lvr2::DenseVertexMap<float>& costs,
+    lvr2::DenseVertexMap<mesh_map::Vector>& vectors,
+    const float inflation_radius,
+    const float inscribed_radius,
+    const float inscribed_value,
+    const float lethal_value
+  );
 
   /**
    * @brief returns repulsive vector at a given position inside a face
@@ -134,7 +152,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return vector of the current vectorfield
    */
-  lvr2::BaseVector<float> vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
+  mesh_map::Vector vectorAt(const std::array<lvr2::VertexHandle, 3>& vertices,
                                    const std::array<float, 3>& barycentric_coords);
 
   /**
@@ -144,14 +162,14 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return vector of vectorfield at requested vertex
    */
-  lvr2::BaseVector<float> vectorAt(const lvr2::VertexHandle& vertex);
+  mesh_map::Vector vectorAt(const lvr2::VertexHandle& vertex);
 
   /**
    * @brief delivers the current repulsive vectorfield
    *
    * @return repulsive vectorfield
    */
-  const boost::optional<lvr2::VertexMap<lvr2::BaseVector<float>>&> vectorMap()
+  const boost::optional<lvr2::VertexMap<mesh_map::Vector>&> vectorMap()
   {
     return vector_map_;
   }
@@ -165,7 +183,7 @@ class InflationLayer : public mesh_map::AbstractLayer
    */
   void backToSource(const lvr2::VertexHandle& current_vertex,
                     const lvr2::DenseVertexMap<lvr2::VertexHandle>& predecessors,
-                    lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map);
+                    lvr2::DenseVertexMap<mesh_map::Vector>& vector_map);
 
   /**
    * @brief calculate the values of this layer
@@ -179,25 +197,22 @@ class InflationLayer : public mesh_map::AbstractLayer
    *
    * @return calculated costmap
    */
-  virtual lvr2::VertexMap<float>& costs() override;
+  virtual const lvr2::VertexMap<float>& costs() override;
 
   /**
    * @brief deliver set containing all vertices marked as lethal
    *
    * @return lethal vertices
    */
-  virtual std::set<lvr2::VertexHandle>& lethals() override
+  virtual const std::set<lvr2::VertexHandle>& lethals() override
   {
     return lethal_vertices_;
   }  // TODO remove... layer types
 
-  /**
-   * @brief update set of lethal vertices by adding and removing vertices
-   *
-   * @param added_lethal vertices to be marked as lethal
-   * @param removed_lethal vertices to be removed from the set of lethal vertices
-   */
-  virtual void updateLethal(std::set<lvr2::VertexHandle>& added_lethal, std::set<lvr2::VertexHandle>& removed_lethal);
+  virtual void onInputChanged(
+    const rclcpp::Time& timestamp,
+    const std::set<lvr2::VertexHandle>& changed
+  ) override;
 
   /**
    * @brief initializes this layer plugin
@@ -215,9 +230,7 @@ class InflationLayer : public mesh_map::AbstractLayer
 
   lvr2::DenseVertexMap<float> direction_;
 
-  lvr2::DenseVertexMap<lvr2::FaceHandle> cutting_faces_;
-
-  lvr2::DenseVertexMap<lvr2::BaseVector<float>> vector_map_;
+  lvr2::DenseVertexMap<mesh_map::Vector> vector_map_;
 
   lvr2::DenseVertexMap<float> distances_;
 

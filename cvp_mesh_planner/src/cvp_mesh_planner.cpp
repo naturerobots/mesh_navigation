@@ -742,7 +742,7 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
     if (distances[current_vh] > goal_dist)
       continue;
 
-    if (vertex_costs[current_vh] > config_.cost_limit)
+    if (vertex_costs[current_vh] >= config_.cost_limit)
       continue;
 
     if (invalid[current_vh])
@@ -786,8 +786,8 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (fixed[a] && fixed[b] && !fixed[c])
         {
           // c is free
-          // Skip vertices above the cost limit
-          if (costs[c] > config_.cost_limit)
+          // Skip vertices at or above the cost limit
+          if (costs[c] >= config_.cost_limit)
           {
             continue;
           }
@@ -809,8 +809,8 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (fixed[a] && !fixed[b] && fixed[c])
         {
           // b is free
-          // Skip vertices above the cost limit
-          if (costs[b] > config_.cost_limit)
+          // Skip vertices at or above the cost limit
+          if (costs[b] >= config_.cost_limit)
           {
             continue;
           }
@@ -832,8 +832,8 @@ uint32_t CVPMeshPlanner::waveFrontPropagation(const mesh_map::Vector& original_s
         else if (!fixed[a] && fixed[b] && fixed[c])
         {
           // a if free
-          // Skip vertices above the cost limit
-          if (costs[a] > config_.cost_limit)
+          // Skip vertices at or above the cost limit
+          if (costs[a] >= config_.cost_limit)
           {
             continue;
           }

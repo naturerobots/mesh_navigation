@@ -40,6 +40,8 @@ add_library(${PROJECT_NAME}
   src/abstract_layer.cpp
   src/mesh_map.cpp
   src/util.cpp
+  src/layer_manager.cpp
+  src/timer.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -83,9 +85,9 @@ if(BUILD_TESTING)
     RUNTIME DESTINATION bin
   )
 
-  # add gmock test suites
-  find_package(ament_cmake_gmock REQUIRED)
-  ament_add_gmock(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
+  # add gtest tests
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(${PROJECT_NAME}_mesh_map_test test/mesh_map_test.cpp)
   target_include_directories(${PROJECT_NAME}_mesh_map_test PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>

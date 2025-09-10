@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include <rclcpp/rclcpp.hpp>
 #include <mesh_map/mesh_map.h>
 
@@ -39,10 +38,18 @@ TEST_F(MeshMapTest, loadsSinglePlugin)
   const std::vector<std::string> layer_names{"test_layer"};
   initNodeAndMeshMap(rclcpp::NodeOptions()
     .append_parameter_override("mesh_map.layers", layer_names)
+    .append_parameter_override("mesh_map.default_layer", "test_layer")
     .append_parameter_override("mesh_map.test_layer.type", "mesh_map/TestLayer")
   );
-  ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
-  EXPECT_THAT(mesh_map_ptr_->layer("test_layer"), NotNull());
+  // The MeshMap requires that a map file is loaded to initialize, so we test the layer manager directly
+  mesh_map::LayerManager manager(*mesh_map_ptr_, node_ptr_);
+
+  EXPECT_NO_THROW(manager.read_configured_layers(node_ptr_));
+  EXPECT_TRUE(manager.load_layer_plugins(node_ptr_->get_logger()));
+  // This calls back to the mesh map and segfaults because the MeshMap has its own internal LayerManager :(
+  // EXPECT_TRUE(manager.initialize_layer_plugins(node_ptr_, mesh_map_ptr_));
+
+  EXPECT_NE(manager.get_layer("test_layer"), nullptr);
 }
 
 TEST_F(MeshMapTest, loadsMultiplePlugins)
@@ -50,18 +57,18 @@ TEST_F(MeshMapTest, loadsMultiplePlugins)
   const std::vector<std::string> layer_names{"t3", "t1", "t2"};
   initNodeAndMeshMap(rclcpp::NodeOptions()
     .append_parameter_override("mesh_map.layers", layer_names)
+    .append_parameter_override("mesh_map.default_layer", "t3")
     .append_parameter_override("mesh_map.t1.type", "mesh_map/TestLayer")
     .append_parameter_override("mesh_map.t2.type", "mesh_map/TestLayer")
     .append_parameter_override("mesh_map.t3.type", "mesh_map/TestLayer")
   );
-  ASSERT_TRUE(mesh_map_ptr_->loadLayerPlugins());
-  EXPECT_THAT(mesh_map_ptr_->layer("t1"), NotNull());
-  EXPECT_THAT(mesh_map_ptr_->layer("t2"), NotNull());
-  EXPECT_THAT(mesh_map_ptr_->layer("t3"), NotNull());
-}
+  // The MeshMap requires that a map file is loaded to initialize, so we test the layer manager directly
+  mesh_map::LayerManager manager(*mesh_map_ptr_, node_ptr_);
 
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  EXPECT_NO_THROW(manager.read_configured_layers(node_ptr_));
+  EXPECT_TRUE(manager.load_layer_plugins(node_ptr_->get_logger()));
+
+  EXPECT_NE(manager.get_layer("t1"), nullptr);
+  EXPECT_NE(manager.get_layer("t2"), nullptr);
+  EXPECT_NE(manager.get_layer("t3"), nullptr);
 }

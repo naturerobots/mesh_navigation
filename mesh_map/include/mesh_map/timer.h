@@ -1,5 +1,5 @@
 /*
- *  Copyright 2020, Sebastian Pütz
+ *  Copyright 2025, Justus Braun
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -31,49 +31,81 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  *  authors:
- *    Sebastian Pütz <spuetz@uni-osnabrueck.de>
+ *    Justus Braun <jubraun@uni-osnabrueck.de>
  *
  */
 
-#ifndef MESH_MAP__NANOFLANN_MESH_ADAPTOR_H
-#define MESH_MAP__NANOFLANN_MESH_ADAPTOR_H
+#ifndef MESH_MAP__TIMER_H
+#define MESH_MAP__TIMER_H
 
-#include <lvr2/geometry/PMPMesh.hpp>
-#include "nanoflann.hpp"
-#include <mesh_map/util.h>
+#include <chrono>
+#include <string>
+#include <fstream>
+#include <mutex>
+
+#include <rclcpp/time.hpp>
 
 namespace mesh_map
 {
 
-struct NanoFlannMeshAdaptor
+/**
+* @brief Provides a facility to log layer update timings to a file.
+*/
+class LayerTimer
 {
-  const std::shared_ptr<lvr2::PMPMesh<Vector> > mesh;
+public:
+  
+  using Clock = std::chrono::steady_clock;
+  using TimePoint = Clock::time_point;
+  using Duration = std::chrono::nanoseconds;
 
-  /// The constructor that sets the data set source
-  NanoFlannMeshAdaptor(const std::shared_ptr<lvr2::PMPMesh<Vector> > mesh) 
-  :mesh(mesh) 
-  { }
+  /**
+  * @brief Enable logging globally
+  */
+  static void enable();
 
-  inline lvr2::Index kdtree_get_point_count() const { return mesh->nextVertexIndex(); }
+  /**
+  * @brief Disable logging globally
+  */
+  static void disable();
+  
+  /**
+  * @brief Record update duration.
+  *
+  * The timestamp is a rclcpp::Time object because the layers pass timestamps
+  * as rclcpp::Time to each other. Also this supports simtime.
+  *
+  * @param layer The layer name
+  * @param timestamp The timestamp to associate with this record
+  * @param locking Time spend waiting for locks
+  * @param update Time spend updating the layer
+  * @param notify Time spend calling AbstractLayer::notifyChange
+  *
+  */
+  static void recordUpdateDuration(
+    const std::string& layer,
+    const rclcpp::Time& timestamp,
+    const Duration& locking,
+    const Duration& update,
+    const Duration& notify
+  );
 
-  inline float kdtree_get_pt(const lvr2::Index idx, const size_t dim) const
+private:
+
+  volatile bool enabled_ = false;
+  std::ofstream file_;
+  std::mutex mutex_;
+  
+  // C++11 guarantees that static instances in this form are initialized in
+  // a thread safe manner.
+  // https://en.cppreference.com/w/cpp/language/storage_duration#Static_block_variables
+  static LayerTimer& instance()
   {
-    const lvr2::VertexHandle vH(idx);
-    if(mesh->containsVertex(vH))
-    {
-      const Vector& vertex = mesh->getVertexPosition(vH);
-      if (dim == 0) return vertex.x;
-      else if (dim == 1) return vertex.y;
-      else return vertex.z;
-    }
-    return std::nanf("");
+    static LayerTimer instance;
+    return instance;
   }
-
-  template <class BBOX>
-  bool kdtree_get_bbox(BBOX& /*bb*/) const { return false; }
-
-}; // end of PointCloudAdaptor
+};
 
 } // namespace mesh_map
 
-#endif /* MESH_MAP__NANOFLANN_MESH_ADAPTOR_H */
+#endif 

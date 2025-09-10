@@ -46,9 +46,11 @@
 #include <memory>
 
 #include <mesh_map/abstract_layer.h>
+#include <mesh_map/layer_manager.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_colors_stamped.hpp>
 #include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_costs_sparse_stamped.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <tf2_ros/buffer.h>
@@ -56,20 +58,26 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
+#include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
-#include <lvr2/geometry/BaseMesh.hpp>
+#include <lvr2/geometry/PMPMesh.hpp>
 
 #include "nanoflann.hpp"
 #include "nanoflann_mesh_adaptor.h"
 
 namespace mesh_map
 {
-class MeshMap : public std::enable_shared_from_this<MeshMap>
+
+class MeshMap 
+: public std::enable_shared_from_this<MeshMap>
 {
 public:
   inline static const std::string MESH_MAP_NAMESPACE = "mesh_map";
   typedef std::shared_ptr<MeshMap> Ptr;
+  // NOTE: This defines what data is returned from the shared Raycaster interface.
+  // If some component needs more/different data we can extend this type
+  using RayCastResult = lvr2::Intersection<lvr2::intelem::Distance, lvr2::intelem::Face, lvr2::intelem::Point>;
 
   MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node);
 
@@ -78,18 +86,6 @@ public:
    * @return true f the mesh and its attributes have been load successfully.
    */
   bool readMap();
-
-  /**
-   * @brief Loads all configured layer plugins
-   * @return true if the layer plugins have been load successfully.
-   */
-  bool loadLayerPlugins();
-
-  /**
-   * @brief Initialized all loaded layer plugins
-   * @return true if the loaded layer plugins have been initialized successfully.
-   */
-  bool initLayerPlugins();
 
   /**
    * @brief Return and optional vertex handle of to the closest vertex to the given position
@@ -130,12 +126,6 @@ public:
   rcl_interfaces::msg::SetParametersResult reconfigureCallback(std::vector<rclcpp::Parameter> parameters);
 
   /**
-   * @brief A method which combines all layer costs with the respective weightings
-   * @param map_stamp timestamp for published cost data
-   */
-  void combineVertexCosts(const rclcpp::Time& map_stamp);
-
-  /**
    * @brief pre-computes edge weights from combined vertex costs.
    * The result can be directly used inside a search algorithm 
    * that searches over the edges to a given target
@@ -143,11 +133,11 @@ public:
   void computeEdgeWeights();
 
   /**
-   * @brief Computes contours
-   * @param contours the vector to bo filled with contours
-   * @param min_contour_size The minimum contour size, i.e. the number of vertices per contour.
+   * @brief update the per edge costs of the edges incident to changed vertices.
+   * @param map_stamp timestamp for published cost data
+   * @param changed The Vertices whose costs have changed.
    */
-  // void findContours(std::vector<std::vector<lvr2::VertexHandle>>& contours, int min_contour_size);
+  void updateEdgeWeights(const rclcpp::Time& map_stamp, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
@@ -155,6 +145,13 @@ public:
    * @param name The name of the cost map
    */
   void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp);
+
+  /**
+   * @brief Publishes the given vertex map as mesh_msgs/VertexCostsSparse, e.g. to update the visualization in RVIZ.
+   * @param costs The cost map to publish
+   * @param name The name of the cost map
+   */
+  void publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp);
 
   /**
    * @briefP Publishes the vertex colors if these exists.
@@ -193,7 +190,7 @@ public:
    * @brief Callback function which is called from inside a layer plugin if cost values change
    * @param layer_name the name of the layer.
    */
-  void layerChanged(const std::string& layer_name);
+  void layerChanged(const std::string& layer_name, const std::set<lvr2::VertexHandle>& changes);
 
   /**
    * @brief Returns the global frame / coordinate system id string
@@ -217,7 +214,7 @@ public:
    * @param barycentric_coords The barycentric coordinates of the query position.
    * @return An optional vector of the computed direction. It is valid if a vector has been computed successfully.
    */
-  boost::optional<Vector> directionAtPosition(const lvr2::VertexMap<lvr2::BaseVector<float>>& vector_map,
+  boost::optional<Vector> directionAtPosition(const lvr2::VertexMap<Vector>& vector_map,
                                               const std::array<lvr2::VertexHandle, 3>& vertices,
                                               const std::array<float, 3>& barycentric_coords);
 
@@ -274,7 +271,7 @@ public:
   /**
    * @brief Returns the stored mesh
    */
-  std::shared_ptr<lvr2::BaseMesh<Vector> > mesh()
+  std::shared_ptr<lvr2::PMPMesh<Vector> > mesh()
   {
     return mesh_ptr;
   }
@@ -301,6 +298,24 @@ public:
   const std::string& mapFrame()
   {
     return global_frame;
+  }
+
+  /**
+   * @brief Returns the TF2 Buffer instance
+   */
+  const tf2_ros::Buffer& tf2Buffer() const
+  {
+    return tf_buffer;
+  }
+
+  /**
+   * @brief Return the shared lvr2::RaycasterBase
+   *
+   * This interface allows plugins to cast rays inside the MeshMap.
+   */
+  std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster() const
+  {
+    return raycaster_ptr;
   }
 
   /**
@@ -386,7 +401,7 @@ public:
    * @param vector_map The vector field to publish
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
-  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<Vector>& vector_map,
                           const bool publish_face_vectors = false);
 
   /**
@@ -397,7 +412,7 @@ public:
    * @param cost_function A cost function to compute costs inside a triangle
    * @param publish_face_vectors Enables to publish an additional vertex for the triangle's center.
    */
-  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<lvr2::BaseVector<float>>& vector_map,
+  void publishVectorField(const std::string& name, const lvr2::DenseVertexMap<Vector>& vector_map,
                           const lvr2::DenseVertexMap<float>& values,
                           const std::function<float(float)>& cost_function = {},
                           const bool publish_face_vectors = false);
@@ -410,7 +425,7 @@ public:
   /**
    * @brief returns a shared pointer to the specified layer
    */
-  mesh_map::AbstractLayer::Ptr layer(const std::string& layer_name);
+  AbstractLayer::Ptr layer(const std::string& layer_name);
 
   /**
    * @brief calls 'writeLayer' on every active layer. Every layer itself writes its costs 
@@ -429,16 +444,27 @@ public:
 
   lvr2::DenseVertexMap<bool> invalid;
 
+  const std::string& getUUID() const
+  {
+    return uuid_str;
+  }
+
 protected:
   //! This is an abstract interface to load mesh information from somewhere
   //! The default case is loading from a HDF5 file
   //! However we could also implement a server connection here
   //! We might use the pluginlib for that
   std::shared_ptr<lvr2::AttributeMeshIOBase> mesh_io_ptr;
-  std::shared_ptr<lvr2::BaseMesh<Vector>> mesh_ptr;
-  std::string hem_impl_;
+  std::shared_ptr<lvr2::PMPMesh<Vector> >    mesh_ptr;
 
 private:
+
+  /**
+   * @brief Copies the per vertex costs from the configured default layer into the map.
+   *
+   * @return true on success false on failure
+   */
+  bool copyVertexCostsFromDefaultLayer();
   
   /**
    * @brief Publishes the edge computed weights as visualisation_msgs/MarkerArray
@@ -446,19 +472,11 @@ private:
    */
   void publishEdgeWeightsAsText();
 
-  //! plugin class loader for for the layer plugins
-  pluginlib::ClassLoader<mesh_map::AbstractLayer> layer_loader;
+  //! Manages loading, configuration and updating the cost map layers
+  LayerManager layer_manager_;
 
-  //! mapping from layer name to layer type, as configured via ros params. 
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, std::string>> configured_layers;
-
-  //! mapping from layer name to instance of respective layer
-  //! The order of layers might become relevant at some point, so we use a vector to preserve the configured order.
-  std::vector<std::pair<std::string, mesh_map::AbstractLayer::Ptr>> loaded_layers;
-
-  //! each layer maps to a set of impassable indices
-  std::map<std::string, std::set<lvr2::VertexHandle>> lethal_indices;
+  //! The layer used to provide the lethal and combined vertex costs
+  std::string default_layer_;
 
   //! all impassable vertices
   std::set<lvr2::VertexHandle> lethals;
@@ -513,6 +531,7 @@ private:
 
   //! publisher for vertex costs
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr vertex_costs_update_pub_;
 
   //! publisher for vertex colors
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;
@@ -560,6 +579,9 @@ private:
 
   //! k-d tree to query mesh vertices in logarithmic time
   std::unique_ptr<KDTree> kd_tree_ptr;
+
+  //! Shared Raycasting interface for layers/planners/controllers etc.
+  std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster_ptr;
 };
 
 } /* namespace mesh_map */
