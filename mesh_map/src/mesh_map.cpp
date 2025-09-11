@@ -138,9 +138,9 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
       if (count > vertex_costs_sub_count_)
       {
         RCLCPP_INFO(node->get_logger(), "New cost layer subscriber detected. Publishing vertex costs once...");
-        vertex_costs_sub_count_ = count;
         publishCostLayers(node->now());
       }
+      vertex_costs_sub_count_ = count;
     });
   vertex_costs_update_pub_ = node->create_publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>(std::string(vertex_costs_pub->get_topic_name()) + "/updates", rclcpp::QoS(10).transient_local());
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
