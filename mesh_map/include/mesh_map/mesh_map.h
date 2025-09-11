@@ -531,6 +531,8 @@ private:
 
   //! publisher for vertex costs
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
+  rclcpp::TimerBase::SharedPtr vertex_costs_subscribe_checker_;
+  size_t vertex_costs_sub_count_ = 0;
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr vertex_costs_update_pub_;
 
   //! publisher for vertex colors
