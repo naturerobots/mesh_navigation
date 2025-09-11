@@ -84,22 +84,6 @@ namespace fs = std::filesystem;
 namespace mesh_map
 {
 
-// std::shared_ptr<lvr2::BaseMesh<Vector> > createHemByName(std::string hem_impl, lvr2::MeshBufferPtr mesh_buffer)
-// {
-//   if(hem_impl == "pmp")
-//   {
-//     return std::make_shared<lvr2::PMPMesh<Vector> >(mesh_buffer);
-//   } 
-//   else if(hem_impl == "lvr")
-//   {
-//     return std::make_shared<lvr2::HalfEdgeMesh<Vector> >(mesh_buffer);
-//   }
-
-//   std::stringstream error_msg;
-//   error_msg << "'" << hem_impl << "' not known." << std::endl;
-//   throw std::runtime_error(error_msg.str());
-// }
-
 using HDF5MeshIO = lvr2::Hdf5Build<lvr2::hdf5features::MeshIO>;
 
 MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
@@ -147,6 +131,17 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("~/mesh", rclcpp::QoS(1).transient_local());
   vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(1).transient_local());
+  // we dont want to publish static costs all the time.
+  // therefore we have to check if someone newly subscribed to the topic
+  vertex_costs_subscribe_checker_ = node->create_wall_timer(std::chrono::milliseconds(200), [this, node]{
+      const size_t count = vertex_costs_pub->get_subscription_count() + vertex_costs_pub->get_intra_process_subscription_count();
+      if (count > vertex_costs_sub_count_)
+      {
+        RCLCPP_INFO(node->get_logger(), "New cost layer subscriber detected. Publishing vertex costs once...");
+        publishCostLayers(node->now());
+      }
+      vertex_costs_sub_count_ = count;
+    });
   vertex_costs_update_pub_ = node->create_publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>(std::string(vertex_costs_pub->get_topic_name()) + "/updates", rclcpp::QoS(10).transient_local());
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
