@@ -48,13 +48,22 @@ If your are looking for the old ROS 1 version, checkout the [noetic branch](http
 **Warning**: The ROS 1 version of mesh_navigation is not maintained anymore.
 
 ### Installation from source
-* Prerequisite: A working ROS 2 installation
-* Go into a ROS 2 workspace's source directory `cd $YOUR_ROS_WS/src`.
-* Clone the repo `git clone git@github.com:naturerobots/mesh_navigation.git`
-* Get the tutorial's ROS 2 dependencies
-  * Clone source dependencies: Run `vcs import --input mesh_navigation/source_dependencies.yaml` in your ROS 2 workspace source directory.
-  * Get packaged dependencies: Run `rosdep install --from-paths . --ignore-src -r -y` from within your ROS 2 workspace source directory.
-* Build: Go to workspace root `cd $YOUR_ROS_WS` and run `colcon build --packages-up-to mesh_navigation`.
+
+You need a working ROS 2 installation; we target `humble` and `jazzy` at the moment. Go into a ROS 2 workspace's source directory `cd $YOUR_ROS_WS/src`. Then clone the source code 
+
+```bash
+git clone git@github.com:naturerobots/mesh_navigation.git`
+```
+
+Get MeshNav's ROS 2 dependencies
+* Clone source dependencies: Run `vcs import --input mesh_navigation/source_dependencies.yaml` in your ROS 2 workspace source directory.
+* Get packaged dependencies: Run `rosdep install --from-paths . --ignore-src -r -y` from within your ROS 2 workspace source directory.
+
+Build: Go to workspace root `cd $YOUR_ROS_WS` and run 
+
+```bash
+colcon build --packages-up-to mesh_navigation`
+```
 
 # Usage Examples and Demos
 
@@ -109,13 +118,9 @@ The package structure is as follows:
 
 - `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account. This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`, since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots`.
 
-## Mesh Map
-
-### Mesh Layers
+## Mesh Layers
 
 The following table gives an overview of all currently implemented layer plugins available in the stack and the corresponding types to specify for usage in the mesh map configuration. An example mesh map configuration is shown below.
-
-#### Overview of all layers
 
 | Layer               | Plugin Type Specifier         | Description of Cost Computation          | Example Image                                                                           |
 | ------------------- | ----------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -145,7 +150,7 @@ Currently the following planners are available:
     type: 'cvp_mesh_planner/CVPMeshPlanner'
 ```
 
-### MMP Planner
+### MMP Planner (only)
 
 ```yaml
   mesh_planner:
@@ -169,35 +174,49 @@ The planners are compared to each other.
     type: 'mesh_controller/MeshController'
 ```
 
-# Publications
+# Related Publications
 
 Please reference the following papers when using the navigation stack in your scientific work.
+
+#### 3D Navigation Mesh Generation for Path Planning in Uneven Terrain
+
+```bib
+@inproceedings{puetz20163dnav,
+  title     = {3D Navigation Mesh Generation for Path Planning in Uneven Terrain},
+  author    = {Pütz, Sebastian and Wiemann, Thomas and Sprickerhof, Jochen and Hertzberg, Joachim},
+  booktitle = {9th IFAC Symposium on Intelligent Autonomous Vehicles (IAV)},
+  series    = {IFAC-PapersOnLine},
+  volume    = {49},
+  number    = {15},
+  pages     = {212--217},
+  year      = {2016},
+  publisher = {Elsevier},
+  doi       = {10.1016/j.ifacol.2016.07.734}
+}
+```
 
 #### Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots
 ```bib
 @inproceedings{puetz21cvp,
-    author = {Pütz, Sebastian and Wiemann, Thomas and Kleine Piening, Malte and Hertzberg, Joachim},
-    title = {Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots},
-    booktitle = {2021 IEEE International Conference on Robotics and Automation (ICRA)},
-    year = 2021,
-    url = {https://github.com/uos/mesh_navigation},
-    note = {Software available at \url{https://github.com/uos/mesh_navigation}}
+  author = {Pütz, Sebastian and Wiemann, Thomas and Kleine Piening, Malte and Hertzberg, Joachim},
+  title = {Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots},
+  booktitle = {2021 IEEE International Conference on Robotics and Automation (ICRA)},
+  year = 2021,
+  url = {https://github.com/uos/mesh_navigation},
+  note = {Software available at \url{https://github.com/uos/mesh_navigation}}
 }
 ```
 
-#### Move Base Flex: A Highly Flexible Navigation Framework for Mobile Robots
+#### Navigation Control & Path Planning for Autonomous Mobile Robots
+
 ```bib
-@inproceedings{puetz18mbf,
-    author = {Sebastian Pütz and Jorge Santos Simón and Joachim Hertzberg},
-    title = {{Move Base Flex}: A Highly Flexible Navigation Framework for Mobile Robots},
-    booktitle = {2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
-    year = 2018,
-    month = {October},
-    url = {https://github.com/magazino/move_base_flex},
-    note = {Software available at \url{https://github.com/magazino/move_base_flex}}
+@phdthesis{puetz2022diss,
+  author = {Sebastian Pütz},
+  title = {Navigation Control \& Path Planning for Autonomous Mobile Robots}
+  year = {2022},
+  school = {Universität Osnabrück}
 }
 ```
-
 
 # Related Work
 
