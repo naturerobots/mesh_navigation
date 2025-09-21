@@ -190,7 +190,6 @@ Please reference the following papers when using the navigation stack in your sc
   number    = {15},
   pages     = {212--217},
   year      = {2016},
-  publisher = {Elsevier},
   doi       = {10.1016/j.ifacol.2016.07.734}
 }
 ```
@@ -198,12 +197,11 @@ Please reference the following papers when using the navigation stack in your sc
 #### Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots
 ```bib
 @inproceedings{puetz21cvp,
-  author = {Pütz, Sebastian and Wiemann, Thomas and Kleine Piening, Malte and Hertzberg, Joachim},
-  title = {Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots},
+  title     = {Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots},
+  author    = {Pütz, Sebastian and Wiemann, Thomas and Kleine Piening, Malte and Hertzberg, Joachim},
   booktitle = {2021 IEEE International Conference on Robotics and Automation (ICRA)},
-  year = 2021,
-  url = {https://github.com/uos/mesh_navigation},
-  note = {Software available at \url{https://github.com/uos/mesh_navigation}}
+  year      = {2021},
+  doi       = {10.1109/ICRA48506.2021.9560981}
 }
 ```
 
@@ -211,10 +209,11 @@ Please reference the following papers when using the navigation stack in your sc
 
 ```bib
 @phdthesis{puetz2022diss,
+  title  = {Navigation Control \& Path Planning for Autonomous Mobile Robots}
   author = {Sebastian Pütz},
-  title = {Navigation Control \& Path Planning for Autonomous Mobile Robots}
-  year = {2022},
-  school = {Universität Osnabrück}
+  school = {Universität Osnabrück},
+  year   = {2022},
+  doi    = {10.48693/69}
 }
 ```
 
