@@ -62,7 +62,7 @@ Get MeshNav's ROS 2 dependencies
 Build: Go to workspace root `cd $YOUR_ROS_WS` and run 
 
 ```bash
-colcon build --packages-up-to mesh_navigation`
+colcon build --packages-up-to mesh_navigation
 ```
 
 # Usage Examples and Demos
