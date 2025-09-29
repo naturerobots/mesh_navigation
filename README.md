@@ -6,7 +6,7 @@
 </div>
 <h4 align="center">Mobile Robot Navigation in 3D Meshes</h4>
 <div align="center">
-  <a href="https://github.com/naturerobots/mesh_navigation_tutorials">Tutorials</a>
+  <a href="https://naturerobots.github.io/mesh_navigation_docs/tutorials/">Tutorials</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://naturerobots.github.io/mesh_navigation_docs/">Documentation</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
@@ -54,10 +54,9 @@ colcon build --packages-up-to mesh_navigation
 
 # Usage Examples and Demos
 
-Recommended entrypoint for new users: Check out the **[mesh_navigation_tutorials](https://github.com/naturerobots/mesh_navigation_tutorials/tree/main)** for a ready-to-use mesh navigation stack. Complete with simulated environment, RViz config, mesh nav config, etc.
+**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**: a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
 
-
-## Demos
+## Demo Videos
 
 In the following demo videos we used the developed *continuous vector field planner* (CVP).
 
@@ -65,15 +64,12 @@ In the following demo videos we used the developed *continuous vector field plan
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) | [![Mesh Navigation with acorn19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
 
-### Stone Quarry in the Forest in Brockum
+#### Stone Quarry in the Forest in Brockum
 
 | Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
 
-### Learn to Navigate in 3D - No Robot Needed
-
-We provide a collection of virtual worlds within our [tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/). They are easy to use, even if you don’t have access to a robot or only have limited computing resources: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
 
 # Software Stack
 
