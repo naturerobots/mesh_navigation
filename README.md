@@ -6,7 +6,7 @@
 </div>
 <h4 align="center">Mobile Robot Navigation in 3D Meshes</h4>
 <div align="center">
-  <a href="https://github.com/naturerobots/mesh_navigation_tutorials">Tutorials</a>
+  <a href="https://naturerobots.github.io/mesh_navigation_docs/tutorials/">Tutorials</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://naturerobots.github.io/mesh_navigation_docs/">Documentation</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
@@ -26,19 +26,6 @@ layered mesh map. Layers can be loaded as plugins representing specific geometri
 The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
 <center><img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600"></center>
-
-<!-- # Contents
-* [Publications](#publications)
-* [Installation](#installation)
-* [Usage Examples and Demos](#usage-examples-and-demos)
-* [Software Stack](#software-stack)
-* [Mesh Map](#mesh-map)
-* [Planners](#planners)
-* [Controllers](#controllers)
-* [Simulation](#simulation)
-* [Maintain and Contribute](#maintain-and-contribute)
-* [Build Status](#build-status) -->
-
 
 # Installation
 
@@ -67,23 +54,22 @@ colcon build --packages-up-to mesh_navigation
 
 # Usage Examples and Demos
 
-Recommended entrypoint for new users: Check out the **[mesh_navigation_tutorials](https://github.com/naturerobots/mesh_navigation_tutorials/tree/main)** for a ready-to-use mesh navigation stack. Complete with simulated environment, RViz config, mesh nav config, etc.
+**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**, a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
 
-
-## Demos
+## Demo Videos
 
 In the following demo videos we used the developed *continuous vector field planner* (CVP).
 
-| Dataset and Description                  | Demo Video                                                                                                               |
+| Botanical Garden of Osnabrück University                  | Stone Quarry in the Forest Brockum                                                                                                               |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Botanical Garden of Osnabrück University | [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) |
-| Stone Quarry in the Forest Brockum       | [![Mesh Navigation with acorn19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
+| [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) | [![Mesh Navigation with acorn19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
 
-### Stone Quarry in the Forest in Brockum
+#### Stone Quarry in the Forest in Brockum
 
 | Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
+
 
 # Software Stack
 
@@ -235,8 +221,12 @@ For the necessary localization of the robot relative to the mesh, we recommend u
 Maintainers:
 * [Matthias Holoch](mailto:matthias.holoch@naturerobots.com) (Nature Robots)
 * [Alexander Mock](https://github.com/amock) (Osnabrück University)
-* [Sebastian Pütz](mailto:sebastian.puetz@naturerobots.com) (Nature Robots, DFKI)
+* [Justus Braun](https://github.com/justusbraun) (Osnabrück University)
 
-Author: [Sebastian Pütz](mailto:spuetz@uos.de)
+Authors:
+* [Sebastian Pütz](mailto:spuetz@uos.de) (Nature Robots)
+* [Alexander Mock](https://github.com/amock) (Osnabrück University)
+* [Matthias Holoch](mailto:matthias.holoch@naturerobots.com) (Nature Robots)
+* [Justus Braun](https://github.com/justusbraun) (Osnabrück University)
 
 We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs are welcome!
