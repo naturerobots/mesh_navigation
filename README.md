@@ -54,7 +54,7 @@ colcon build --packages-up-to mesh_navigation
 
 # Usage Examples and Demos
 
-**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**: a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
+**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**, a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
 
 ## Demo Videos
 
