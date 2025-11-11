@@ -15,9 +15,9 @@ LayerManager::LayerManager(MeshMap& map, const rclcpp::Node::SharedPtr& node)
 , loader_("mesh_map", "mesh_map::AbstractLayer")
 {}
 
-void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
+void LayerManager::read_configured_layers()
 {
-  const auto layer_names = node->declare_parameter(
+  const auto layer_names = node_->declare_parameter(
     MeshMap::MESH_MAP_NAMESPACE + ".layers", std::vector<std::string>()
   );
   const rclcpp::ParameterType ros_param_type = rclcpp::ParameterType::PARAMETER_STRING;
@@ -29,7 +29,7 @@ void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
       throw rclcpp::exceptions::InvalidParametersException("The layer name " + layer_name + " is used more than once. Layer names must be unique!");
     }
     // This will throws rclcpp::ParameterValue exception if mesh_map.layer_name.type is not set
-    const std::string layer_type = node->declare_parameter<std::string>(
+    const std::string layer_type = node_->declare_parameter<std::string>(
       MeshMap::MESH_MAP_NAMESPACE + "." + layer_name + ".type"
     );
 
@@ -42,7 +42,7 @@ void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
   // output warning if no layer plugins were configured
   if (names_.size() == 0)
   {
-    RCLCPP_WARN_STREAM(node->get_logger(), "No MeshMap layer plugins configured!"
+    RCLCPP_WARN_STREAM(node_->get_logger(), "No MeshMap layer plugins configured!"
       << " - Use the param \"" << MeshMap::MESH_MAP_NAMESPACE << ".layers\", which must be a list of strings with arbitrary layer names. "
       << "For each layer_name, also define layer_name.type with the respective type that shall be loaded via pluginlib.");
   }
@@ -59,7 +59,7 @@ void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
   {
     const Vertex& v = vertices_[layer_name];
     // If mesh_map.layer_name.inputs is not set we assume the layer needs no inputs
-    const auto dependencies = node->declare_parameter<std::vector<std::string>>(
+    const auto dependencies = node_->declare_parameter<std::vector<std::string>>(
       MeshMap::MESH_MAP_NAMESPACE + "." + layer_name + ".inputs", std::vector<std::string>()
     );
     
@@ -72,7 +72,7 @@ void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
   }
   
   // Print the dependencies
-  RCLCPP_INFO(node->get_logger(), "Layer dependencies:");
+  RCLCPP_INFO(node_->get_logger(), "Layer dependencies:");
   for (const auto& [name, vertex]: vertices_)
   {
     auto [it, end] = boost::adjacent_vertices(vertex, graph_);
@@ -90,8 +90,28 @@ void LayerManager::read_configured_layers(const rclcpp::Node::SharedPtr& node)
     }
     builder << ']';
 
-    RCLCPP_INFO(node->get_logger(), "  %s: %s", name.c_str(), builder.str().c_str());
+    RCLCPP_INFO(node_->get_logger(), "  %s: %s", name.c_str(), builder.str().c_str());
   }
+
+  // Initialize the publishers
+  cost_pub_ = node_->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(names_.size()).transient_local());
+
+  // we dont want to publish static costs all the time.
+  // therefore we have to check if someone newly subscribed to the topic
+  cost_subscribe_checker_ = node_->create_wall_timer(std::chrono::milliseconds(200), [this]{
+      const size_t count = cost_pub_->get_subscription_count() + cost_pub_->get_intra_process_subscription_count();
+      if (count > vertex_cost_sub_count_)
+      {
+        RCLCPP_INFO(node_->get_logger(), "New cost layer subscriber detected. Publishing vertex costs once...");
+        for (const auto& [layer_name, layer_ptr]: layer_instances())
+        {
+          publish_cost_layer(layer_ptr->costs(), layer_name, node_->get_clock()->now());
+        }
+      }
+      vertex_cost_sub_count_ = count;
+    });
+
+  cost_update_pub_ = node_->create_publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>(std::string(cost_pub_->get_topic_name()) + "/updates", rclcpp::QoS(10).transient_local());
 }
 
 bool LayerManager::load_layer_plugins(const rclcpp::Logger& logger)
@@ -125,7 +145,7 @@ bool LayerManager::load_layer_plugins(const rclcpp::Logger& logger)
   return instances_.empty() ? false : true;
 }
 
-bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node, const MeshMap::Ptr& map)
+bool LayerManager::initialize_layer_plugins(const MeshMap::Ptr& map)
 {
   // Prevent layers from publishing updates while initialization is still ongoing initialization
   std::unique_lock lock(layer_mtx_);
@@ -142,7 +162,7 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
     if (nullptr == instance)
     {
       RCLCPP_WARN(
-        node->get_logger(),
+        node_->get_logger(),
         "Skipping initialization of layer '%s' because it failed to load",
         name.c_str()
       );
@@ -156,10 +176,10 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
       std::placeholders::_3
     );
 
-    if (!instance->initialize(name, callback, map, node))
+    if (!instance->initialize(name, callback, map, node_))
     {
       RCLCPP_ERROR(
-        node->get_logger(),
+        node_->get_logger(),
         "Could not initialize the layer plugin with the name \"%s\"!",
         name.c_str()
       );
@@ -168,12 +188,12 @@ bool LayerManager::initialize_layer_plugins(const rclcpp::Node::SharedPtr& node,
 
     if (!instance->readLayer())
     {
-      RCLCPP_INFO(node->get_logger(), "Computing layer '%s' ...", name.c_str());
+      RCLCPP_INFO(node_->get_logger(), "Computing layer '%s' ...", name.c_str());
       instance->computeLayer();
     }
 
     // Publish the layer
-    map_.publishVertexCosts(instance->costs(), name, node_->get_clock()->now());
+    publish_cost_layer(instance->costs(), name, node_->get_clock()->now());
   }
 
   return true;
@@ -199,14 +219,14 @@ void LayerManager::layer_changed(
   const auto& ptr = get_layer(name);
   if (nullptr == ptr)
   {
-    // TODO: Log error
+    RCLCPP_ERROR(node_->get_logger(), "LayerManager::layer_changed() - Could not get pointer to changed layer %s", name.c_str());
     return;
   }
 
   const auto v_it = vertices_.find(name);
   if (v_it == vertices_.end())
   {
-    // TODO: Log error
+    RCLCPP_ERROR(node_->get_logger(), "LayerManager::layer_changed() - Could not find dependency graph vertex for layer %s", name.c_str());
     return;
   }
   
@@ -221,7 +241,7 @@ void LayerManager::layer_changed(
     c.insert(v, cm.containsKey(v)? cm[v]: ptr->defaultValue());
   }
   rlock.unlock();
-  map_.publishVertexCostsUpdate(c, ptr->defaultValue(), name, timestamp);
+  publish_cost_update(c, ptr->defaultValue(), name, timestamp);
   
   // Notify the map
   map_.layerChanged(name, changed);
@@ -240,6 +260,35 @@ void LayerManager::layer_changed(
 
     layer->onInputChanged(timestamp, changed);
   }
+}
+
+void LayerManager::publish_cost_layer(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& timestamp)
+{
+  cost_pub_->publish(
+    mesh_msgs_conversions::toVertexCostsStamped(
+      costs,
+      map_.mesh()->numVertices(),
+      0,
+      name,
+      map_.getGlobalFrameID(),
+      map_.getUUID(),
+      timestamp
+    )
+  );
+}
+
+void LayerManager::publish_cost_update(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& timestamp)
+{
+  cost_update_pub_->publish(
+    mesh_msgs_conversions::toVertexCostsSparseStamped(
+      costs,
+      default_value,
+      name,
+      map_.getGlobalFrameID(),
+      map_.getUUID(),
+      timestamp
+    )
+  );
 }
 
 } // namespace mesh_map;
