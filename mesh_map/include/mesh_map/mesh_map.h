@@ -143,15 +143,9 @@ public:
    * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
    * @param costs The cost map to publish
    * @param name The name of the cost map
+   * @param timestamp The timestamp of the costmap
    */
   void publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp);
-
-  /**
-   * @brief Publishes the given vertex map as mesh_msgs/VertexCostsSparse, e.g. to update the visualization in RVIZ.
-   * @param costs The cost map to publish
-   * @param name The name of the cost map
-   */
-  void publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp);
 
   /**
    * @briefP Publishes the vertex colors if these exists.
@@ -528,12 +522,6 @@ private:
 
   //! vertex normals
   lvr2::DenseVertexMap<Normal> vertex_normals;
-
-  //! publisher for vertex costs
-  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr vertex_costs_pub;
-  rclcpp::TimerBase::SharedPtr vertex_costs_subscribe_checker_;
-  size_t vertex_costs_sub_count_ = 0;
-  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr vertex_costs_update_pub_;
 
   //! publisher for vertex colors
   rclcpp::Publisher<mesh_msgs::msg::MeshVertexColorsStamped>::SharedPtr vertex_colors_pub;

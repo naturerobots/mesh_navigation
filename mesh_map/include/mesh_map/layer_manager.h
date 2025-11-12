@@ -47,6 +47,9 @@
 #include <mesh_map/abstract_layer.h>
 #include <mesh_map/definitions.h>
 
+#include <mesh_msgs/msg/mesh_vertex_costs_stamped.hpp>
+#include <mesh_msgs/msg/mesh_vertex_costs_sparse_stamped.hpp>
+
 namespace mesh_map
 {
 
@@ -55,9 +58,9 @@ class LayerManager
 public:
 
   /**
-   *  @brief Read the configured layers and dependencies from the node
+   *  @brief Read the configured layers and dependencies from the stored node
    */
-  void read_configured_layers(const rclcpp::Node::SharedPtr& node);
+  void read_configured_layers();
   
   /**
    *  @brief Create instances of the configured layers
@@ -69,7 +72,7 @@ public:
    *  @brief Initialize all layer plugins and load or compute their values
    *  @return true If all loaded layers were initialized sucessfully
    */
-  bool initialize_layer_plugins(const rclcpp::Node::SharedPtr& node, const std::shared_ptr<MeshMap>& map);
+  bool initialize_layer_plugins(const std::shared_ptr<MeshMap>& map);
   
   /**
    *  @brief Get the plugin type of a layer
@@ -108,6 +111,22 @@ public:
   {
     return instances_;
   }
+
+  /**
+   * @brief Publishes the given vertex map as mesh_msgs/VertexCosts, e.g. to visualize these.
+   * @param costs The cost map to publish
+   * @param name The name of the cost map
+   * @param timestamp The timestamp of the cost layer
+   */
+  void publish_cost_layer(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& timestamp);
+
+  /**
+   * @brief Publishes the given vertex map as mesh_msgs/VertexCostsSparse, e.g. to update the visualization in RVIZ.
+   * @param costs The cost map to publish
+   * @param name The name of the cost map
+   * @param timestamp The timestamp of the cost update
+   */
+  void publish_cost_update(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& timestamp);
 
   /**
    *  @brief Init the layer manager. Stores a reference to the map, which is not used
@@ -162,6 +181,13 @@ private:
   //! Maps layer name to instance
   std::map<std::string, std::shared_ptr<AbstractLayer>> instances_;
 
+  //! Publisher for vertex costs
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsStamped>::SharedPtr cost_pub_;
+  rclcpp::TimerBase::SharedPtr cost_subscribe_checker_;
+  size_t vertex_cost_sub_count_ = 0;
+
+  //! Publisher for vertex cost changes
+  rclcpp::Publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>::SharedPtr cost_update_pub_;
 };
 
 } /* namespace mesh_map */

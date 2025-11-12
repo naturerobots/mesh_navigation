@@ -44,7 +44,7 @@ TEST_F(MeshMapTest, loadsSinglePlugin)
   // The MeshMap requires that a map file is loaded to initialize, so we test the layer manager directly
   mesh_map::LayerManager manager(*mesh_map_ptr_, node_ptr_);
 
-  EXPECT_NO_THROW(manager.read_configured_layers(node_ptr_));
+  EXPECT_NO_THROW(manager.read_configured_layers());
   EXPECT_TRUE(manager.load_layer_plugins(node_ptr_->get_logger()));
   // This calls back to the mesh map and segfaults because the MeshMap has its own internal LayerManager :(
   // EXPECT_TRUE(manager.initialize_layer_plugins(node_ptr_, mesh_map_ptr_));
@@ -65,7 +65,7 @@ TEST_F(MeshMapTest, loadsMultiplePlugins)
   // The MeshMap requires that a map file is loaded to initialize, so we test the layer manager directly
   mesh_map::LayerManager manager(*mesh_map_ptr_, node_ptr_);
 
-  EXPECT_NO_THROW(manager.read_configured_layers(node_ptr_));
+  EXPECT_NO_THROW(manager.read_configured_layers());
   EXPECT_TRUE(manager.load_layer_plugins(node_ptr_->get_logger()));
 
   EXPECT_NE(manager.get_layer("t1"), nullptr);

@@ -130,19 +130,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
 
   marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/marker", 100);
   mesh_geometry_pub = node->create_publisher<mesh_msgs::msg::MeshGeometryStamped>("~/mesh", rclcpp::QoS(1).transient_local());
-  vertex_costs_pub = node->create_publisher<mesh_msgs::msg::MeshVertexCostsStamped>("~/vertex_costs", rclcpp::QoS(1).transient_local());
-  // we dont want to publish static costs all the time.
-  // therefore we have to check if someone newly subscribed to the topic
-  vertex_costs_subscribe_checker_ = node->create_wall_timer(std::chrono::milliseconds(200), [this, node]{
-      const size_t count = vertex_costs_pub->get_subscription_count() + vertex_costs_pub->get_intra_process_subscription_count();
-      if (count > vertex_costs_sub_count_)
-      {
-        RCLCPP_INFO(node->get_logger(), "New cost layer subscriber detected. Publishing vertex costs once...");
-        publishCostLayers(node->now());
-      }
-      vertex_costs_sub_count_ = count;
-    });
-  vertex_costs_update_pub_ = node->create_publisher<mesh_msgs::msg::MeshVertexCostsSparseStamped>(std::string(vertex_costs_pub->get_topic_name()) + "/updates", rclcpp::QoS(10).transient_local());
+
   vertex_colors_pub = node->create_publisher<mesh_msgs::msg::MeshVertexColorsStamped>("~/vertex_colors", rclcpp::QoS(1).transient_local());
   vector_field_pub = node->create_publisher<visualization_msgs::msg::Marker>("~/vector_field", rclcpp::QoS(1).transient_local());
   edge_weights_text_pub = node->create_publisher<visualization_msgs::msg::MarkerArray>("~/edge_weights", rclcpp::QoS(1).transient_local());
@@ -434,7 +422,7 @@ bool MeshMap::readMap()
     }
   }
   
-  layer_manager_.read_configured_layers(node);
+  layer_manager_.read_configured_layers();
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Load layer plugins...");
   if (!layer_manager_.load_layer_plugins(node->get_logger()))
@@ -444,7 +432,7 @@ bool MeshMap::readMap()
   }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Initialize layer plugins...");
-  if (!layer_manager_.initialize_layer_plugins(node, shared_from_this()))
+  if (!layer_manager_.initialize_layer_plugins(shared_from_this()))
   {
     RCLCPP_FATAL_STREAM(node->get_logger(), "Could not initialize plugins!");
     return false;
@@ -456,7 +444,6 @@ bool MeshMap::readMap()
     return false;
   }
   computeEdgeWeights();
-  publishCostLayers(map_stamp);
 
   map_loaded = true;
   return true;
@@ -1320,44 +1307,9 @@ bool MeshMap::resetLayers()
   return true;  // TODO implement
 }
 
-void MeshMap::publishCostLayers(const rclcpp::Time& map_stamp)
-{
-  for (const auto& [layer_name, layer_ptr] : layer_manager_.layer_instances())
-  {
-    vertex_costs_pub->publish(
-      mesh_msgs_conversions::toVertexCostsStamped(
-        layer_ptr->costs(),
-        mesh_ptr->numVertices(),
-        layer_ptr->defaultValue(),
-        layer_name,
-        global_frame,
-        uuid_str,
-        map_stamp
-      )
-    );
-  }
-}
-
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp)
 {
-  vertex_costs_pub->publish(
-      mesh_msgs_conversions::toVertexCostsStamped(costs, mesh_ptr->numVertices(), 0, name, global_frame, uuid_str, map_stamp));
-  // TODO: Should this be moved to the LayerManager? Publishing the layers and updates
-  // is part of managing the layers isnt it?
-}
-
-void MeshMap::publishVertexCostsUpdate(const lvr2::VertexMap<float>& costs, const float default_value, const std::string& name, const rclcpp::Time& map_stamp)
-{
-  vertex_costs_update_pub_->publish(
-    mesh_msgs_conversions::toVertexCostsSparseStamped(
-      costs,
-      default_value,
-      name,
-      global_frame,
-      uuid_str,
-      map_stamp
-    )
-  );
+  layer_manager_.publish_cost_layer(costs, name, map_stamp);
 }
 
 void MeshMap::publishVertexColors(const rclcpp::Time& map_stamp)
