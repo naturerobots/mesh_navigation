@@ -21,10 +21,7 @@
 
 ---
 
-The *Mesh Navigation* bundle (MeshNav) provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
-layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
-The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
-
+The *Mesh Navigation* bundle (MeshNav) provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion planning.
 
 <center><a href="https://www.youtube.com/watch?v=gvKsW5MEC4Y&list=PLZCjrqh-MUkTzEJxnscuDPakxjo-xKMTO&index=1"><img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600"></a></center>
 
@@ -57,34 +54,46 @@ colcon build --packages-up-to mesh_navigation
 
 # MeshNav Plugins
 
-MeshNav provides a plugin system so that you can write your own plugins for mesh layers and Mesh-based planning & control. This project already provides some implementations you can use out of the box.
+MeshNav inherits the generic navigation interfaces from **[Move Base Flex (MBF)](https://github.com/naturerobots/move_base_flex)**, which provides a universal, map-agnostic ROS action interface for path planning, motion control, and recovery behaviors. This flexible architecture makes MeshNav extensible and interoperable with other navigation approaches. We also provide additional planner and controller plugins that run on the layered mesh map. MeshNav provides a plugin system so that you can write your own plugins for mesh layers and mesh-based planning & control. This project already provides several implementations you can use out of the box.
 
 ## Mesh Layers
+
+Mesh layers are plugins that compute cost or feature values for each triangle or vertex in the mesh. They enable the robot to assess terrain properties and make informed navigation decisions. Each layer can represent different geometric or semantic characteristics of the environment.
 
 |   |   |  |  |
 |:---:|:---:|:---:|:---:|
 |  HeightDiff | Roughness  |  Steepness |  Ridge |
 | ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer") | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer") | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer") |
-|  Clearance | Inflation  |  Steepness |  Obstacle |
+|  Clearance | Inflation  |  Border |  Obstacle |
 | ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer") | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer") | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
+
+The layered approach allows combining multiple cost factors (e.g., steepness, roughness, obstacles) to create comprehensive traversability assessments for safe navigation in complex terrain.
 
 [>> More Information <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
 ## Planners & Controllers
+
+MeshNav includes several planners and controllers specifically designed to work with mesh maps. These plugins leverage the 3D mesh structure to compute paths and control commands that respect the terrain geometry.
+
+### Global Planners
 
 | Dijkstra | Continuous Vector Field Planner (CVP) |
 |:---:|:---:|
 | ![VectorFieldController](docs/images/planners/dijkstra_pot.jpg "Vector Field Controller") | ![CVP](docs/images/planners/cvp_pot.jpg "CVP") |
 | `dijkstra_mesh_planner/DijkstraMeshPlanner`| `cvp_mesh_planner/CVPMeshPlanner` |
 
+Both planners compute globally optimal paths across the mesh surface, taking into account the accumulated costs from all active mesh layers.
+
+### Local Controllers
+
 |  Vector Field Controller | MeshMPPI  |
 |:---:|:---:|
 | ![VectorFieldController](docs/images/controllers/vector_field_controller.png "Vector Field Controller") | ![MeshMPPI](docs/images/controllers/mesh_mppi.gif "MeshMPPI") |
 | `mesh_controller/MeshController` | `mesh_mppi/DiffDriveMPC`/ `mesh_mppi/BicycleMPC` |
 
+The controllers generate velocity commands to follow the planned path while reacting to local obstacles and terrain features.
+
 [>> Explore Planners & Controllers <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/planner_and_controller/)
-
-
 
 # Related Publications
 
