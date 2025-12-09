@@ -67,7 +67,7 @@ Mesh layers are plugins that compute cost or feature values for each triangle or
 |  Clearance | Inflation  |  Border |  Obstacle |
 | ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer") | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer") | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
 
-The layered approach allows combining multiple cost factors (e.g., steepness, roughness, obstacles) to create comprehensive traversability assessments for safe navigation in complex terrain.
+The layered approach allows combining multiple cost factors (e.g., steepness, roughness, obstacles) in a dependency graph structure to create comprehensive traversability assessments for safe navigation in complex terrain.
 
 [>> Explore Mesh Layers <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
@@ -88,7 +88,7 @@ Both planners compute globally optimal paths across the mesh surface, taking int
 
 |  Vector Field Controller | MeshMPPI  |
 |:---:|:---:|
-| ![VectorFieldController](docs/images/controllers/vector_field_controller.png "Vector Field Controller") | ![MeshMPPI](docs/images/controllers/mesh_mppi.gif "MeshMPPI") |
+| [![VectorFieldController](docs/images/controllers/vector_field_controller.png "Vector Field Controller")](https://www.youtube.com/watch?v=tLDl9xIBrlw&list=PLZCjrqh-MUkQLEL4s06xf8ieexrjX9y6c&index=3) | [![MeshMPPI](docs/images/controllers/mesh_mppi.gif "MeshMPPI")](https://github.com/uos/mesh_mppi) |
 | `mesh_controller/MeshController` | `mesh_mppi/DiffDriveMPC`/ `mesh_mppi/BicycleMPC` |
 
 The controllers generate velocity commands to follow the planned path while reacting to local obstacles and terrain features.
