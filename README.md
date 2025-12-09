@@ -28,8 +28,6 @@ The *Mesh Navigation* bundle (MeshNav) provides software for efficient robot nav
 
 # Installation
 
-### Installation from source
-
 You need a working ROS 2 installation; we target `humble` and `jazzy` at the moment. Go into a ROS 2 workspace's source directory `cd $YOUR_ROS_WS/src`. Then clone the source code 
 
 ```bash
