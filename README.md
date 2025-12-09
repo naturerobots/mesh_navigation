@@ -33,7 +33,7 @@ The *Mesh Navigation* bundle (MeshNav) provides software for efficient robot nav
 You need a working ROS 2 installation; we target `humble` and `jazzy` at the moment. Go into a ROS 2 workspace's source directory `cd $YOUR_ROS_WS/src`. Then clone the source code 
 
 ```bash
-git clone git@github.com:naturerobots/mesh_navigation.git`
+git clone git@github.com:naturerobots/mesh_navigation.git
 ```
 
 Get MeshNav's ROS 2 dependencies
@@ -58,7 +58,7 @@ MeshNav inherits the generic navigation interfaces from **[Move Base Flex (MBF)]
 
 ## Mesh Layers
 
-Mesh layers are plugins that compute cost or feature values for each triangle or vertex in the mesh. They enable the robot to assess terrain properties and make informed navigation decisions. Each layer can represent different geometric or semantic characteristics of the environment.
+Mesh layers are plugins that compute cost or feature values for each triangle or vertex in the mesh. They enable the robot to evaluate terrain properties and use this information to make informed navigation decisions. Each layer can represent different geometric or semantic characteristics of the environment.
 
 |   |   |  |  |
 |:---:|:---:|:---:|:---:|
