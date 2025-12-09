@@ -21,18 +21,15 @@
 
 ---
 
-The *Mesh Navigation* bundle provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
+The *Mesh Navigation* bundle (MeshNav) provides software for efficient robot navigation on 2D manifolds, which are represented in 3D as triangle meshes. It enables safe navigation in various complex outdoor environments by using a modularly extensible
 layered mesh map. Layers can be loaded as plugins representing specific geometric or semantic metrics of the terrain. This allows the incorporation of obstacles in these complex outdoor environments into path and motion motion planning.
 The layered *Mesh Map* is integrated with *Move Base Flex (MBF)*, which provides a universal ROS action interface for path planning, motion control, and for recovery behaviors. We also provide additional planner and controller plugins that run on the layered mesh map.
 
-<center><img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600"></center>
+
+<center><a href="https://www.youtube.com/watch?v=gvKsW5MEC4Y&list=PLZCjrqh-MUkTzEJxnscuDPakxjo-xKMTO&index=1"><img title="Demo Gif" src="docs/images/demo.gif?raw=true" alt="Demo Gif" width="600"></a></center>
+
 
 # Installation
-
-### ROS Version
-This is the active ROS 2 branch of this repository, which targets `humble`.
-If your are looking for the old ROS 1 version, checkout the [noetic branch](https://github.com/naturerobots/mesh_navigation/tree/noetic).
-**Warning**: The ROS 1 version of mesh_navigation is not maintained anymore.
 
 ### Installation from source
 
@@ -52,7 +49,7 @@ Build: Go to workspace root `cd $YOUR_ROS_WS` and run
 colcon build --packages-up-to mesh_navigation
 ```
 
-# Usage Examples and Demos
+# Getting Started
 
 **Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**, a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware.
 
@@ -73,19 +70,21 @@ MeshNav provides a plugin system so that you can write your own plugins for mesh
 
 [>> More Information <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
-## Planners
+## Planners & Controllers
 
 | Dijkstra | Continuous Vector Field Planner (CVP) |
 |:---:|:---:|
 | ![VectorFieldController](docs/images/planners/dijkstra_pot.jpg "Vector Field Controller") | ![CVP](docs/images/planners/cvp_pot.jpg "CVP") |
 | `dijkstra_mesh_planner/DijkstraMeshPlanner`| `cvp_mesh_planner/CVPMeshPlanner` |
 
-## Controllers
-
 |  Vector Field Controller | MeshMPPI  |
 |:---:|:---:|
 | ![VectorFieldController](docs/images/controllers/vector_field_controller.png "Vector Field Controller") | ![MeshMPPI](docs/images/controllers/mesh_mppi.gif "MeshMPPI") |
 | `mesh_controller/MeshController` | `mesh_mppi/DiffDriveMPC`/ `mesh_mppi/BicycleMPC` |
+
+[>> Explore Planners & Controllers <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/planner_and_controller/)
+
+
 
 # Related Publications
 
