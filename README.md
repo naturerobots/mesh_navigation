@@ -54,80 +54,38 @@ colcon build --packages-up-to mesh_navigation
 
 # Usage Examples and Demos
 
-**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**, a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware: [Explore Virtual Worlds](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/).
+**Recommended entrypoint for new users:** Start with the **[mesh_navigation_tutorials](https://naturerobots.github.io/mesh_navigation_docs/tutorials/)**, a ready-to-use mesh navigation stack including simulated environments, RViz setup, and configuration files. As part of the tutorials, we also provide a collection of **virtual worlds** that work even without a robot or powerful hardware.
 
-## Demo Videos
+[>> Explore Virtual Worlds <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/tutorial_worlds/)
 
-In the following demo videos we used the developed *continuous vector field planner* (CVP).
-
-| Botanical Garden of Osnabrück University                  | Stone Quarry in the Forest Brockum                                                                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [![Mesh Navigation with Pluto](http://img.youtube.com/vi/qAUWTiqdBM4/0.jpg)](http://www.youtube.com/watch?v=qAUWTiqdBM4) | [![Mesh Navigation with acorn19](http://img.youtube.com/vi/DFmv3wnIxug/0.jpg)](https://youtu.be/DFmv3wnIxug)             |
-
-#### Stone Quarry in the Forest in Brockum
-
-| Colored Point Cloud | Height Diff Layer | RGB Vertex Colors |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
-
-
-# Plugins
+# MeshNav Plugins
 
 MeshNav provides a plugin system so that you can write your own plugins for mesh layers and Mesh-based planning & control. This project already provides some implementations you can use out of the box.
 
 ## Mesh Layers
 
-<div class="no-header">
-
 |   |   |  |  |
 |:---:|:---:|:---:|:---:|
-| ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer") | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer") | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer") |
 |  HeightDiff | Roughness  |  Steepness |  Ridge |
-| ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer") | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer") | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
+| ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer") | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer") | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer") |
 |  Clearance | Inflation  |  Steepness |  Obstacle |
-
-</div>
+| ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer") | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer") | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
 
 [>> More Information <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
 ## Planners
-Currently the following planners are available:
 
-### Dijkstra Mesh Planner
-
-```yaml
-  mesh_planner:
-    type: 'dijkstra_mesh_planner/DijkstraMeshPlanner'
-```
-
-### Continuous Vector Field Planner
-
-```yaml
-  mesh_planner:
-    type: 'cvp_mesh_planner/CVPMeshPlanner'
-```
-
-The planners are compared to each other.
-
-| Vector Field Planner                                                                        | Dijkstra Mesh Planner                                                                              | ROS Global Planner on 2.5D DEM                                                     |
-| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ![VectorFieldPlanner](docs/images/stone_quarry/fmm_pot.jpg?raw=true "Vector Field Planner") | ![DijkstraMeshPlanner](docs/images/stone_quarry/dijkstra_pot.jpg?raw=true "Dijkstra Mesh Planner") | ![2D-DEM-Planner](docs/images/stone_quarry/dem_side.jpg?raw=true "2D DEM Planner") |
+| Dijkstra | Continuous Vector Field Planner (CVP) |
+|:---:|:---:|
+| ![VectorFieldController](docs/images/planners/dijkstra_pot.jpg "Vector Field Controller") | ![CVP](docs/images/planners/cvp_pot.jpg "CVP") |
+| `dijkstra_mesh_planner/DijkstraMeshPlanner`| `cvp_mesh_planner/CVPMeshPlanner` |
 
 ## Controllers
 
-### Mesh Controller
-
-```yaml
-  mesh_controller:
-    type: 'mesh_controller/MeshController'
-```
-
-### MeshMPPI
-
-```yaml
-  mesh_controller:
-    type: `mesh_mppi/MeshMPPI`
-```
+|  Vector Field Controller | MeshMPPI  |
+|:---:|:---:|
+| ![VectorFieldController](docs/images/controllers/vector_field_controller.png "Vector Field Controller") | ![MeshMPPI](docs/images/controllers/mesh_mppi.gif "MeshMPPI") |
+| `mesh_controller/MeshController` | `mesh_mppi/DiffDriveMPC`/ `mesh_mppi/BicycleMPC` |
 
 # Related Publications
 
@@ -182,20 +140,22 @@ allow to publish, edit and inspect such maps within the existing ROS software st
 
 ## Mesh Localization
 
-For the necessary localization of the robot relative to the mesh, we recommend using RMCL: [https://github.com/uos/rmcl](https://github.com/uos/rmcl). We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
+For the necessary localization of the robot relative to the mesh, we recommend using [RMCL](https://github.com/uos/rmcl). We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
 
 <a href="https://vimeo.com/879000775" target="_blank" ><img src="docs/images/roscon2023_talk.png" alt="MeshNav ROSCon 2023 Video" width="300px"/></a>
 
 # Maintain and Contribute
+
+We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs are welcome!
+
 Maintainers:
 * [Matthias Holoch](mailto:matthias.holoch@naturerobots.com) (Nature Robots)
-* [Alexander Mock](https://github.com/amock) (Osnabrück University)
+* [Alexander Mock](https://github.com/amock) (Nature Robots)
 * [Justus Braun](https://github.com/justusbraun) (Osnabrück University)
 
 Authors:
 * [Sebastian Pütz](mailto:spuetz@uos.de) (Nature Robots)
-* [Alexander Mock](https://github.com/amock) (Osnabrück University)
+* [Alexander Mock](https://github.com/amock) (Nature Robots)
 * [Matthias Holoch](mailto:matthias.holoch@naturerobots.com) (Nature Robots)
 * [Justus Braun](https://github.com/justusbraun) (Osnabrück University)
 
-We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs are welcome!
