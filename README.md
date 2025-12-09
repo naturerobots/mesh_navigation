@@ -69,7 +69,7 @@ Mesh layers are plugins that compute cost or feature values for each triangle or
 
 The layered approach allows combining multiple cost factors (e.g., steepness, roughness, obstacles) to create comprehensive traversability assessments for safe navigation in complex terrain.
 
-[>> More Information <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
+[>> Explore Mesh Layers <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
 ## Planners & Controllers
 
