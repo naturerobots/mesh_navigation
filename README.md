@@ -146,7 +146,7 @@ allow to publish, edit and inspect such maps within the existing ROS software st
 
 ## Mesh Localization
 
-For the necessary localization of the robot relative to the mesh, we recommend using [RMCL](https://github.com/uos/rmcl). We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
+For the necessary localization of the robot relative to the mesh, we recommend using **[RMCL](https://github.com/uos/rmcl)**. We presented the combination of both software packages at [ROSCon 2023](https://vimeo.com/879000775):
 
 <a href="https://vimeo.com/879000775" target="_blank" ><img src="docs/images/roscon2023_talk.png" alt="MeshNav ROSCon 2023 Video" width="300px"/></a>
 
