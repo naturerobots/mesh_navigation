@@ -71,53 +71,24 @@ In the following demo videos we used the developed *continuous vector field plan
 | ![StoneQuarryPointCLoud](docs/images/stone_quarry/cloud.png?raw=true "Stone Quarry Point Cloud") | ![StoneQuarryHeightDiff](docs/images/stone_quarry/height_diff.jpg?raw=true "Stone Quarry Height Diff") | ![StoneQuarryVertexColors](docs/images/stone_quarry/mesh_rgb.jpg?raw=true "Stone Quarry Vertex Colors") |
 
 
-# Software Stack
+# Plugins
 
-This **[mesh_navigation](https://github.com/naturerobots/mesh_navigation)** stack provides a navigation server for **[Move Base Flex (MBF)](https://github.com/naturerobots/move_base_flex)**. It provides a couple of configuration files and launch files to start the navigation server with the configured layer plugins for the layered mesh map, and the configured planners and controller to perform path planning and motion control in 3D (or more specifically on 2D-manifold). 
-
-The package structure is as follows:
-
-- `mesh_navigation` The corresponding ROS meta package.
-
-- `mbf_mesh_core` contains the plugin interfaces derived from the abstract MBF plugin interfaces to initialize planner and controller plugins with one `mesh_map` instance. It provides the following three interfaces:
-  
-  - MeshPlanner - `mbf_mesh_core/mesh_planner.h`
-  - MeshController - `mbf_mesh_core/mesh_controller.h`
-  - MeshRecovery - `mbf_mesh_core/mesh_recovery.h`
-
-- `mbf_mesh_nav` contains the mesh navigation server which is built on top of the abstract MBF navigation server. It uses the plugin interfaces in `mbf_mesh_core` to load and initialize plugins of the types described above.
-
-- `mesh_map` contains an implementation of a mesh map representation building on top of the generic mesh interface implemented in **[lvr2](https://github.com/uos/lvr2)**. This package provides a layered mesh map implementation. Layers can be loaded as plugins to allow a highly configurable 3D navigation stack for robots traversing on the ground in outdoor and rough terrain.
-
-- `mesh_layers` The package provides a couple of mesh layers to compute trafficability/traversibility properties of the terrain. Furthermore, these plugins have access to the HDF5 map file and can load and store layer information. The mesh layers can be configured for the robots abilities and needs. Currently we provide the following layer plugins:
-  
-  - HeightDiffLayer - `mesh_layers/HeightDiffLayer`
-  - RoughnessLayer - `mesh_layers/RoughnessLayer`
-  - SteepnessLayer - `mesh_layers/SteepnessLayer`
-  - RidgeLayer - `mesh_layer/RidgeLayer`
-  - ClearanceLayer - `mesh_layers/ClearanceLayer`
-  - InflationLayer - `mesh_layers/InflationLayer`
-  - BorderLayer - `mesh_layers/BorderLayer`
-  - ObstacleLayer - `mesh_layers/ObstacleLayer`
-
-- `dijkstra_mesh_planner` contains a mesh planner plugin providing a path planning method based on Dijkstra's algorithm. It plans by using the edges of the mesh map. The propagation start a the goal pose, thus a path from every accessed vertex to the goal pose can be computed. This leads to a sub-optimal potential field, which highly depends on the mesh structure.
-
-- `cvp_mesh_planner` contains a Fast Marching Method (FMM) wave front path planner to take the 2D-manifold into account. This planner is able to plan over the surface, due to that it results in shorter paths than the `dijkstra_mesh_planner`, since it is not restricted to the edges or topology of the mesh. A comparison is shown below. Please refer to the paper `Continuous Shortest Path Vector Field Navigation on 3D Triangular Meshes for Mobile Robots`.
+MeshNav provides a plugin system so that you can write your own plugins for mesh layers and Mesh-based planning & control. This project already provides some implementations you can use out of the box.
 
 ## Mesh Layers
 
-The following table gives an overview of all currently implemented layer plugins available in the stack and the corresponding types to specify for usage in the mesh map configuration. An example mesh map configuration is shown below.
+<div class="no-header">
 
-| Layer               | Plugin Type Specifier         | Description of Cost Computation          | Example Image                                                                           |
-| ------------------- | ----------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
-| **HeightDiffLayer** | `mesh_layers/HeightDiffLayer` | local radius based height differences    | ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") |
-| **RoughnessLayer**  | `mesh_layers/RoughnessLayer`  | local radius based normal fluctuation    | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer")      |
-| **SteepnessLayer**  | `mesh_layers/SteepnessLayer`  | arccos of the normal's z coordinate      | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer")      |
-| **RidgeLayer**      | `mesh_layer/RidgeLayer`       | local radius based distance along normal. This can be useful to drive along ridge or bed structures in agricultural scenarios (e.g. potatoes, carrots, or onions). Hereby, the upper part of the ridges would have higher costs while the valleys would have low costs. This can be useful to plan vehicle wheel trajectories and only allow driving inside the ridge valleys (and thus not damage crops). | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer")                   |
-| **ClearanceLayer**  | `mesh_layers/ClearanceLayer`  | comparison of robot height and clearance along each vertex normal | ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |
-| **InflationLayer**  | `mesh_layers/InflationLayer`  | by distance to a lethal vertex           | ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer")      |
-| **BorderLayer** | `mesh_layers/BorderLayer` | give vertices close to the border a certain cost | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer")   |
-| **ObstacleLayer**   | `mesh_layers/ObstacleLayer`   | marks vertices blocked by dynamic obstacles as lethal. Cost layer (left) and gazebo sim with unmapped obstacle (right) | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
+|   |   |  |  |
+|:---:|:---:|:---:|:---:|
+| ![HeightDiffLayer](docs/images/costlayers/height_diff.jpg?raw=true "Height Diff Layer") | ![RoughnessLayer](docs/images/costlayers/roughness.jpg?raw=true "Roughness Layer") | ![SteepnessLayer](docs/images/costlayers/steepness.jpg?raw=true "Steepness Layer") | ![RidgeLayer](docs/images/costlayers/ridge.jpg?raw=true "RidgeLayer") |
+|  HeightDiff | Roughness  |  Steepness |  Ridge |
+| ![ClearanceLayer](docs/images/costlayers/clearance.jpg?raw=true "Clearance Layer") |  ![InflationLayer](docs/images/costlayers/inflation.jpg?raw=true "Inflation Layer") | ![BorderLayer](docs/images/costlayers/border.png?raw=true "Border Layer") | ![ObstacleLayer](docs/images/costlayers/obstacle.png?raw=true "ObstacleLayer") |
+|  Clearance | Inflation  |  Steepness |  Obstacle |
+
+</div>
+
+[>> More Information <<](https://naturerobots.github.io/mesh_navigation_docs/tutorials/mesh_cost_layers/)
 
 ## Planners
 Currently the following planners are available:
@@ -136,15 +107,6 @@ Currently the following planners are available:
     type: 'cvp_mesh_planner/CVPMeshPlanner'
 ```
 
-### MMP Planner (only)
-
-```yaml
-  mesh_planner:
-    type: 'mmp_planner/MMPPlanner'
-```
-
-**Note**: The MMP planner is currently only available with ROS 1 / [mmp-planner](https://github.com/naturerobots/mesh_navigation/tree/mmp-planner) branch.
-
 The planners are compared to each other.
 
 | Vector Field Planner                                                                        | Dijkstra Mesh Planner                                                                              | ROS Global Planner on 2.5D DEM                                                     |
@@ -158,6 +120,13 @@ The planners are compared to each other.
 ```yaml
   mesh_controller:
     type: 'mesh_controller/MeshController'
+```
+
+### MeshMPPI
+
+```yaml
+  mesh_controller:
+    type: `mesh_mppi/MeshMPPI`
 ```
 
 # Related Publications
