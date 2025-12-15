@@ -41,21 +41,20 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <optional>
 #include <memory>
-
 #include <functional>
-#include <geometry_msgs/msg/point_stamped.hpp>
-#include <geometry_msgs/msg/vector3.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
+#include <mutex>
+#include <filesystem>
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
 #include <lvr2/io/deprecated/hdf5/MeshIO.hpp>
 #include <lvr2/types/MeshBuffer.hpp>
-
 // Mesh structure for fast surface traversal
 #include <lvr2/geometry/PMPMesh.hpp>
-
 // Raycaster implementations
 #ifdef LVR2_USE_EMBREE
   #include <lvr2/algorithm/raycasting/EmbreeRaycaster.hpp>
@@ -63,21 +62,21 @@
   #include <lvr2/algorithm/raycasting/BVHRaycaster.hpp>
 #endif
 
+#include <rclcpp/rclcpp.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
+
 #include <mesh_map/abstract_layer.h>
 #include <mesh_map/mesh_map.h>
 #include <mesh_map/util.h>
 #include <mesh_map/timer.h>
 #include <mesh_msgs/msg/mesh_geometry_stamped.hpp>
 #include <mesh_msgs_conversions/conversions.h>
-#include <mutex>
-#include <rclcpp/rclcpp.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-
-#include <filesystem>
-
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
 
 namespace fs = std::filesystem;
 
@@ -1305,6 +1304,24 @@ bool MeshMap::rayTriangleIntersect(const Vector& orig, const Vector& dir, const 
 bool MeshMap::resetLayers()
 {
   return true;  // TODO implement
+}
+
+geometry_msgs::msg::PoseStamped MeshMap::transformToMapFrame(
+    const geometry_msgs::msg::PoseStamped& input_pose) const
+{
+  if(input_pose.header.frame_id == mapFrame())
+  {
+    return input_pose;
+  }
+
+  // we shouldn't catch/ignore the error that comes from here, as it indicates a misconfiguration
+  const geometry_msgs::msg::TransformStamped Tim = tf_buffer.lookupTransform(
+      mapFrame(), input_pose.header.frame_id, input_pose.header.stamp);
+
+  geometry_msgs::msg::PoseStamped output_pose;
+  tf2::doTransform(input_pose, output_pose, Tim);
+  
+  return output_pose;
 }
 
 void MeshMap::publishVertexCosts(const lvr2::VertexMap<float>& costs, const std::string& name, const rclcpp::Time& map_stamp)

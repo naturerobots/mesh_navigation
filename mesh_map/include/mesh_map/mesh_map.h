@@ -42,7 +42,6 @@
 #include <mutex>
 #include <tuple>
 #include <unordered_map>
-#include <geometry_msgs/msg/point.hpp>
 #include <memory>
 
 #include <mesh_map/abstract_layer.h>
@@ -57,6 +56,9 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
 #include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
@@ -255,6 +257,12 @@ public:
   bool resetLayers();
 
   /**
+   * @brief Transforms the given transform to the global frame of the MeshMap
+   */
+  geometry_msgs::msg::PoseStamped transformToMapFrame(
+    const geometry_msgs::msg::PoseStamped& input_pose) const;
+
+  /**
    * @brief Returns the stored vector map
    */
   const lvr2::DenseVertexMap<mesh_map::Vector>& getVectorMap()
@@ -289,7 +297,7 @@ public:
   /**
    * @brief Returns the map frame / coordinate system id
    */
-  const std::string& mapFrame()
+  const std::string& mapFrame() const
   {
     return global_frame;
   }

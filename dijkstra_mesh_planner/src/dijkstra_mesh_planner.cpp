@@ -56,13 +56,17 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
                             double tolerance, std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message)
 {
+  // This planner requires start and goal pose to be in map frame
+  const geometry_msgs::msg::PoseStamped start_in_map = mesh_map_->transformToMapFrame(start);
+  const geometry_msgs::msg::PoseStamped goal_in_map = mesh_map_->transformToMapFrame(goal);
+
   const auto mesh = mesh_map_->mesh();
 
   std::list<lvr2::VertexHandle> path;
   RCLCPP_INFO(node_->get_logger(), "start dijkstra mesh planner.");
 
-  mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
-  mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
+  mesh_map::Vector start_vec = mesh_map::toVector(start_in_map.pose.position);
+  mesh_map::Vector goal_vec = mesh_map::toVector(goal_in_map.pose.position);
 
   // call dijkstra with the goal pose as seed / start vertex
   uint32_t outcome = dijkstra(goal_vec, start_vec, path);
