@@ -57,16 +57,25 @@ uint32_t DijkstraMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& st
                             std::string& message)
 {
   // This planner requires start and goal pose to be in map frame
-  const geometry_msgs::msg::PoseStamped start_in_map = mesh_map_->transformToMapFrame(start);
-  const geometry_msgs::msg::PoseStamped goal_in_map = mesh_map_->transformToMapFrame(goal);
-
-  const auto mesh = mesh_map_->mesh();
-
-  std::list<lvr2::VertexHandle> path;
-  RCLCPP_INFO(node_->get_logger(), "start dijkstra mesh planner.");
+  geometry_msgs::msg::PoseStamped start_in_map, goal_in_map;
+  try {
+    // try to extract start and goal in map frame
+    start_in_map = mesh_map_->transformToMapFrame(start);
+    goal_in_map = mesh_map_->transformToMapFrame(goal);
+  } catch (tf2::TransformException& ex) {
+    RCLCPP_ERROR_STREAM(
+      node_->get_logger(), name_ <<
+        ": Could not transform start or goal pose to map frame '" << map_frame_ << "': " << ex.what());
+    return mbf_msgs::action::GetPath::Result::TF_ERROR;
+  }
 
   mesh_map::Vector start_vec = mesh_map::toVector(start_in_map.pose.position);
   mesh_map::Vector goal_vec = mesh_map::toVector(goal_in_map.pose.position);
+
+  const auto mesh = mesh_map_->mesh();
+  std::list<lvr2::VertexHandle> path;
+
+  RCLCPP_INFO(node_->get_logger(), "start dijkstra mesh planner.");
 
   // call dijkstra with the goal pose as seed / start vertex
   uint32_t outcome = dijkstra(goal_vec, start_vec, path);
