@@ -116,9 +116,10 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
       plan.push_back(pose);
     }
 
+    // Add the goal pose with correct orientation to the plan
     geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
-    pose.pose = goal.pose;
+    pose.pose = goal_in_map.pose;
     plan.push_back(pose);
   }
 
