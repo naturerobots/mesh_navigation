@@ -91,6 +91,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   , node(node)
   , first_config(true)
   , map_loaded(false)
+  , tf_timeout(1.0) // default 1s
 {
   auto edge_cost_factor_desc = rcl_interfaces::msg::ParameterDescriptor{};
   edge_cost_factor_desc.name = MESH_MAP_NAMESPACE + ".edge_cost_factor";
@@ -118,6 +119,7 @@ MeshMap::MeshMap(tf2_ros::Buffer& tf, const rclcpp::Node::SharedPtr& node)
   mesh_working_file = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_file", "");
   mesh_working_part = node->declare_parameter(MESH_MAP_NAMESPACE + ".mesh_working_part", "");
   global_frame = node->declare_parameter(MESH_MAP_NAMESPACE + ".global_frame", "map");
+  node->get_parameter("tf_timeout", tf_timeout); // declared in mbf abstract_navigation_server
 
   const bool enable_layer_timer = node->declare_parameter(MESH_MAP_NAMESPACE + ".enable_layer_timer", false);
   if (enable_layer_timer)
@@ -1316,7 +1318,7 @@ geometry_msgs::msg::PoseStamped MeshMap::transformToMapFrame(
 
   // we shouldn't catch/ignore the error that comes from here, as it indicates a misconfiguration
   const geometry_msgs::msg::TransformStamped Tim = tf_buffer.lookupTransform(
-      mapFrame(), input_pose.header.frame_id, input_pose.header.stamp);
+      mapFrame(), input_pose.header.frame_id, input_pose.header.stamp, rclcpp::Duration::from_seconds(tf_timeout));
 
   geometry_msgs::msg::PoseStamped output_pose;
   tf2::doTransform(input_pose, output_pose, Tim);

@@ -504,6 +504,9 @@ private:
   //! The name of the mesh part that is used for navigation stored to the working file
   std::string mesh_working_part;
 
+  //! TF2 transform timeout duration (fetched from MBF)
+  double tf_timeout;
+
   //! dynamic params callback handle
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_callback;
 
