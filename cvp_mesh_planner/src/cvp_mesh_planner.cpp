@@ -65,16 +65,27 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
                             std::vector<geometry_msgs::msg::PoseStamped>& plan, double& cost,
                             std::string& message)
 {
+  // This planner requires start and goal pose to be in map frame
+  geometry_msgs::msg::PoseStamped start_in_map, goal_in_map;
+
+  try {
+    // try to extract start and goal in map frame
+    start_in_map = mesh_map_->transformToMapFrame(start);
+    goal_in_map = mesh_map_->transformToMapFrame(goal);
+  } catch (tf2::TransformException& ex) {
+    RCLCPP_ERROR_STREAM(
+      node_->get_logger(), name_ <<
+        ": Could not transform start or goal pose to map frame '" << map_frame_ << "': " << ex.what());
+    return mbf_msgs::action::GetPath::Result::TF_ERROR;
+  }
+
+  mesh_map::Vector start_vec = mesh_map::toVector(start_in_map.pose.position);
+  mesh_map::Vector goal_vec = mesh_map::toVector(goal_in_map.pose.position);
+
   const auto mesh = mesh_map_->mesh();
   std::list<std::pair<mesh_map::Vector, lvr2::FaceHandle>> path;
 
-  // mesh_map->combineVertexCosts(); // TODO should be outside the planner
-
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "start wave front propagation.");
-
-  mesh_map::Vector goal_vec = mesh_map::toVector(goal.pose.position);
-  mesh_map::Vector start_vec = mesh_map::toVector(start.pose.position);
-
   const uint32_t outcome = waveFrontPropagation(goal_vec, start_vec, path, message);
 
   RCLCPP_DEBUG_STREAM(node_->get_logger(), "finished wave front propagation.");
@@ -105,9 +116,10 @@ uint32_t CVPMeshPlanner::makePlan(const geometry_msgs::msg::PoseStamped& start,
       plan.push_back(pose);
     }
 
+    // Add the goal pose with correct orientation to the plan
     geometry_msgs::msg::PoseStamped pose;
     pose.header = header;
-    pose.pose = goal.pose;
+    pose.pose = goal_in_map.pose;
     plan.push_back(pose);
   }
 
