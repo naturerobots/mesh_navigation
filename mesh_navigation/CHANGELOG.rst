@@ -2,6 +2,10 @@
 Changelog for package mesh_navigation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.1 (2026-08-15)
+------------------
+* Update maintainer information
+
 3.0.0 (2025-09-10)
 ------------------
 

@@ -12,4 +12,4 @@ repositories:
   move_base_flex:
     type: git
     url: https://github.com/naturerobots/move_base_flex.git
-    version: humble
+    version: ros2

@@ -14,7 +14,7 @@ find_package(mbf_msgs REQUIRED)
 find_package(mbf_utility REQUIRED)
 find_package(mesh_map REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(LVR2 REQUIRED)
+find_package(lvr2 REQUIRED)
 
 pluginlib_export_plugin_description_file(mbf_mesh_core dijkstra_mesh_planner.xml)
 
@@ -24,11 +24,11 @@ add_library(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${LVR2_INCLUDE_DIRS})
+)
 target_compile_definitions(${PROJECT_NAME} PRIVATE "DIJKSTRA_MESH_PLANNER_BUILDING_LIBRARY")
 ament_target_dependencies(${PROJECT_NAME} mbf_mesh_core mbf_msgs mbf_utility mesh_map rclcpp)
 target_link_libraries(${PROJECT_NAME} 
-    ${LVR2_LIBRARIES}
+    lvr2::lvr2
     ${MPI_CXX_LIBRARIES}
 )
 
