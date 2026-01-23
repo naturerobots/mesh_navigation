@@ -1,14 +1,16 @@
 <?xml version="1.0"?>
 <package format="3">
     <name>mbf_mesh_core</name>
-    <version>3.0.0</version>
+    <version>3.0.1</version>
     <description>The mbf_mesh_core package</description>
 
-    <maintainer email="matthias.holoch@naturerobots.com">Matthias Holoch</maintainer>
-    <maintainer email="sebastian.puetz@naturerobots.com">Sebastian Pütz</maintainer>
+    <maintainer email="alexander.mock@naturerobots.com">Alexander Mock</maintainer>
+    <maintainer email="jubraun@uos.de">Justus Braun</maintainer>
 
-    <license>BSD-3</license>
+    <license>BSD-3-Clause</license>
     <author email="spuetz@uos.de">Sebastian Pütz</author>
+    <author email="alexander.mock@naturerobots.com">Alexander Mock</author>
+    <author email="jubraun@uos.de">Justus Braun</author>
 
     <depend>mbf_abstract_core</depend>
     <depend>mesh_map</depend>

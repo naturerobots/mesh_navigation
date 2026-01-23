@@ -59,6 +59,7 @@
 #ifdef LVR2_USE_EMBREE
   #include <lvr2/algorithm/raycasting/EmbreeRaycaster.hpp>
 #else
+  #pragma message("[WARNING] MeshMap: No Embree found. Using fallback raycaster. (SLOWER!)")
   #include <lvr2/algorithm/raycasting/BVHRaycaster.hpp>
 #endif
 

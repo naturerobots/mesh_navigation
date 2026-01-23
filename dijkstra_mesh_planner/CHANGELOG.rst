@@ -2,6 +2,11 @@
 Changelog for package dijkstra_mesh_planner
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.1 (2026-08-15)
+------------------
+* Update maintainer information
+* Use lvr2 cmake targets
+
 3.0.0 (2025-09-10)
 ------------------
 * Cost-aware planning

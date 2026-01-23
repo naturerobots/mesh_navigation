@@ -25,7 +25,7 @@ foreach(dep IN LISTS dependencies)
   find_package(${dep} REQUIRED)
 endforeach()
 
-find_package(LVR2 REQUIRED)
+find_package(lvr2 REQUIRED)
 find_package(assimp REQUIRED)
 find_package(MPI)
 find_package(PkgConfig REQUIRED)
@@ -33,7 +33,6 @@ pkg_check_modules(JSONCPP jsoncpp)
 
 include_directories(
   include
-  ${LVR2_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
@@ -49,13 +48,13 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   ${ASSIMP_INCLUDE_DIRS})
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 target_link_libraries(${PROJECT_NAME} 
-    ${LVR2_LIBRARIES}
+    lvr2::lvr2
     ${ASSIMP_LIBRARIES}
 )
-target_compile_definitions(${PROJECT_NAME}
-  PUBLIC
-  ${LVR2_DEFINITIONS}
-)
+# target_compile_definitions(${PROJECT_NAME}
+#   PUBLIC
+#   ${LVR2_DEFINITIONS}
+# )
 
 install(DIRECTORY include/
   DESTINATION include

@@ -170,7 +170,7 @@ bool barycentricCoords(const Vector& p, const Vector& v0, const Vector& v1, cons
 
 /**
  * @brief Computes a linear combination of vertex properties and the barycentric coordinates
- * @tparam T The value to combine with barycentric coordinates, it must support the star/*-operator
+ * @tparam T The value to combine with barycentric coordinates, it must support the star\*-operator
  * @param vertex_properties The vertex properties of a triangle
  * @param barycentric_coords The barycentric coordinates
  * @return The linear combined value, e.g. a vector, or cost value
@@ -185,7 +185,7 @@ T linearCombineBarycentricCoords(const std::array<T, 3>& vertex_properties,
 
 /**
  * @brief Computes a linear combination of vertex properties and the barycentric coordinates
- * @tparam T The value to combine with barycentric coordinates, it must support the star/*-operator
+ * @tparam T The value to combine with barycentric coordinates, it must support the star\*-operator
  * @param vertices The three vertex handles of a triangle
  * @param attribute_map An attribute map to access with the given vertex handles
  * @param barycentric_coords The barycentric coordinates

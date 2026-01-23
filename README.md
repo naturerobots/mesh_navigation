@@ -155,7 +155,6 @@ For the necessary localization of the robot relative to the mesh, we recommend u
 We are happy to receive improvements to the mesh navigation stack. Just open an issue. PRs are welcome!
 
 Maintainers:
-* [Matthias Holoch](mailto:matthias.holoch@naturerobots.com) (Nature Robots)
 * [Alexander Mock](https://github.com/amock) (Nature Robots)
 * [Justus Braun](https://github.com/justusbraun) (Osnabrück University)
 

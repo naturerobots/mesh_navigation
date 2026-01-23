@@ -34,7 +34,7 @@ include_directories(
   include
 )
 
-find_package(LVR2 REQUIRED)
+find_package(lvr2 REQUIRED)
 find_package(MPI)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP jsoncpp)
@@ -52,11 +52,11 @@ add_library(mbf_mesh_server
 target_include_directories(mbf_mesh_server PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${LVR2_INCLUDE_DIRS})
+)
 ament_target_dependencies(mbf_mesh_server ${dependencies})
 target_link_libraries(mbf_mesh_server 
   ${JSONCPP_LIBRARIES}
-  ${LVR2_LIBRARIES}
+  lvr2::lvr2
   ${MPI_CXX_LIBRARIES}
 )
 
@@ -65,9 +65,9 @@ ament_target_dependencies(${PROJECT_NAME} ${dependencies} ${${PROJECT_NAME}_EXPO
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${LVR2_INCLUDE_DIRS})
+)
 target_link_libraries(${PROJECT_NAME}
-  ${LVR2_LIBRARIES}
+  lvr2::lvr2
   ${MPI_CXX_LIBRARIES}
   ${JSONCPP_LIBRARIES}
   mbf_mesh_server
