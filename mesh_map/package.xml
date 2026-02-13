@@ -1,11 +1,14 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
     <name>mesh_map</name>
     <version>3.0.1</version>
     <description>The mesh_map package</description>
+    
     <maintainer email="alexander.mock@naturerobots.com">Alexander Mock</maintainer>
     <maintainer email="jubraun@uos.de">Justus Braun</maintainer>
     <license>BSD 3-Clause</license>
+    
     <author email="spuetz@uos.de">Sebastian Pütz</author>
     <author email="alexander.mock@naturerobots.com">Alexander Mock</author>
     <author email="jubraun@uos.de">Justus Braun</author>
