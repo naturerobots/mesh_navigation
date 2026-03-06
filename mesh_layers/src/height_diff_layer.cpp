@@ -104,7 +104,8 @@ bool HeightDiffLayer::computeLayer()
 {
   auto map = map_ptr_.lock();
   auto mesh = map->mesh();
-  height_diff_ = lvr2::calcVertexHeightDifferences(*mesh, config_.radius);
+  const auto& normals = map->vertexNormals();
+  height_diff_ = lvr2::calcVertexHeightDifferences(*mesh, normals, config_.radius);
   return computeLethals();
 }
 
