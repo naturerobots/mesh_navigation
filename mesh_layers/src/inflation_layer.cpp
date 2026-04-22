@@ -312,10 +312,8 @@ bool InflationLayer::waveFrontUpdate(
   return false;
 }
 
-float InflationLayer::fading(const float squared_distance)
+float InflationLayer::fading(const float distance)
 {
-  const float distance = sqrt(squared_distance);
-
   if (distance > config_.inflation_radius)
   {
     return 0;
