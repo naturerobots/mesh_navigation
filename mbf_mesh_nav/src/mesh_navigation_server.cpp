@@ -66,7 +66,7 @@ MeshNavigationServer::MeshNavigationServer(const TFPtr& tf_listener_ptr, const r
   RCLCPP_INFO_STREAM(node_->get_logger(), "Reading map file...");
   mesh_ptr_->readMap();
 
-  // initialize all plugins (done by SimpleNavigationServer constructor) and then initialize the server components (e.g. services) that depend on the plugins to be loaded and initialized
+  // initialize all plugins (also done by SimpleNavigationServer constructor) and then initialize the server components (e.g. services) that depend on the plugins to be loaded and initialized
   initializeServerComponents();
 }
 
