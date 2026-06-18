@@ -14,6 +14,8 @@
 
     <depend>geometry_msgs</depend>
     <depend>mbf_abstract_nav</depend>
+    <depend>mbf_abstract_core</depend>
+    <depend>mbf_simple_nav</depend>
     <depend>mbf_simple_core</depend>
     <depend>mbf_mesh_core</depend>
     <depend>mbf_msgs</depend>

@@ -40,7 +40,8 @@
 
 #include <mutex>
 
-#include <mbf_abstract_nav/abstract_navigation_server.h>
+
+#include <mbf_simple_nav/simple_navigation_server.h>
 
 #include "mesh_controller_execution.h"
 #include "mesh_planner_execution.h"
@@ -54,6 +55,14 @@
 #include <mbf_simple_core/simple_planner.h>
 #include <mbf_simple_core/simple_controller.h>
 #include <mbf_simple_core/simple_recovery.h>
+
+#include <mbf_abstract_nav/abstract_planner_execution.h>
+#include <mbf_abstract_nav/abstract_controller_execution.h>
+#include <mbf_abstract_nav/abstract_recovery_execution.h>
+
+#include <mbf_abstract_core/abstract_planner.h>
+#include <mbf_abstract_core/abstract_controller.h>
+#include <mbf_abstract_core/abstract_recovery.h>
 
 #include <pluginlib/class_loader.hpp>
 
@@ -75,12 +84,14 @@ namespace mbf_mesh_nav
  *
  * @ingroup navigation_server move_base_server
  */
-class MeshNavigationServer : public mbf_abstract_nav::AbstractNavigationServer
+class MeshNavigationServer : public mbf_simple_nav::SimpleNavigationServer
 {
 public:
   typedef std::shared_ptr<mesh_map::MeshMap> MeshPtr;
 
   typedef std::shared_ptr<MeshNavigationServer> Ptr;
+
+  using Base = mbf_simple_nav::SimpleNavigationServer;
 
   /**
    * @brief Constructor
@@ -95,18 +106,17 @@ public:
 
   virtual void stop();
 
-private:
   //! shared pointer to a new @ref planner_execution "PlannerExecution"
   virtual mbf_abstract_nav::AbstractPlannerExecution::Ptr
-  newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
+    newPlannerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractPlanner::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref controller_execution "ControllerExecution"
   virtual mbf_abstract_nav::AbstractControllerExecution::Ptr
-  newControllerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
+    newControllerExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractController::Ptr plugin_ptr);
 
   //! shared pointer to a new @ref recovery_execution "RecoveryExecution"
   virtual mbf_abstract_nav::AbstractRecoveryExecution::Ptr
-  newRecoveryExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
+    newRecoveryExecution(const std::string &plugin_name, const mbf_abstract_core::AbstractRecovery::Ptr plugin_ptr);
 
   /**
    * @brief Loads the plugin associated with the given planner_type parameter.
@@ -190,17 +200,15 @@ private:
    */
   void callServiceClearMesh(std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<std_srvs::srv::Empty::Request> request, std::shared_ptr<std_srvs::srv::Empty::Response> response);
 
+private:
   //! plugin class loader for recovery behaviors plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshRecovery> recovery_plugin_loader_;
-  pluginlib::ClassLoader<mbf_simple_core::SimpleRecovery> simple_recovery_plugin_loader_;
 
   //! plugin class loader for controller plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshController> controller_plugin_loader_;
-  pluginlib::ClassLoader<mbf_simple_core::SimpleController> simple_controller_plugin_loader_;
-
+ 
   //! plugin class loader for planner plugins
   pluginlib::ClassLoader<mbf_mesh_core::MeshPlanner> planner_plugin_loader_;
-  pluginlib::ClassLoader<mbf_simple_core::SimplePlanner> simple_planner_plugin_loader_;
 
   //! Shared pointer to the common global mesh
   MeshPtr mesh_ptr_;

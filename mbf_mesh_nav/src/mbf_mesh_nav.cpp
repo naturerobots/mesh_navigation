@@ -63,8 +63,8 @@ int main(int argc, char** argv)
 
   TFPtr tf_buffer_ptr = std::make_shared<TF>(node->get_clock(), tf2::durationFromSec(cache_time));
   tf2_ros::TransformListener tf_listener(*tf_buffer_ptr);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Starting mesh navigation server.");
   mesh_nav_srv_ptr = std::make_shared<mbf_mesh_nav::MeshNavigationServer>(tf_buffer_ptr, node);
-
   signal(SIGINT, sigintHandler);
 
   // NOTE: Using a multithreaded executor is recommended so cost layers can use

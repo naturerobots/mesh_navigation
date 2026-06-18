@@ -17,6 +17,8 @@ find_package(ament_cmake_ros REQUIRED)
 set(dependencies
   geometry_msgs
   mbf_abstract_nav
+  mbf_abstract_core
+  mbf_simple_nav
   mbf_simple_core
   mbf_mesh_core
   mbf_msgs
