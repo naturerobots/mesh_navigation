@@ -1125,21 +1125,59 @@ boost::optional<std::tuple<           // returns:
       Vector& query_point,            // -> query point
       const float& max_dist)          // -> maximum search radius around query point
 {
-  if(auto vH_opt = getNearestVertexHandle(query_point))
+  auto vH_opt = getNearestVertexHandle(query_point);
+  if (!vH_opt)
   {
-    auto vH = vH_opt.unwrap();
-    float lowest_distance_found = std::numeric_limits<float>::max();
-    std::array<Vector, 3> closest_face_vertices;
-    std::array<float, 3> bary_coords_on_closest_face;
-    lvr2::OptionalFaceHandle opt_closest_face_handle;
-    for(auto current_face_handle : mesh_ptr->getFacesOfVertex(vH))
+    RCLCPP_FATAL_STREAM(node->get_logger(), "Could not find the nearest vertex");
+    return boost::none;
+  }
+  const auto start_vH = vH_opt.unwrap();
+
+  float lowest_distance_found = std::numeric_limits<float>::max();
+  std::array<Vector, 3> closest_face_vertices;
+  std::array<float, 3> bary_coords_on_closest_face;
+  lvr2::OptionalFaceHandle opt_closest_face_handle;
+
+  // no vertex / no face visited twice
+  std::vector<bool> visited_vertices(mesh_ptr->nextVertexIndex(), false);
+  std::vector<bool> checked_faces(mesh_ptr->nextFaceIndex(), false);
+
+  // min-heap keyed on distance to query_point -> best-first / "sorted BFS"
+  using VertexDist = std::pair<float, lvr2::VertexHandle>;
+  auto cmp = [](const VertexDist& a, const VertexDist& b) { return a.first > b.first; };
+  std::priority_queue<VertexDist, std::vector<VertexDist>, decltype(cmp)> open(cmp);
+
+  const float start_dist = (mesh_ptr->getVertexPosition(start_vH) - query_point).length();
+  open.push({start_dist, start_vH});
+  visited_vertices[start_vH.idx()] = true;
+
+  while (!open.empty())
+  {
+    const auto [vertex_dist, vH] = open.top();
+    open.pop();
+
+    // everything remaining in the queue is at least this far away
+    if (vertex_dist > max_dist)
     {
+      break;
+    }
+
+    // check all faces attached to this vertex
+    for (auto current_face_handle : mesh_ptr->getFacesOfVertex(vH))
+    {
+      if (checked_faces[current_face_handle.idx()])
+      {
+        continue;
+      }
+      checked_faces[current_face_handle.idx()] = true;
+
       const auto& current_vertices = mesh_ptr->getVertexPositionsOfFace(current_face_handle);
       float distance_to_current_face = 0;
       std::array<float, 3> current_bary_coords;
-      const bool is_query_point_in_current_face = mesh_map::projectedBarycentricCoords(query_point, current_vertices, current_bary_coords, distance_to_current_face);
+      const bool is_query_point_in_current_face = mesh_map::projectedBarycentricCoords(
+          query_point, current_vertices, current_bary_coords, distance_to_current_face);
 
-      if(is_query_point_in_current_face && distance_to_current_face < lowest_distance_found)
+      if (is_query_point_in_current_face && distance_to_current_face < lowest_distance_found)
       {
         lowest_distance_found = distance_to_current_face;
         opt_closest_face_handle = current_face_handle;
@@ -1147,14 +1185,30 @@ boost::optional<std::tuple<           // returns:
         bary_coords_on_closest_face = current_bary_coords;
       }
     }
-    if(opt_closest_face_handle)
+
+    // expand frontier: sort neighbours of vH by distance implicitly via the heap
+    for (auto nH : mesh_ptr->getNeighboursOfVertex(vH))
     {
-      return std::make_tuple(opt_closest_face_handle.unwrap(), closest_face_vertices, bary_coords_on_closest_face);
+      if (visited_vertices[nH.idx()])
+      {
+        continue;
+      }
+      visited_vertices[nH.idx()] = true;
+
+      const float d = (mesh_ptr->getVertexPosition(nH) - query_point).length();
+      if (d <= max_dist)
+      {
+        open.push({d, nH});
+      }
     }
-    RCLCPP_ERROR_STREAM(node->get_logger(), "No containing face found!");
-    return boost::none;
   }
-  RCLCPP_FATAL_STREAM(node->get_logger(), "Could not find the nearest vertex");
+
+  if (opt_closest_face_handle)
+  {
+    return std::make_tuple(opt_closest_face_handle.unwrap(), closest_face_vertices, bary_coords_on_closest_face);
+  }
+
+  RCLCPP_ERROR_STREAM(node->get_logger(), "No containing face found!");
   return boost::none;
 }
 
