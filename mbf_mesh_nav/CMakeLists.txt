@@ -39,7 +39,6 @@ include_directories(
 find_package(lvr2 REQUIRED)
 find_package(MPI)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(JSONCPP jsoncpp)
 
 include_directories(
   include
@@ -57,7 +56,6 @@ target_include_directories(mbf_mesh_server PUBLIC
 )
 ament_target_dependencies(mbf_mesh_server ${dependencies})
 target_link_libraries(mbf_mesh_server 
-  ${JSONCPP_LIBRARIES}
   lvr2::lvr2
   ${MPI_CXX_LIBRARIES}
 )
@@ -71,7 +69,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_link_libraries(${PROJECT_NAME}
   lvr2::lvr2
   ${MPI_CXX_LIBRARIES}
-  ${JSONCPP_LIBRARIES}
   mbf_mesh_server
 )
 

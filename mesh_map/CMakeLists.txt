@@ -29,7 +29,6 @@ find_package(lvr2 REQUIRED)
 find_package(assimp REQUIRED)
 find_package(MPI)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(JSONCPP jsoncpp)
 
 include_directories(
   include
