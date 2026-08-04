@@ -1143,6 +1143,11 @@ boost::optional<std::tuple<           // returns:
     // Check for max distance
     const float dist = (result.point - qp).norm();
     if (dist > max_dist) {
+      RCLCPP_WARN(
+        node->get_logger(),
+        "[MeshMap::searchContainingFace] Closest point distance exceeds max dist! Dist: %f Max Dist: %f",
+        dist, max_dist
+      );
       return boost::none;
     }
 
@@ -1160,11 +1165,13 @@ boost::optional<std::tuple<           // returns:
         "[MeshMap::searchContainingFace] Failed to calculate barycentric coordinates for closest surface point! Point: [%f, %f, %f] Face: %u",
         closest_point.x, closest_point.y, closest_point.z, result.face.idx()
       );
+      return boost::none;
     }
     // TODO: This API is stupid. We could just return the closest point!
     return std::tuple(result.face, vertices, bary);
   }
 
+  RCLCPP_ERROR(node->get_logger(), "[MeshMap::searchContainingFace] Failed to find containing face!");
   return boost::none;
 }
 
