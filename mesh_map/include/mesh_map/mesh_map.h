@@ -61,6 +61,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
 #include <lvr2/algorithm/raycasting/RaycasterBase.hpp>
+#include <lvr2/algorithm/ClosestSurfacePoint.hpp>
 #include <lvr2/geometry/BaseVector.hpp>
 #include <lvr2/io/AttributeMeshIOBase.hpp>
 #include <lvr2/geometry/PMPMesh.hpp>
@@ -318,6 +319,17 @@ public:
   std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster() const
   {
     return raycaster_ptr;
+  }
+
+  /**
+   * @brief Return the shared lvr2::IClosestSurfacePointQuery interface
+   *
+   * This interface allows plugins to query for the closest surface point on
+   * the mesh map's surface for any point in space.
+   */
+  std::shared_ptr<lvr2::IClosestSurfacePointQuery> closestPointQueryInterface() const
+  {
+      return closest_point_query_ptr;
   }
 
   /**
@@ -583,6 +595,9 @@ private:
 
   //! Shared Raycasting interface for layers/planners/controllers etc.
   std::shared_ptr<lvr2::RaycasterBase<RayCastResult>> raycaster_ptr;
+
+  //! Shared ClosestPointQuery interface uses the same backend as \ref raycaster_ptr if possible
+  std::shared_ptr<lvr2::IClosestSurfacePointQuery> closest_point_query_ptr;
 };
 
 } /* namespace mesh_map */

@@ -314,14 +314,19 @@ bool MeshMap::readMap()
     // than the native lvr2 implementation and therefore faster.
 #ifdef LVR2_USE_EMBREE
     RCLCPP_DEBUG(node->get_logger(), "Building lvr2::EmbreeRaycaster...");
-    raycaster_ptr = std::make_shared<lvr2::EmbreeRaycaster<RayCastResult>>(mesh_buffer);
+    const auto ptr = std::make_shared<lvr2::EmbreeRaycaster<RayCastResult>>(mesh_buffer);
+    raycaster_ptr = ptr;
+    closest_point_query_ptr = ptr;
     RCLCPP_DEBUG(node->get_logger(), "Finished building lvr2::EmbreeRaycaster");
 #else
     RCLCPP_DEBUG(node->get_logger(), "Building lvr2::BVHRaycaster...");
-    raycaster_ptr = std::make_shared<lvr2::BVHRaycaster<RayCastResult>>(mesh_buffer);
+    const auto ptr = std::make_shared<lvr2::BVHRaycaster<RayCastResult>>(mesh_buffer);
+    raycaster_ptr = ptr;
+    closest_point_query_ptr = ptr;
     RCLCPP_DEBUG(node->get_logger(), "Finished building lvr2::BVHRaycaster");
 #endif
     RCLCPP_INFO(node->get_logger(), "Initialized the raycasting interface");
+    RCLCPP_INFO(node->get_logger(), "Initialized the closest point query interface");
   }
   else
   {
@@ -1125,90 +1130,48 @@ boost::optional<std::tuple<           // returns:
       Vector& query_point,            // -> query point
       const float& max_dist)          // -> maximum search radius around query point
 {
-  auto vH_opt = getNearestVertexHandle(query_point);
-  if (!vH_opt)
-  {
-    RCLCPP_FATAL_STREAM(node->get_logger(), "Could not find the nearest vertex");
-    return boost::none;
-  }
-  const auto start_vH = vH_opt.unwrap();
 
-  float lowest_distance_found = std::numeric_limits<float>::max();
-  std::array<Vector, 3> closest_face_vertices;
-  std::array<float, 3> bary_coords_on_closest_face;
-  lvr2::OptionalFaceHandle opt_closest_face_handle;
+  const lvr2::Vector3f qp(
+    query_point.x,
+    query_point.y,
+    query_point.z
+  );
 
-  // no vertex / no face visited twice
-  std::vector<bool> visited_vertices(mesh_ptr->nextVertexIndex(), false);
-  std::vector<bool> checked_faces(mesh_ptr->nextFaceIndex(), false);
+  if (const auto opt = closest_point_query_ptr->getClosestPoint(qp)) {
+    const auto& result = opt.value();
 
-  // min-heap keyed on distance to query_point -> best-first / "sorted BFS"
-  using VertexDist = std::pair<float, lvr2::VertexHandle>;
-  auto cmp = [](const VertexDist& a, const VertexDist& b) { return a.first > b.first; };
-  std::priority_queue<VertexDist, std::vector<VertexDist>, decltype(cmp)> open(cmp);
-
-  const float start_dist = (mesh_ptr->getVertexPosition(start_vH) - query_point).length();
-  open.push({start_dist, start_vH});
-  visited_vertices[start_vH.idx()] = true;
-
-  while (!open.empty())
-  {
-    const auto [vertex_dist, vH] = open.top();
-    open.pop();
-
-    // everything remaining in the queue is at least this far away
-    if (vertex_dist > max_dist)
-    {
-      break;
+    // Check for max distance
+    const float dist = (result.point - qp).norm();
+    if (dist > max_dist) {
+      RCLCPP_WARN(
+        node->get_logger(),
+        "[MeshMap::searchContainingFace] Closest point distance exceeds max dist! Dist: %f Max Dist: %f",
+        dist, max_dist
+      );
+      return boost::none;
     }
 
-    // check all faces attached to this vertex
-    for (auto current_face_handle : mesh_ptr->getFacesOfVertex(vH))
-    {
-      if (checked_faces[current_face_handle.idx()])
-      {
-        continue;
-      }
-      checked_faces[current_face_handle.idx()] = true;
-
-      const auto& current_vertices = mesh_ptr->getVertexPositionsOfFace(current_face_handle);
-      float distance_to_current_face = 0;
-      std::array<float, 3> current_bary_coords;
-      const bool is_query_point_in_current_face = mesh_map::projectedBarycentricCoords(
-          query_point, current_vertices, current_bary_coords, distance_to_current_face);
-
-      if (is_query_point_in_current_face && distance_to_current_face < lowest_distance_found)
-      {
-        lowest_distance_found = distance_to_current_face;
-        opt_closest_face_handle = current_face_handle;
-        closest_face_vertices = current_vertices;
-        bary_coords_on_closest_face = current_bary_coords;
-      }
+    // Fetch vertices and compute barycentric coords
+    const Vector closest_point = result.point;
+    const std::array<Vector, 3> vertices = mesh_ptr->getVertexPositionsOfFace(result.face);
+    std::array<float, 3> bary = {0.0, 0.0, 0.0};
+    if (!mesh_map::barycentricCoords(
+        closest_point,
+        vertices[0], vertices[1], vertices[2],
+        bary[0], bary[1], bary[2]
+    )) {
+      RCLCPP_ERROR(
+        node->get_logger(),
+        "[MeshMap::searchContainingFace] Failed to calculate barycentric coordinates for closest surface point! Point: [%f, %f, %f] Face: %u",
+        closest_point.x, closest_point.y, closest_point.z, result.face.idx()
+      );
+      return boost::none;
     }
-
-    // expand frontier: sort neighbours of vH by distance implicitly via the heap
-    for (auto nH : mesh_ptr->getNeighboursOfVertex(vH))
-    {
-      if (visited_vertices[nH.idx()])
-      {
-        continue;
-      }
-      visited_vertices[nH.idx()] = true;
-
-      const float d = (mesh_ptr->getVertexPosition(nH) - query_point).length();
-      if (d <= max_dist)
-      {
-        open.push({d, nH});
-      }
-    }
+    // TODO: This API is stupid. We could just return the closest point!
+    return std::tuple(result.face, vertices, bary);
   }
 
-  if (opt_closest_face_handle)
-  {
-    return std::make_tuple(opt_closest_face_handle.unwrap(), closest_face_vertices, bary_coords_on_closest_face);
-  }
-
-  RCLCPP_ERROR_STREAM(node->get_logger(), "No containing face found!");
+  RCLCPP_ERROR(node->get_logger(), "[MeshMap::searchContainingFace] Failed to find containing face!");
   return boost::none;
 }
 
