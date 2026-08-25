@@ -405,32 +405,24 @@ void InflationLayer::waveCostInflation(
   // lethal vertex or from the end of a lethal strip.
   for (const auto lethal_vh : lethals)
   {
-    for (const auto neighbor_vh : pmp_mesh.vertices(lethal_vh))
-    {
-      if (fixed[neighbor_vh])
-      {
-        continue;
-      }
+    for (const auto halfedge: pmp_mesh.halfedges(lethal_vh)) {
+        const auto neighbor_vh = pmp_mesh.to_vertex(halfedge);
+        if (fixed[neighbor_vh]) {
+            continue;
+        }
+        float inf = INFINITY;
+        const float candidate = edge_distances.get(halfedge.edge()).value_or(inf);
+        if (!std::isfinite(candidate) || candidate > inflation_radius)
+        {
+            continue;
+        }
 
-      const auto edge = mesh->getEdgeBetween(lethal_vh, neighbor_vh);
-      if (!edge)
-      {
-        continue;
-      }
-
-      float inf = INFINITY;
-      const float candidate = edge_distances.get(edge.unwrap()).value_or(inf);
-      if (!std::isfinite(candidate) || candidate > inflation_radius)
-      {
-        continue;
-      }
-
-      const float current = distances_.get(neighbor_vh).value_or(inf);
-      if (candidate < current)
-      {
-        distances_.insert(neighbor_vh, candidate);
-        pq.insert(neighbor_vh, candidate);
-      }
+        const float current = distances_.get(neighbor_vh).value_or(inf);
+        if (candidate < current)
+        {
+            distances_.insert(neighbor_vh, candidate);
+            pq.insert(neighbor_vh, candidate);
+        }
     }
   }
 
