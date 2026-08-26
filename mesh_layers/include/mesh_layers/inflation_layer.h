@@ -117,11 +117,11 @@ public:
   /**
    * @brief fade cost value based on lethal and inscribed area
    *
-   * @param val input cost value
+   * @param distance input cost value
    *
    * @return resulting cost value
    */
-  float fading(const float squared_distance);
+  float fading(const float distance);
 
   /**
    * @brief inflate around lethal vertices by using an wave front propagation and assign riskiness values to vertices
