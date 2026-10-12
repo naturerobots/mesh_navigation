@@ -112,7 +112,7 @@ public:
    * @param max_dist The maximum distance to the triangle
    * @return Optional face handle, the optional is valid if a corresponding triangle has been found.
    */
-  lvr2::OptionalFaceHandle getContainingFace(Vector& position, const float& max_dist);
+  lvr2::OptionalFaceHandle getContainingFace(const Vector& position, const float& max_dist);
 
   /**
    * @brief Searches for a triangle which contains the given position with respect to the maximum distance
@@ -121,7 +121,7 @@ public:
    * @return optional tuple of the corresponding triangle, the triangle's vertices, and barycentric coordinates, if a corresponding triangle has been found.
    */
   boost::optional<std::tuple<lvr2::FaceHandle, std::array<mesh_map::Vector, 3>,
-    std::array<float, 3>>> searchContainingFace(Vector& position, const float& max_dist);
+    std::array<float, 3>>> searchContainingFace(const Vector& position, const float& max_dist);
 
   /**
    * @brief reconfigure callback function which is called if a parameter changes.

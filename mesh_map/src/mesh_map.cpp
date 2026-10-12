@@ -35,7 +35,6 @@
  *
  */
 #include <algorithm>
-#include <unordered_set>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -51,7 +50,9 @@
 #include <lvr2/geometry/Normal.hpp>
 #include <lvr2/algorithm/GeometryAlgorithms.hpp>
 #include <lvr2/algorithm/NormalAlgorithms.hpp>
+#include <lvr2/algorithm/pmp/BarycentricCoordinates.h>
 #include <lvr2/io/deprecated/hdf5/MeshIO.hpp>
+#include <lvr2/types/MatrixTypes.hpp>
 #include <lvr2/types/MeshBuffer.hpp>
 // Mesh structure for fast surface traversal
 #include <lvr2/geometry/PMPMesh.hpp>
@@ -1112,7 +1113,7 @@ bool MeshMap::meshAhead(mesh_map::Vector& pos, lvr2::FaceHandle& face, const flo
   return false;
 }
 
-lvr2::OptionalFaceHandle MeshMap::getContainingFace(Vector& position, const float& max_dist)
+lvr2::OptionalFaceHandle MeshMap::getContainingFace(const Vector& position, const float& max_dist)
 {
   auto search_result = searchContainingFace(position, max_dist);
   if(search_result)
@@ -1127,7 +1128,7 @@ boost::optional<std::tuple<           // returns:
     std::array<mesh_map::Vector, 3>,  // -> closest face vertices (why no handles?)
     std::array<float, 3>              // -> barycentric coords on closest face
     >> MeshMap::searchContainingFace( // inputs:
-      Vector& query_point,            // -> query point
+      const Vector& query_point,      // -> query point
       const float& max_dist)          // -> maximum search radius around query point
 {
 
@@ -1154,21 +1155,20 @@ boost::optional<std::tuple<           // returns:
     // Fetch vertices and compute barycentric coords
     const Vector closest_point = result.point;
     const std::array<Vector, 3> vertices = mesh_ptr->getVertexPositionsOfFace(result.face);
-    std::array<float, 3> bary = {0.0, 0.0, 0.0};
-    if (!mesh_map::barycentricCoords(
-        closest_point,
-        vertices[0], vertices[1], vertices[2],
-        bary[0], bary[1], bary[2]
-    )) {
-      RCLCPP_ERROR(
-        node->get_logger(),
-        "[MeshMap::searchContainingFace] Failed to calculate barycentric coordinates for closest surface point! Point: [%f, %f, %f] Face: %u",
-        closest_point.x, closest_point.y, closest_point.z, result.face.idx()
-      );
-      return boost::none;
-    }
-    // TODO: This API is stupid. We could just return the closest point!
-    return std::tuple(result.face, vertices, bary);
+
+    // NOTE: mesh_map::barycentricCoords(...) checks if the point is within the triangle. Per
+    // construction the closest point on the mesh surface HAS to be inside the closest triangle!
+    // However, sometimes the barycentricCoords(...) fails to compute the barycentric coordinates
+    // for the closest point. Therefore we use the pmp version here, which does not fail, but
+    // returns barycentric coordinates that can lie slightly outside of the triangle.
+    const lvr2::Vector3f cp = closest_point;
+    const lvr2::Vector3f a = vertices[0];
+    const lvr2::Vector3f b = vertices[1];
+    const lvr2::Vector3f c = vertices[2];
+    const lvr2::Vector3f bary = pmp::barycentric_coordinates(cp, a, b, c);
+
+    // NOTE: This API allows easy cost lookups with using the barycentric coordinates and vertex handles
+    return std::tuple(result.face, vertices, std::array{bary.x(), bary.y(), bary.z()});
   }
 
   RCLCPP_ERROR(node->get_logger(), "[MeshMap::searchContainingFace] Failed to find containing face!");
