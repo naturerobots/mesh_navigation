@@ -75,8 +75,23 @@ bool InflationLayer::writeLayer()
   // Since this is called by the map we do not need to check if this is successful
   const auto map = map_ptr_.lock();
 
+  // riskiness_ only holds values for vertices within the inflation radius.
+  // addDenseAttributeMap writes the values without their indices, so we have
+  // to store a value for every vertex to keep the channel aligned with the mesh.
+  const auto mesh = map->mesh();
+  lvr2::DenseVertexMap<float> costs;
+  costs.reserve(mesh->nextVertexIndex());
+  {
+    const auto rlock = this->readLock();
+    for (const lvr2::VertexHandle& v: mesh->vertices())
+    {
+      const auto cost = riskiness_.get(v);
+      costs.insert(v, cost ? *cost : this->defaultValue());
+    }
+  }
+
   auto mesh_io = map->meshIO();
-  if (mesh_io->addDenseAttributeMap(riskiness_, layer_name_))
+  if (mesh_io->addDenseAttributeMap(costs, layer_name_))
   {
     RCLCPP_INFO_STREAM(get_logger(), "Saved riskiness to map file.");
     return true;
